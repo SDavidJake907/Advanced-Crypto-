@@ -1,0 +1,830 @@
+{
+  "active_pairs": [
+    "BTC/USD",
+    "ETH/USD",
+    "XRP/USD",
+    "SOL/USD",
+    "ZEC/USD",
+    "DOGE/USD",
+    "SUI/USD",
+    "HBAR/USD",
+    "ADA/USD",
+    "PAXG/USD",
+    "LINK/USD",
+    "FET/USD",
+    "XMR/USD",
+    "DOT/USD",
+    "NEAR/USD",
+    "LTC/USD",
+    "DASH/USD",
+    "AVAX/USD",
+    "XLM/USD",
+    "UNI/USD",
+    "APT/USD",
+    "BCH/USD",
+    "TRX/USD",
+    "ICP/USD",
+    "AAVE/USD",
+    "FIL/USD",
+    "CRV/USD",
+    "ATOM/USD",
+    "ALGO/USD",
+    "QNT/USD",
+    "CVX/USD",
+    "GRT/USD",
+    "BAT/USD",
+    "INJ/USD",
+    "STX/USD",
+    "SYRUP/USD",
+    "AXS/USD",
+    "ETC/USD",
+    "HNT/USD",
+    "OP/USD",
+    "SAND/USD",
+    "MANA/USD",
+    "KSM/USD",
+    "COMP/USD"
+  ],
+  "updated_at": 1773711476,
+  "reason": "adds=['OP/USD', 'SAND/USD', 'MANA/USD', 'KSM/USD', 'COMP/USD'] removes=[]",
+  "meta": {
+    "phi3_scan": {
+      "watchlist": [
+        {
+          "symbol": "CVX/USD",
+          "tag": "trend_continuation",
+          "confidence": 1.0,
+          "reason": "heuristic_scan"
+        },
+        {
+          "symbol": "DOGE/USD",
+          "tag": "meme_breakout",
+          "confidence": 1.0,
+          "reason": "heuristic_scan"
+        },
+        {
+          "symbol": "GRT/USD",
+          "tag": "trend_continuation",
+          "confidence": 1.0,
+          "reason": "heuristic_scan"
+        },
+        {
+          "symbol": "NEAR/USD",
+          "tag": "trend_continuation",
+          "confidence": 1.0,
+          "reason": "heuristic_scan"
+        },
+        {
+          "symbol": "SYRUP/USD",
+          "tag": "trend_continuation",
+          "confidence": 1.0,
+          "reason": "heuristic_scan"
+        },
+        {
+          "symbol": "QNT/USD",
+          "tag": "early_acceleration",
+          "confidence": 1.0,
+          "reason": "heuristic_scan"
+        },
+        {
+          "symbol": "ADA/USD",
+          "tag": "trend_continuation",
+          "confidence": 1.0,
+          "reason": "heuristic_scan"
+        },
+        {
+          "symbol": "ALGO/USD",
+          "tag": "trend_continuation",
+          "confidence": 1.0,
+          "reason": "heuristic_scan"
+        },
+        {
+          "symbol": "BAT/USD",
+          "tag": "trend_continuation",
+          "confidence": 1.0,
+          "reason": "heuristic_scan"
+        },
+        {
+          "symbol": "BTC/USD",
+          "tag": "trend_continuation",
+          "confidence": 1.0,
+          "reason": "heuristic_scan"
+        }
+      ],
+      "market_note": "heuristic_scan"
+    },
+    "lane_supervision": [
+      {
+        "symbol": "CVX/USD",
+        "lane_candidate": "L1",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "trend_continuation"
+      },
+      {
+        "symbol": "DOGE/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "GRT/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "NEAR/USD",
+        "lane_candidate": "L1",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "trend_continuation"
+      },
+      {
+        "symbol": "SYRUP/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "QNT/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "ADA/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "ALGO/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "BAT/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "BTC/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "CRV/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "INJ/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "STX/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "XLM/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      },
+      {
+        "symbol": "XRP/USD",
+        "lane_candidate": "L4",
+        "lane_confidence": 0.8,
+        "lane_reason": "heuristic_lane_supervision",
+        "lane_conflict": true,
+        "narrative_tag": "early_acceleration"
+      }
+    ],
+    "news_context": {
+      "fng_value": 28,
+      "fng_label": "Fear",
+      "total_market_cap_usd": 2663481809617.596,
+      "btc_dominance": 56.99986534607231,
+      "market_cap_change_24h": 4.185876685168285,
+      "trending": [
+        {
+          "symbol": "FARTCOIN",
+          "change_24h": 26.91787078636811
+        },
+        {
+          "symbol": "ZEC",
+          "change_24h": 20.004456937440835
+        },
+        {
+          "symbol": "PENGU",
+          "change_24h": 7.686224502184848
+        },
+        {
+          "symbol": "HYPE",
+          "change_24h": 8.135844930436367
+        },
+        {
+          "symbol": "TAO",
+          "change_24h": 1.0450526450768656
+        },
+        {
+          "symbol": "BTC",
+          "change_24h": 4.401984227347841
+        },
+        {
+          "symbol": "SOL",
+          "change_24h": 4.214056581822896
+        },
+        {
+          "symbol": "ETH",
+          "change_24h": 8.514771516045856
+        },
+        {
+          "symbol": "PI",
+          "change_24h": -3.738282397871954
+        },
+        {
+          "symbol": "LINK",
+          "change_24h": 5.415136674475912
+        }
+      ]
+    },
+    "dex_context": {
+      "CVX/USD": {
+        "symbol": "CVX/USD",
+        "chain_id": "solana",
+        "dex_id": "raydium",
+        "pair_address": "EHDNWGxdwAWEo9u7oTEWYVPT1Aj1ym2fX96ppcoWfzUt",
+        "price_usd": 2.25,
+        "volume_24h": 3.99,
+        "liquidity_usd": 219715286.53,
+        "price_change_24h": 0.0,
+        "pair_url": "https://dexscreener.com/solana/ehdnwgxdwaweo9u7otewyvpt1aj1ym2fx96ppcowfzut"
+      },
+      "DOGE/USD": {
+        "symbol": "DOGE/USD",
+        "chain_id": "bsc",
+        "dex_id": "pancakeswap",
+        "pair_address": "0xC8469Ec692BC80a4a4ee702667c698B7632dedc7",
+        "price_usd": 0.1032,
+        "volume_24h": 17.94,
+        "liquidity_usd": 6227055.88,
+        "price_change_24h": 5.01,
+        "pair_url": "https://dexscreener.com/bsc/0xc8469ec692bc80a4a4ee702667c698b7632dedc7"
+      },
+      "GRT/USD": {
+        "symbol": "GRT/USD",
+        "chain_id": "solana",
+        "dex_id": "raydium",
+        "pair_address": "7pnU5cp9XQs5RuM21cgtfv9eCxHjeuCVwXTQVGFtZ5fC",
+        "price_usd": 0.119,
+        "volume_24h": 3.99,
+        "liquidity_usd": 1168944923.15,
+        "price_change_24h": 0.0,
+        "pair_url": "https://dexscreener.com/solana/7pnu5cp9xqs5rum21cgtfv9ecxhjeucvwxtqvgftz5fc"
+      },
+      "NEAR/USD": {
+        "symbol": "NEAR/USD",
+        "chain_id": "solana",
+        "dex_id": "meteora",
+        "pair_address": "8zEGz35kypZCaXKNarzsVTc8sWu7k9Bi2AjzfZiBYUEG",
+        "price_usd": 5.21,
+        "volume_24h": 3.99,
+        "liquidity_usd": 6101379817.9,
+        "price_change_24h": -0.04,
+        "pair_url": "https://dexscreener.com/solana/8zegz35kypzcaxknarzsvtc8swu7k9bi2ajzfzibyueg"
+      },
+      "SYRUP/USD": {
+        "symbol": "SYRUP/USD",
+        "chain_id": "solana",
+        "dex_id": "raydium",
+        "pair_address": "HBw2eTi4EYS6kE8V79s7Bm17GdECLHVmsUkYFUtuXkEr",
+        "price_usd": 0.5087,
+        "volume_24h": 3.99,
+        "liquidity_usd": 541283155.47,
+        "price_change_24h": 0.0,
+        "pair_url": "https://dexscreener.com/solana/hbw2eti4eys6ke8v79s7bm17gdeclhvmsukyfutuxker"
+      },
+      "QNT/USD": {
+        "symbol": "QNT/USD",
+        "chain_id": "solana",
+        "dex_id": "meteora",
+        "pair_address": "6C2Evquk6GyTfy4Z2iApo1ga92hUAbkiQYr2EqQes2YH",
+        "price_usd": 109.23,
+        "volume_24h": 3.99,
+        "liquidity_usd": 1624499894.19,
+        "price_change_24h": -0.02,
+        "pair_url": "https://dexscreener.com/solana/6c2evquk6gytfy4z2iapo1ga92huabkiqyr2eqqes2yh"
+      },
+      "ADA/USD": {
+        "symbol": "ADA/USD",
+        "chain_id": "solana",
+        "dex_id": "raydium",
+        "pair_address": "C3GRjM1i7H8yycDBTp3wDpgdt8kEaJ5Fhn8tWZAj3p6d",
+        "price_usd": 0.3993,
+        "volume_24h": 40091.99,
+        "liquidity_usd": 5990693.87,
+        "price_change_24h": -0.12,
+        "pair_url": "https://dexscreener.com/solana/c3grjm1i7h8yycdbtp3wdpgdt8keaj5fhn8twzaj3p6d"
+      },
+      "ALGO/USD": {
+        "symbol": "ALGO/USD",
+        "chain_id": "solana",
+        "dex_id": "meteora",
+        "pair_address": "3iCsbkaW3rAgiS9U6qdy4gHzdTLpMRMe9EH3PCS1YSJA",
+        "price_usd": 0.2873,
+        "volume_24h": 3.99,
+        "liquidity_usd": 2872151053.62,
+        "price_change_24h": -0.02,
+        "pair_url": "https://dexscreener.com/solana/3icsbkaw3ragis9u6qdy4ghzdtlpmrme9eh3pcs1ysja"
+      },
+      "BAT/USD": {
+        "symbol": "BAT/USD",
+        "chain_id": "solana",
+        "dex_id": "orca",
+        "pair_address": "AB9TLW7jBzbFysiGg7NdfQJhisFAuP35A9fEWwP81Aq9",
+        "price_usd": 0.2142,
+        "volume_24h": 3.99,
+        "liquidity_usd": 319386508.87,
+        "price_change_24h": -0.04,
+        "pair_url": "https://dexscreener.com/solana/ab9tlw7jbzbfysigg7ndfqjhisfaup35a9fewwp81aq9"
+      },
+      "BTC/USD": {
+        "symbol": "BTC/USD",
+        "chain_id": "solana",
+        "dex_id": "raydium",
+        "pair_address": "4S8dBxKb6Myb4nJDwbvTMVcEoRd3PyiYQjApjYK7PZ57",
+        "price_usd": 64993.74,
+        "volume_24h": 3.99,
+        "liquidity_usd": 6500661845.04,
+        "price_change_24h": 0.0,
+        "pair_url": "https://dexscreener.com/solana/4s8dbxkb6myb4njdwbvtmvceord3pyiyqjapjyk7pz57"
+      },
+      "CRV/USD": {
+        "symbol": "CRV/USD",
+        "chain_id": "solana",
+        "dex_id": "meteora",
+        "pair_address": "57yjD8nryLRatAv7kocanwFc8YVRztQppC9tvpeJTV3D",
+        "price_usd": 0.9854,
+        "volume_24h": 3.99,
+        "liquidity_usd": 2985087195.37,
+        "price_change_24h": -0.02,
+        "pair_url": "https://dexscreener.com/solana/57yjd8nrylratav7kocanwfc8yvrztqppc9tvpejtv3d"
+      },
+      "INJ/USD": {
+        "symbol": "INJ/USD",
+        "chain_id": "solana",
+        "dex_id": "raydium",
+        "pair_address": "EAJqYgRhYXa2sNYANbWtMrYETqQAXbpfax9DUEhdioQB",
+        "price_usd": 25.89,
+        "volume_24h": 3.99,
+        "liquidity_usd": 2562297865.45,
+        "price_change_24h": 0.0,
+        "pair_url": "https://dexscreener.com/solana/eajqygrhyxa2snyanbwtmryetqqaxbpfax9duehdioqb"
+      },
+      "STX/USD": {
+        "symbol": "STX/USD",
+        "chain_id": "solana",
+        "dex_id": "meteora",
+        "pair_address": "CHBQasdCobL5oe19mDQzBpAFWbar8E1qzvvFMDjfYCc5",
+        "price_usd": 0.8884,
+        "volume_24h": 3.99,
+        "liquidity_usd": 1614183360.82,
+        "price_change_24h": -0.02,
+        "pair_url": "https://dexscreener.com/solana/chbqasdcobl5oe19mdqzbpafwbar8e1qzvvfmdjfycc5"
+      },
+      "XLM/USD": {
+        "symbol": "XLM/USD",
+        "chain_id": "solana",
+        "dex_id": "raydium",
+        "pair_address": "8aTRZyt4LabPsKob1omzRSYqdqG3T9uSX17iK9HVrqN2",
+        "price_usd": 0.2256,
+        "volume_24h": 40181.99,
+        "liquidity_usd": 6770560.26,
+        "price_change_24h": -0.11,
+        "pair_url": "https://dexscreener.com/solana/8atrzyt4labpskob1omzrsyqdqg3t9usx17ik9hvrqn2"
+      },
+      "XRP/USD": {
+        "symbol": "XRP/USD",
+        "chain_id": "solana",
+        "dex_id": "raydium",
+        "pair_address": "J56aBqVXDzeUzL8b1nfU8ywGkSWmEwUcQ4GJgKvuC9Pn",
+        "price_usd": 1.43,
+        "volume_24h": 65923.8,
+        "liquidity_usd": 64435135.31,
+        "price_change_24h": -0.01,
+        "pair_url": "https://dexscreener.com/solana/j56abqvxdzeuzl8b1nfu8ywgkswmewucq4gjgkvuc9pn"
+      }
+    },
+    "buckets": {
+      "leaders": [
+        "CVX/USD",
+        "DOGE/USD",
+        "GRT/USD",
+        "NEAR/USD",
+        "SYRUP/USD",
+        "QNT/USD",
+        "ADA/USD",
+        "ALGO/USD",
+        "BAT/USD",
+        "BTC/USD",
+        "CRV/USD",
+        "INJ/USD",
+        "STX/USD",
+        "XLM/USD",
+        "XRP/USD",
+        "AVAX/USD",
+        "AXS/USD",
+        "LTC/USD",
+        "HNT/USD",
+        "ETC/USD",
+        "OP/USD",
+        "HBAR/USD",
+        "SAND/USD",
+        "DASH/USD",
+        "ETH/USD",
+        "AAVE/USD",
+        "MANA/USD"
+      ],
+      "emerging": [],
+      "meme_heat": [
+        "DOGE/USD"
+      ],
+      "reversion_candidates": [
+        "SOL/USD",
+        "ICP/USD",
+        "FET/USD",
+        "BCH/USD",
+        "DOT/USD",
+        "SUI/USD",
+        "ATOM/USD",
+        "XMR/USD",
+        "APT/USD",
+        "UNI/USD",
+        "KSM/USD",
+        "ZEC/USD",
+        "FIL/USD"
+      ],
+      "losers": []
+    },
+    "top_ranked": [
+      "CVX/USD",
+      "DOGE/USD",
+      "GRT/USD",
+      "NEAR/USD",
+      "SYRUP/USD",
+      "QNT/USD",
+      "ADA/USD",
+      "ALGO/USD",
+      "BAT/USD",
+      "BTC/USD"
+    ],
+    "top_scored": [
+      {
+        "symbol": "CVX/USD",
+        "lane": "L1",
+        "candidate_score": 100.0,
+        "recommendation": "STRONG_BUY",
+        "risk": "LOW",
+        "reasons": [
+          "volume_expansion",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "DOGE/USD",
+        "lane": "L4",
+        "candidate_score": 100.0,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "lane4_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "GRT/USD",
+        "lane": "L1",
+        "candidate_score": 100.0,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "NEAR/USD",
+        "lane": "L1",
+        "candidate_score": 100.0,
+        "recommendation": "STRONG_BUY",
+        "risk": "LOW",
+        "reasons": [
+          "volume_expansion",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "SYRUP/USD",
+        "lane": "L1",
+        "candidate_score": 100.0,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "QNT/USD",
+        "lane": "L1",
+        "candidate_score": 92.68,
+        "recommendation": "AVOID",
+        "risk": "HIGH",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "ADA/USD",
+        "lane": "L1",
+        "candidate_score": 91.49,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "ALGO/USD",
+        "lane": "L1",
+        "candidate_score": 88.0,
+        "recommendation": "WATCH",
+        "risk": "MEDIUM",
+        "reasons": [
+          "overbought_penalty",
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_rsi_hot",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "BAT/USD",
+        "lane": "L1",
+        "candidate_score": 88.0,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "overbought_penalty",
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_vol_low",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "BTC/USD",
+        "lane": "L1",
+        "candidate_score": 88.0,
+        "recommendation": "AVOID",
+        "risk": "HIGH",
+        "reasons": [
+          "overbought_penalty",
+          "fast_momentum",
+          "volume_expansion",
+          "rotation_leader",
+          "lane1_rsi_hot",
+          "unknown"
+        ]
+      }
+    ],
+    "hot_candidates": [
+      {
+        "symbol": "CVX/USD",
+        "lane": "L1",
+        "candidate_score": 100.0,
+        "recommendation": "STRONG_BUY",
+        "risk": "LOW",
+        "reasons": [
+          "volume_expansion",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "DOGE/USD",
+        "lane": "L4",
+        "candidate_score": 100.0,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "lane4_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "GRT/USD",
+        "lane": "L1",
+        "candidate_score": 100.0,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "NEAR/USD",
+        "lane": "L1",
+        "candidate_score": 100.0,
+        "recommendation": "STRONG_BUY",
+        "risk": "LOW",
+        "reasons": [
+          "volume_expansion",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "SYRUP/USD",
+        "lane": "L1",
+        "candidate_score": 100.0,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "ADA/USD",
+        "lane": "L1",
+        "candidate_score": 91.49,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "BAT/USD",
+        "lane": "L1",
+        "candidate_score": 88.0,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "overbought_penalty",
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_vol_low",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "AXS/USD",
+        "lane": "L1",
+        "candidate_score": 87.23,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "vol_low",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "LTC/USD",
+        "lane": "L1",
+        "candidate_score": 86.56,
+        "recommendation": "BUY",
+        "risk": "MEDIUM",
+        "reasons": [
+          "overbought_penalty",
+          "volume_expansion",
+          "rotation_leader",
+          "lane1_rsi_hot",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "ETC/USD",
+        "lane": "L1",
+        "candidate_score": 85.09,
+        "recommendation": "STRONG_BUY",
+        "risk": "LOW",
+        "reasons": [
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      }
+    ],
+    "avoid_candidates": [
+      {
+        "symbol": "ZEC/USD",
+        "lane": "L3",
+        "candidate_score": 61.9,
+        "recommendation": "AVOID",
+        "risk": "HIGH",
+        "reasons": [
+          "overbought_penalty",
+          "rotation_leader",
+          "lane3_rsi_hot",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "BTC/USD",
+        "lane": "L1",
+        "candidate_score": 88.0,
+        "recommendation": "AVOID",
+        "risk": "HIGH",
+        "reasons": [
+          "overbought_penalty",
+          "fast_momentum",
+          "volume_expansion",
+          "rotation_leader",
+          "lane1_rsi_hot",
+          "unknown"
+        ]
+      },
+      {
+        "symbol": "QNT/USD",
+        "lane": "L1",
+        "candidate_score": 92.68,
+        "recommendation": "AVOID",
+        "risk": "HIGH",
+        "reasons": [
+          "fast_momentum",
+          "rotation_leader",
+          "lane1_ok",
+          "unknown"
+        ]
+      }
+    ]
+  }
+}

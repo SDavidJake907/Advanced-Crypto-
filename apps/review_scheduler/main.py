@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+import json
+import os
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from dotenv import load_dotenv
+
+from core.config.runtime import get_runtime_snapshot, update_runtime_overrides
+from core.llm.client import nvidia_nemotron_chat, parse_json_response
+from core.llm.prompts import NVIDIA_OPTIMIZER_SYSTEM_PROMPT
+from core.memory.kraken_history import build_history_review_block
+from core.memory.trade_memory import TradeMemoryStore
+from core.runtime.log_rotation import rotate_jsonl_if_needed
+from core.state.store import load_universe
+
+load_dotenv()
+
+ROOT = Path(__file__).resolve().parents[2]
+REVIEW_LOG = ROOT / "logs" / "nvidia_optimizer_reviews.jsonl"
+
+
+def _bool_env(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _read_jsonl_tail(path: Path, limit: int) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    items: list[dict[str, Any]] = []
+    from collections import deque
+
+    recent_lines: deque[str] = deque(maxlen=limit)
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip():
+                recent_lines.append(line)
+    for line in recent_lines:
+        try:
+            payload = json.loads(line)
+            if isinstance(payload, dict):
+                items.append(payload)
+        except Exception:
+            continue
+    return items
+
+
+def _append_review(event: dict[str, Any]) -> None:
+    REVIEW_LOG.parent.mkdir(parents=True, exist_ok=True)
+    rotate_jsonl_if_needed(REVIEW_LOG)
+    payload = {"ts": datetime.now(timezone.utc).isoformat(), **event}
+    with REVIEW_LOG.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload) + "\n")
+
+
+def _allowed_override_keys() -> set[str]:
+    return set(get_runtime_snapshot()["values"].keys())
+
+
+def _build_payload() -> dict[str, Any]:
+    trade_zip = os.getenv("KRAKEN_TRADE_HISTORY_ZIP", "").strip()
+    memory_block = TradeMemoryStore().build_memory_block()
+    history_block = build_history_review_block(trade_zip) if trade_zip else ""
+    return {
+        "runtime": get_runtime_snapshot()["values"],
+        "universe": load_universe().get("meta", {}),
+        "recent_decision_debug": _read_jsonl_tail(ROOT / "logs" / "decision_debug.jsonl", 20),
+        "recent_nemotron_debug": _read_jsonl_tail(ROOT / "logs" / "nemotron_debug.jsonl", 20),
+        "trade_memory": memory_block,
+        "history_review": history_block,
+    }
+
+
+def _run_once() -> None:
+    payload = _build_payload()
+    raw = nvidia_nemotron_chat(
+        payload,
+        system=NVIDIA_OPTIMIZER_SYSTEM_PROMPT,
+        max_tokens=1200,
+        model=os.getenv("NVIDIA_OPTIMIZER_MODEL", os.getenv("NVIDIA_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1.5")),
+    )
+    parsed = parse_json_response(raw)
+    updates = parsed.get("recommended_overrides", {})
+    if not isinstance(updates, dict):
+        updates = {}
+    allowed = _allowed_override_keys()
+    filtered_updates = {key: value for key, value in updates.items() if key in allowed}
+    applied: dict[str, Any] = {}
+    if _bool_env("NVIDIA_OPTIMIZER_APPLY", False) and filtered_updates:
+        applied = update_runtime_overrides(filtered_updates)
+    _append_review(
+        {
+            "summary": parsed.get("summary", ""),
+            "issues": parsed.get("issues", []),
+            "recommended_overrides": filtered_updates,
+            "applied_overrides": applied,
+            "confidence": parsed.get("confidence", 0.0),
+        }
+    )
+
+
+def main() -> None:
+    if not _bool_env("NVIDIA_OPTIMIZER_ENABLED", True):
+        print("NVIDIA optimizer disabled.")
+        return
+    if not os.getenv("NVIDIA_API_KEY", "").strip():
+        print("NVIDIA optimizer skipped: NVIDIA_API_KEY not set.")
+        return
+    interval_min = max(int(os.getenv("NVIDIA_OPTIMIZER_INTERVAL_MIN", "30")), 5)
+    print(f"NVIDIA optimizer scheduler running every {interval_min} minutes.")
+    while True:
+        try:
+            _run_once()
+        except Exception as exc:
+            _append_review({"summary": "optimizer_error", "issues": [str(exc)], "recommended_overrides": {}, "applied_overrides": {}, "confidence": 0.0})
+        time.sleep(interval_min * 60)
+
+
+if __name__ == "__main__":
+    main()

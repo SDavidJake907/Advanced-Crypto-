@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KrakenSK Operator UI</title>
+  <style>
+    :root {
+      --bg: #081018;
+      --panel: #0f1b28;
+      --panel-2: #122235;
+      --line: #21364c;
+      --text: #e7eef7;
+      --muted: #8ea3bb;
+      --accent: #35c4ff;
+      --accent-2: #0de7b5;
+      --warn: #ffb545;
+      --bad: #ff6a6a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(53, 196, 255, 0.12), transparent 28%),
+        radial-gradient(circle at left center, rgba(13, 231, 181, 0.08), transparent 22%),
+        linear-gradient(180deg, #081018 0%, #06111c 100%);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0.02em;
+    }
+    .sub {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 14px;
+    }
+    .status {
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      background: rgba(18, 34, 53, 0.9);
+      border-radius: 14px;
+      color: var(--muted);
+      min-width: 220px;
+      text-align: right;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+    }
+    .card {
+      background: rgba(15, 27, 40, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    }
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+    .kpi-label {
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+    }
+    .kpi-value {
+      margin-top: 10px;
+      font-size: 32px;
+      font-weight: 700;
+    }
+    .kpi-sub {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .heading h2 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      text-align: left;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .mono { font-family: Consolas, monospace; }
+    .good { color: var(--accent-2); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .muted { color: var(--muted); }
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+    .row {
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(18, 34, 53, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .row-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .split {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    pre {
+      margin: 0;
+      padding: 12px;
+      background: rgba(6, 17, 28, 0.9);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      overflow: auto;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    @media (max-width: 1100px) {
+      .span-3, .span-4, .span-5, .span-6, .span-7, .span-8 { grid-column: span 12; }
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .status { text-align: left; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>KrakenSK Mission Control</h1>
+        <div class="sub">Live operator view backed by repo logs and runtime state.</div>
+      </div>
+      <div class="status">
+        <div id="lastRefresh">Connecting...</div>
+        <div class="small" id="healthLine">Waiting for first status payload</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card span-3">
+        <div class="kpi-label">Cash</div>
+        <div class="kpi-value" id="cashUsd">$0.00</div>
+        <div class="kpi-sub" id="dustCount">Dust positions: 0</div>
+      </div>
+      <div class="card span-3">
+        <div class="kpi-label">Initial Equity</div>
+        <div class="kpi-value" id="equityUsd">$0.00</div>
+        <div class="kpi-sub" id="positionCount">Open positions: 0</div>
+      </div>
+      <div class="card span-3">
+        <div class="kpi-label">Active Universe</div>
+        <div class="kpi-value" id="activeCount">0</div>
+        <div class="kpi-sub" id="laneSupervisionCount">Lane reviews: 0</div>
+      </div>
+      <div class="card span-3">
+        <div class="kpi-label">Latest Total Latency</div>
+        <div class="kpi-value" id="totalMs">0 ms</div>
+        <div class="kpi-sub" id="advisoryMs">Advisory: 0 ms</div>
+      </div>
+
+      <div class="card span-4">
+        <div class="kpi-label">Book Value</div>
+        <div class="kpi-value" id="bookValueUsd">$0.00</div>
+        <div class="kpi-sub" id="bookPnl">Open-book delta: $0.00</div>
+      </div>
+      <div class="card span-4">
+        <div class="kpi-label">Accounting Confidence</div>
+        <div class="kpi-value" id="accountingConfidence">LOW</div>
+        <div class="kpi-sub" id="accountingReasons">Waiting for accounting signals</div>
+      </div>
+      <div class="card span-4">
+        <div class="kpi-label">Known Filled Buys</div>
+        <div class="kpi-value" id="knownFilledBuys">0</div>
+        <div class="kpi-sub" id="knownFillsSub">Filled sells: 0 | Open orders: 0</div>
+      </div>
+
+      <div class="card span-7">
+        <div class="heading">
+          <h2>Open Positions</h2>
+          <div class="pill" id="positionsPill">0 tracked</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Units</th>
+              <th>Weight</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody id="positionsBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card span-5">
+        <div class="heading">
+          <h2>Decision Snapshot</h2>
+          <div class="pill" id="latestSymbol">No symbol</div>
+        </div>
+        <div class="list">
+          <div class="row">
+            <div class="split">
+              <div class="row-title" id="latestAction">HOLD</div>
+              <div class="small" id="latestLane">lane --</div>
+            </div>
+            <div class="small" id="latestReason">No recent decision</div>
+          </div>
+          <div class="row">
+            <div class="split"><span>Market state</span><span id="marketState" class="good">--</span></div>
+            <div class="split"><span>Posture</span><span id="posture" class="warn">--</span></div>
+            <div class="split"><span>Entry recommendation</span><span id="entryRec">--</span></div>
+            <div class="split"><span>Reversal risk</span><span id="reversalRisk">--</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card span-6">
+        <div class="heading">
+          <h2>Visual Phil</h2>
+          <div class="pill" id="visualDevice">device --</div>
+        </div>
+        <div class="list">
+          <div class="row">
+            <div class="split">
+              <div class="row-title" id="visualState">No visual review</div>
+              <div class="small" id="visualLatency">0 ms</div>
+            </div>
+            <div class="small" id="visualReason">Waiting for feed</div>
+          </div>
+          <div class="row">
+            <div class="split"><span>Setup quality</span><span id="visualSetup">--</span></div>
+            <div class="split"><span>Risk</span><span id="visualRisk">--</span></div>
+            <div class="split"><span>Range warning</span><span id="visualRange">--</span></div>
+            <div class="split"><span>Overextension</span><span id="visualOver">--</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card span-6">
+        <div class="heading">
+          <h2>Collector + Diagnostics</h2>
+          <div class="pill" id="collectorStatus">collector --</div>
+        </div>
+        <div class="list">
+          <div class="row">
+            <div class="split"><span>Processed bars</span><span id="processedBars">0</span></div>
+            <div class="split"><span>Invalid volume</span><span id="invalidVolume">0</span></div>
+            <div class="split"><span>Dropped unknown</span><span id="droppedUnknown">0</span></div>
+            <div class="split"><span>Trade history sync</span><span id="tradeHistoryStatus" class="warn">pending</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card span-6">
+        <div class="heading">
+          <h2>Top Nemo Reasons</h2>
+          <div class="pill">last 12 decisions</div>
+        </div>
+        <div class="list" id="reasonList"></div>
+      </div>
+
+      <div class="card span-6">
+        <div class="heading">
+          <h2>Lane Mix</h2>
+          <div class="pill">recent trade identity</div>
+        </div>
+        <div class="list" id="laneMetricsList"></div>
+      </div>
+
+      <div class="card span-6">
+        <div class="heading">
+          <h2>Optimizer Reviews</h2>
+          <div class="pill">recent cloud notes</div>
+        </div>
+        <div class="list" id="optimizerList"></div>
+      </div>
+
+      <div class="card span-6">
+        <div class="heading">
+          <h2>Universe Leaders</h2>
+          <div class="pill" id="fearGreedPill">F&G --</div>
+        </div>
+        <div class="list" id="topScoredList"></div>
+      </div>
+
+      <div class="card span-6">
+        <div class="heading">
+          <h2>Watchlist + Hot</h2>
+          <div class="pill" id="laneConflictPill">conflicts 0</div>
+        </div>
+        <div class="list" id="watchlistList"></div>
+      </div>
+
+      <div class="card span-12">
+        <div class="heading">
+          <h2>Collector Depth</h2>
+          <div class="pill">bar readiness</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>1m</th>
+              <th>1h</th>
+              <th>7d</th>
+              <th>30d</th>
+            </tr>
+          </thead>
+          <tbody id="collectorDepthBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card span-12">
+        <div class="heading">
+          <h2>Known Entry Ledger</h2>
+          <div class="pill">open_orders.json + sync</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Qty</th>
+              <th>Entry Price</th>
+              <th>Notional</th>
+            </tr>
+          </thead>
+          <tbody id="entryLedgerBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card span-12">
+        <div class="heading">
+          <h2>Recent Decisions</h2>
+          <div class="pill mono">/api/status</div>
+        </div>
+        <pre id="recentDecisions">[]</pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function refreshStatus() {
+      const response = await fetch('/api/status', { cache: 'no-store' });
+      const data = await response.json();
+
+      document.getElementById('lastRefresh').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+      document.getElementById('healthLine').textContent =
+        `${data.universe.active_count} active pairs | ${data.portfolio.position_count} tracked positions`;
+
+      document.getElementById('cashUsd').textContent = `$${(data.portfolio.cash_usd || 0).toFixed(2)}`;
+      document.getElementById('equityUsd').textContent = `$${(data.portfolio.initial_equity_usd || 0).toFixed(2)}`;
+      document.getElementById('dustCount').textContent = `Dust positions: ${data.portfolio.dust_count || 0}`;
+      document.getElementById('positionCount').textContent = `Open positions: ${data.portfolio.position_count || 0}`;
+      document.getElementById('activeCount').textContent = data.universe.active_count || 0;
+      document.getElementById('laneSupervisionCount').textContent =
+        `Lane reviews: ${data.universe.lane_supervision_count || 0}`;
+
+      const timings = data.diagnostics.latest_timings || {};
+      document.getElementById('totalMs').textContent = `${Math.round(timings.total_ms || 0)} ms`;
+      document.getElementById('advisoryMs').textContent = `Advisory: ${Math.round(timings.advisory_ms || 0)} ms`;
+
+      const accounting = data.accounting || {};
+      const openPnl = Number(accounting.open_pnl_usd || 0);
+      document.getElementById('bookValueUsd').textContent = `$${Number(accounting.book_value_usd || 0).toFixed(2)}`;
+      document.getElementById('bookPnl').textContent =
+        `Open-book delta: ${openPnl >= 0 ? '+' : ''}$${openPnl.toFixed(2)} vs baseline`;
+      document.getElementById('accountingConfidence').textContent = String(accounting.confidence || 'unknown').toUpperCase();
+      document.getElementById('accountingReasons').textContent =
+        (accounting.confidence_reasons || []).join(' | ') || 'Entry basis and realized flow available';
+      document.getElementById('knownFilledBuys').textContent = accounting.known_filled_buys || 0;
+      document.getElementById('knownFillsSub').textContent =
+        `Filled sells: ${accounting.known_filled_sells || 0} | Open orders: ${accounting.open_orders || 0}`;
+
+      const positions = data.portfolio.positions || [];
+      document.getElementById('positionsPill').textContent = `${positions.length} tracked`;
+      document.getElementById('positionsBody').innerHTML = positions.length
+        ? positions.map((item) => `
+            <tr>
+              <td>${item.symbol}</td>
+              <td>${item.side}</td>
+              <td class="mono">${Number(item.units || 0).toFixed(6)}</td>
+              <td>${(Number(item.weight || 0) * 100).toFixed(1)}%</td>
+              <td>$${Number(item.value_usd || 0).toFixed(2)}</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="5" class="muted">No tracked positions</td></tr>';
+
+      const latest = data.latest_decision || {};
+      const nemotron = latest.nemotron || {};
+      document.getElementById('latestSymbol').textContent = latest.symbol || 'No symbol';
+      document.getElementById('latestAction').textContent = nemotron.action || 'HOLD';
+      document.getElementById('latestLane').textContent = `lane ${latest.lane || '--'}`;
+      document.getElementById('latestReason').textContent = nemotron.reason || 'No recent reason';
+      document.getElementById('marketState').textContent =
+        (data.diagnostics.latest_market_state || {}).market_state || '--';
+      document.getElementById('posture').textContent =
+        (data.diagnostics.latest_posture || {}).posture || '--';
+      document.getElementById('entryRec').textContent = latest.entry_recommendation || '--';
+      document.getElementById('reversalRisk').textContent = latest.reversal_risk || '--';
+
+      const visual = (data.latest_visual_review || {}).review || {};
+      document.getElementById('visualDevice').textContent = `device ${visual.device || '--'}`;
+      document.getElementById('visualState').textContent = visual.chart_state || 'No visual review';
+      document.getElementById('visualLatency').textContent = `${Math.round(visual.latency_ms || 0)} ms`;
+      document.getElementById('visualReason').textContent = visual.reason || 'Waiting for feed';
+      document.getElementById('visualSetup').textContent = visual.setup_quality || '--';
+      document.getElementById('visualRisk').textContent = visual.visual_risk || '--';
+      document.getElementById('visualRange').textContent = visual.range_warning || '--';
+      document.getElementById('visualOver').textContent = visual.overextension_warning || '--';
+
+      const collector = data.collector.telemetry || {};
+      document.getElementById('collectorStatus').textContent = data.collector.status || 'missing';
+      document.getElementById('processedBars').textContent = collector.processed || 0;
+      document.getElementById('invalidVolume').textContent = collector.invalid_volume || 0;
+      document.getElementById('droppedUnknown').textContent = collector.dropped_unknown_symbol || 0;
+      document.getElementById('tradeHistoryStatus').textContent =
+        data.diagnostics.trades_history_error ? 'invalid key' : 'ok';
+
+      const reasons = data.decision_summary.reasons || [];
+      document.getElementById('reasonList').innerHTML = reasons.length
+        ? reasons.map((item) => `
+            <div class="row">
+              <div class="split">
+                <div class="row-title">${item.reason}</div>
+                <div class="small">${item.count}</div>
+              </div>
+            </div>
+          `).join('')
+        : '<div class="row"><div class="small">No decision reasons yet</div></div>';
+      if (reasons.length) {
+        document.getElementById('reasonList').innerHTML += `
+          <div class="row">
+            <div class="split"><span>Fallback holds</span><span>${data.decision_summary.fallback_holds || 0}</span></div>
+            <div class="split"><span>Range blocks</span><span>${data.decision_summary.range_blocks || 0}</span></div>
+          </div>
+        `;
+      }
+
+      const laneMetrics = (data.lane_metrics || {}).lanes || [];
+      document.getElementById('laneMetricsList').innerHTML = laneMetrics.length
+        ? laneMetrics.map((item) => `
+            <div class="row">
+              <div class="split">
+                <div class="row-title">${item.lane}</div>
+                <div class="small">${item.total} decisions</div>
+              </div>
+              <div class="small">opens ${item.opens} | blocked ${item.blocked} | holds ${item.holds} | no-trade ${item.no_trade}</div>
+              <div class="small">${(item.top_reasons || []).map((reason) => `${reason.reason} (${reason.count})`).join(' | ') || 'no dominant reason'}</div>
+            </div>
+          `).join('')
+        : '<div class="row"><div class="small">No lane metrics yet</div></div>';
+
+      const reviews = data.optimizer_reviews || [];
+      document.getElementById('optimizerList').innerHTML = reviews.length
+        ? reviews.map((item) => `
+            <div class="row">
+              <div class="row-title">${item.summary || item.title || 'Review'}</div>
+              <div class="small">${item.ts || item.when || 'recent'}</div>
+            </div>
+          `).join('')
+        : '<div class="row"><div class="small">No optimizer reviews found</div></div>';
+
+      const universeSummary = data.universe_summary || {};
+      const fearGreed = universeSummary.fear_greed || {};
+      document.getElementById('fearGreedPill').textContent =
+        fearGreed.label ? `F&G ${fearGreed.value} ${fearGreed.label}` : 'F&G --';
+      document.getElementById('laneConflictPill').textContent =
+        `conflicts ${universeSummary.lane_conflicts || 0}`;
+
+      const topScored = universeSummary.top_scored || [];
+      document.getElementById('topScoredList').innerHTML = topScored.length
+        ? topScored.map((item) => `
+            <div class="row">
+              <div class="split">
+                <div class="row-title">${item.symbol}</div>
+                <div class="small">${Number(item.candidate_score || 0).toFixed(2)}</div>
+              </div>
+              <div class="small">${item.lane} | ${item.recommendation} | risk ${item.risk}</div>
+            </div>
+          `).join('')
+        : '<div class="row"><div class="small">No top scored candidates</div></div>';
+
+      const watchlist = universeSummary.watchlist || [];
+      const hotCandidates = universeSummary.hot_candidates || [];
+      const avoidCandidates = universeSummary.avoid_candidates || [];
+      document.getElementById('watchlistList').innerHTML = [
+        ...watchlist.map((item) => `
+          <div class="row">
+            <div class="split">
+              <div class="row-title">${item.symbol}</div>
+              <div class="small">${item.tag}</div>
+            </div>
+            <div class="small">watch confidence ${Number(item.confidence || 0).toFixed(2)}</div>
+          </div>
+        `),
+        ...hotCandidates.slice(0, 2).map((item) => `
+          <div class="row">
+            <div class="split">
+              <div class="row-title">${item.symbol}</div>
+              <div class="small good">hot ${item.recommendation}</div>
+            </div>
+            <div class="small">${item.lane} | score ${Number(item.candidate_score || 0).toFixed(2)}</div>
+          </div>
+        `),
+        ...avoidCandidates.slice(0, 1).map((item) => `
+          <div class="row">
+            <div class="split">
+              <div class="row-title">${item.symbol}</div>
+              <div class="small bad">avoid</div>
+            </div>
+            <div class="small">${item.lane} | ${item.reasons ? item.reasons.join(', ') : ''}</div>
+          </div>
+        `)
+      ].join('') || '<div class="row"><div class="small">No watchlist data</div></div>';
+
+      const entries = accounting.known_entries || [];
+      document.getElementById('entryLedgerBody').innerHTML = entries.length
+        ? entries.map((item) => `
+            <tr>
+              <td>${item.symbol}</td>
+              <td class="mono">${Number(item.qty || 0).toFixed(6)}</td>
+              <td>$${Number(item.entry_price || 0).toFixed(5)}</td>
+              <td>$${Number(item.notional || 0).toFixed(2)}</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="4" class="muted">No known filled entry ledger yet</td></tr>';
+
+      const depth = (data.collector_depth || {}).top_depth || [];
+      document.getElementById('collectorDepthBody').innerHTML = depth.length
+        ? depth.map((item) => `
+            <tr>
+              <td>${item.symbol}</td>
+              <td>${item.bars_1m}</td>
+              <td>${item.bars_1h}</td>
+              <td>${item.bars_7d}</td>
+              <td>${item.bars_30d}</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="5" class="muted">No collector depth data</td></tr>';
+
+      document.getElementById('recentDecisions').textContent = JSON.stringify(data.recent_decisions || [], null, 2);
+    }
+
+    refreshStatus().catch(console.error);
+    setInterval(() => refreshStatus().catch(console.error), 5000);
+  </script>
+</body>
+</html>

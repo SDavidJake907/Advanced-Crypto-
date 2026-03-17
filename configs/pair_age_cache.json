@@ -1,0 +1,246 @@
+{
+  "AAVE/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "ADA/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "ALGO/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "APT/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "ATOM/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "AVAX/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "AXS/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "BAT/USD": {
+    "checked_at": 1773697885,
+    "first_ts": 1771102800
+  },
+  "BCH/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "BTC/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "CELO/USD": {
+    "checked_at": 1773698512,
+    "first_ts": 1771106400
+  },
+  "CFG/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "COMP/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "CRV/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "CVX/USD": {
+    "checked_at": 1773698512,
+    "first_ts": 1771106400
+  },
+  "DAI/USD": {
+    "checked_at": 1773709232,
+    "first_ts": 1771117200
+  },
+  "DASH/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "DOGE/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "DOT/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "DRV/USD": {
+    "checked_at": 1773699008,
+    "first_ts": 1771106400
+  },
+  "ENS/USD": {
+    "checked_at": 1773701170,
+    "first_ts": 1771106400
+  },
+  "ETC/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "ETH/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "FET/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "FIL/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "FLOW/USD": {
+    "checked_at": 1773699008,
+    "first_ts": 1771106400
+  },
+  "GRT/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "HBAR/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "HNT/USD": {
+    "checked_at": 1773701333,
+    "first_ts": 1771106400
+  },
+  "ICNT/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "ICP/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "INJ/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "KSM/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "LINK/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "LTC/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "MANA/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "NEAR/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "OP/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "PAXG/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "PRIME/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "QNT/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "RAVE/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "RAY/USD": {
+    "checked_at": 1773699594,
+    "first_ts": 1771106400
+  },
+  "RIVER/USD": {
+    "checked_at": 1773700516,
+    "first_ts": 1771106400
+  },
+  "RUNE/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "SAND/USD": {
+    "checked_at": 1773703753,
+    "first_ts": 1771110000
+  },
+  "SOL/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "STX/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "SUI/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "SYRUP/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "TRAC/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "TRIA/USD": {
+    "checked_at": 1773701170,
+    "first_ts": 1771106400
+  },
+  "TRX/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "UAI/USD": {
+    "checked_at": 1773697885,
+    "first_ts": 1771102800
+  },
+  "UNI/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "USDC/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "USDT/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "XLM/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "XMR/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "XRP/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  },
+  "ZEC/USD": {
+    "checked_at": 1773697636,
+    "first_ts": 1771102800
+  }
+}

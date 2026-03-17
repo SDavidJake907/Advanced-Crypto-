@@ -1,0 +1,53 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.mypy_cache/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# Env / secrets
+.env
+
+# Logs & runtime state
+logs/
+*.log
+
+# Large model files
+models/
+openvino_models/
+*.pt
+*.bin
+*.safetensors
+*.gguf
+*.onnx
+*.pkl
+
+# Build artifacts
+hybrad9_extras/
+.codex_staging/
+cpp/build/
+*.dll
+*.exe
+*.obj
+*.lib
+*.pdb
+*.rmeta
+*.rlib
+*.d
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store

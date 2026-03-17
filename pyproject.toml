@@ -1,0 +1,29 @@
+[project]
+name = "krakensk"
+version = "0.1.0"
+description = "Kraken spot trading system scaffold with LLM components"
+requires-python = ">=3.11"
+dependencies = [
+  "python-dotenv>=1.0.1",
+  "httpx>=0.27.0",
+  "pydantic>=2.7.0",
+  "pandas>=2.2.0",
+  "numpy>=1.26.0",
+  "fastapi>=0.111.0",
+  "mcp>=1.26.0",
+  "uvicorn>=0.30.0",
+  "websockets>=12.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["core", "apps"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
