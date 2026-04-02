@@ -783,12 +783,13 @@ def _symbol_base(symbol: str) -> str:
 
 
 def _meme_universe_enabled() -> bool:
-    return os.getenv("MEME_UNIVERSE_ENABLED", "true").lower() == "true"
+    return bool(get_runtime_setting("MEME_UNIVERSE_ENABLED"))
 
 
 def _meme_universe_cap() -> int:
-    default_cap = os.getenv("MEME_MAX_OPEN_POSITIONS", "1")
-    return max(0, int(os.getenv("MEME_ACTIVE_UNIVERSE_MAX", default_cap)))
+    default_cap = int(get_runtime_setting("MEME_MAX_OPEN_POSITIONS"))
+    configured_cap = int(get_runtime_setting("MEME_ACTIVE_UNIVERSE_MAX", default_cap))
+    return max(0, configured_cap)
 
 
 def _retention_buffer_mult() -> float:

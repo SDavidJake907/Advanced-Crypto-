@@ -62,6 +62,12 @@ class UniverseSelectionTests(unittest.TestCase):
         self.assertFalse(_universe_symbol_allowed("WIF/USD"))
         self.assertTrue(_universe_symbol_allowed("BTC/USD"))
 
+    def test_universe_symbol_allowed_blocks_memes_when_runtime_override_disabled(self) -> None:
+        with patch("core.config.runtime.load_runtime_overrides", return_value={"MEME_UNIVERSE_ENABLED": False}):
+            os.environ["MEME_SYMBOLS"] = "WIF/USD"
+            self.assertFalse(_universe_symbol_allowed("WIF/USD"))
+            self.assertTrue(_universe_symbol_allowed("BTC/USD"))
+
     def test_universe_symbol_allowed_restricts_to_core_and_conditional_seed(self) -> None:
         os.environ["CORE_ACTIVE_UNIVERSE"] = "BTC/USD,ETH/USD,SOL/USD,LINK/USD"
         os.environ["CONDITIONAL_UNIVERSE"] = "XRP/USD"

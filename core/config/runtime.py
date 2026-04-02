@@ -15,6 +15,8 @@ RUNTIME_OVERRIDE_PROPOSALS_PATH = ROOT / "configs" / "runtime_override_proposals
 
 _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "AGGRESSION_MODE": {"type": str, "default": "NORMAL"},
+    "MEME_UNIVERSE_ENABLED": {"type": bool, "default": True},
+    "MEME_ACTIVE_UNIVERSE_MAX": {"type": int, "default": 1},
     "MEME_SYMBOLS": {"type": str, "default": ""},
     "TRADER_BASE_MOMO_THRESHOLD": {"type": float, "default": 0.0},
     "TRADER_ATR_VOLATILITY_SCALE": {"type": float, "default": 0.5},
