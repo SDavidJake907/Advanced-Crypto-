@@ -12,6 +12,12 @@ KrakenSK is a live crypto trading system built around a deterministic trading co
 
 LLMs are still present, but they are constrained. The intended direction is not "AI decides everything." The intended direction is a measurable leader-rotation engine with AI used for review, diagnosis, and structured advisory.
 
+## Build Attribution
+
+This repository was developed through human-directed implementation with assistance from multiple coding and reasoning systems, including OpenAI Codex/ChatGPT and Claude, alongside direct operator iteration.
+
+AI tools contributed to code generation, refactors, diagnostics, documentation, and testing support. Final runtime decisions, deployment choices, exchange credentials, and live-operation responsibility remain with the operator.
+
 ## Third-Party Notice
 
 This repository integrates third-party services, runtimes, and model endpoints, including NVIDIA-hosted APIs/models when configured. Those third-party components remain the property of their respective owners.
