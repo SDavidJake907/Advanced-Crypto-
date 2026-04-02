@@ -24,6 +24,7 @@ from core.memory.trade_memory import TradeMemoryStore
 from core.policy.nemotron_gate import (
     _get_leader_metrics,
     load_universe_candidate_context,
+    passes_deterministic_candidate_gate,
 )
 from core.risk.basic_risk import BasicRiskEngine
 from core.risk.portfolio import PortfolioConfig, PositionState
@@ -129,6 +130,42 @@ class NemotronStrategist:
             "reason": "nemotron_fallback_hold",
             "debug": {},
             "override_signal": "FLAT",
+            "size_factor_hint": 1.0,
+            "reflex": reflex.get("reflex", "allow"),
+            "micro_state": reflex.get("micro_state", "unknown"),
+        }
+
+    def _build_model_failure_fallback(
+        self,
+        *,
+        symbol: str,
+        features: dict[str, Any],
+        positions_state: PositionState,
+        universe_context: dict[str, Any],
+        reflex: dict[str, Any],
+    ) -> dict[str, Any]:
+        integrated_reflex = self._integrate_reflex(features, reflex)
+        passed_gate, gate_reason = passes_deterministic_candidate_gate(
+            symbol=symbol,
+            positions_state=positions_state,
+            features=features,
+            universe_context=universe_context,
+        )
+        if not passed_gate:
+            integrated_reflex["debug"] = {"fallback_gate_reason": gate_reason}
+            return integrated_reflex
+
+        entry_recommendation = str(features.get("entry_recommendation", "WATCH") or "WATCH").upper()
+        reversal_risk = str(features.get("reversal_risk", "MEDIUM") or "MEDIUM").upper()
+        if entry_recommendation not in {"BUY", "STRONG_BUY"} or reversal_risk == "HIGH":
+            integrated_reflex["debug"] = {"fallback_gate_reason": gate_reason}
+            return integrated_reflex
+
+        return {
+            "action": "OPEN",
+            "reason": "model_parse_failed_deterministic_open",
+            "debug": {"fallback_gate_reason": gate_reason},
+            "override_signal": "LONG",
             "size_factor_hint": 1.0,
             "reflex": reflex.get("reflex", "allow"),
             "micro_state": reflex.get("micro_state", "unknown"),
@@ -490,7 +527,13 @@ class NemotronStrategist:
             }
         except Exception as exc:
             self._log_fallback(payload, exc)
-            integrated_reflex = self._integrate_reflex(features, reflex)
+            integrated_reflex = self._build_model_failure_fallback(
+                symbol=symbol,
+                features=features,
+                positions_state=positions_state,
+                universe_context=universe_context,
+                reflex=reflex,
+            )
             filtered_visual_review = visual_review
             filtered_visual_review = {}
             advisory_ms = 0.0
@@ -679,6 +722,29 @@ class NemotronStrategist:
         batch_parse_failed = False
         raw = ""
 
+        def _safe_batch_model_failure_decision(symbol: str, features: dict[str, Any], reflex: dict[str, Any]) -> dict[str, Any]:
+            fallback = self._build_model_failure_fallback(
+                symbol=symbol,
+                features=features,
+                positions_state=positions_state,
+                universe_context=load_universe_candidate_context(symbol),
+                reflex=reflex,
+            )
+            if str(fallback.get("action", "HOLD")).upper() == "OPEN":
+                return {
+                    "action": "OPEN",
+                    "side": "LONG",
+                    "reason": str(fallback.get("reason", "model_parse_failed_deterministic_open")),
+                    "size": max_trade,
+                    "debug": fallback.get("debug", {}),
+                }
+            return {
+                "action": "HOLD",
+                "reason": "batch_parse_fallback_hold",
+                "size": 0,
+                "debug": fallback.get("debug", {}),
+            }
+
         def _extract_batch_decisions(parsed: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
             reasoning_text = str(parsed.get("reasoning", ""))
             decisions = parsed.get("decisions")
@@ -770,7 +836,7 @@ class NemotronStrategist:
             if sym in decision_map:
                 d = decision_map[sym]
             elif batch_parse_failed:
-                d = _deterministic_batch_fallback(features)
+                d = _safe_batch_model_failure_decision(sym, features, reflex)
             else:
                 d = {"action": "HOLD", "reason": "not_ranked_by_batch"}
             action = str(d.get("action", "HOLD")).upper()

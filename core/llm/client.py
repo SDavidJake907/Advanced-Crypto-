@@ -116,6 +116,15 @@ def _extract_text_from_content_part(part: Any) -> str:
         return part
     if not isinstance(part, dict):
         return ""
+    for key in ("text", "content", "value"):
+        value = part.get(key)
+        if isinstance(value, str):
+            return value
+        if isinstance(value, list):
+            text_parts = [_extract_text_from_content_part(item) for item in value]
+            joined = "".join(chunk for chunk in text_parts if chunk)
+            if joined.strip():
+                return joined
     if isinstance(part.get("text"), str):
         return str(part["text"])
     if part.get("type") == "text":
@@ -127,35 +136,66 @@ def _extract_text_from_content_part(part: Any) -> str:
                 value = inner.get(key)
                 if isinstance(value, str):
                     return value
+                if isinstance(value, list):
+                    text_parts = [_extract_text_from_content_part(item) for item in value]
+                    joined = "".join(chunk for chunk in text_parts if chunk)
+                    if joined.strip():
+                        return joined
     return ""
 
 
 def _extract_chat_content(data: dict[str, Any]) -> str:
     choices = data.get("choices")
-    if not isinstance(choices, list) or not choices:
-        return ""
-    choice0 = choices[0] if isinstance(choices[0], dict) else {}
-    message = choice0.get("message")
-    if isinstance(message, dict):
-        content = message.get("content")
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            text_parts = [_extract_text_from_content_part(part) for part in content]
-            joined = "".join(part for part in text_parts if part)
-            if joined.strip():
-                return joined
-    for key in ("text", "output_text"):
-        value = choice0.get(key)
+    if isinstance(choices, list) and choices:
+        choice0 = choices[0] if isinstance(choices[0], dict) else {}
+        message = choice0.get("message")
+        if isinstance(message, dict):
+            content = message.get("content")
+            if isinstance(content, str):
+                return content
+            if isinstance(content, dict):
+                text = _extract_text_from_content_part(content)
+                if text.strip():
+                    return text
+            if isinstance(content, list):
+                text_parts = [_extract_text_from_content_part(part) for part in content]
+                joined = "".join(part for part in text_parts if part)
+                if joined.strip():
+                    return joined
+        for key in ("text", "output_text"):
+            value = choice0.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+        delta = choice0.get("delta")
+        if isinstance(delta, dict):
+            content = delta.get("content")
+            if isinstance(content, str):
+                return content
+            if isinstance(content, dict):
+                text = _extract_text_from_content_part(content)
+                if text.strip():
+                    return text
+            if isinstance(content, list):
+                text_parts = [_extract_text_from_content_part(part) for part in content]
+                joined = "".join(part for part in text_parts if part)
+                if joined.strip():
+                    return joined
+    output = data.get("output")
+    if isinstance(output, list):
+        text_parts = [_extract_text_from_content_part(part) for part in output]
+        joined = "".join(part for part in text_parts if part)
+        if joined.strip():
+            return joined
+    for key in ("response", "content", "output_text", "text"):
+        value = data.get(key)
         if isinstance(value, str) and value.strip():
             return value
-    delta = choice0.get("delta")
-    if isinstance(delta, dict):
-        content = delta.get("content")
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            text_parts = [_extract_text_from_content_part(part) for part in content]
+        if isinstance(value, dict):
+            text = _extract_text_from_content_part(value)
+            if text.strip():
+                return text
+        if isinstance(value, list):
+            text_parts = [_extract_text_from_content_part(part) for part in value]
             joined = "".join(part for part in text_parts if part)
             if joined.strip():
                 return joined
@@ -840,7 +880,13 @@ def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int 
                         extra_body=extra_body,
                     )
                 if last_raw.strip():
-                    return last_raw
+                    return _repair_json_response(
+                        base_url=base_url,
+                        model=model,
+                        raw=last_raw,
+                        headers=headers,
+                        timeout_s=timeout_s,
+                    )
             except httpx.HTTPStatusError as exc:
                 if exc.response is None or exc.response.status_code < 500:
                     raise
@@ -849,6 +895,23 @@ def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int 
             except (httpx.RequestError, TimeoutError, json.JSONDecodeError):
                 pass
             time.sleep(1.0)
+    if last_raw.strip():
+        if provider == "local":
+            return _repair_json_response(
+                base_url=base_url,
+                model=model,
+                raw=last_raw,
+                headers=headers,
+                timeout_s=timeout_s,
+                use_completion_api=use_ollama_generate,
+            )
+        return _repair_json_response(
+            base_url=base_url,
+            model=model,
+            raw=last_raw,
+            headers=headers,
+            timeout_s=timeout_s,
+        )
     return last_raw
 
 

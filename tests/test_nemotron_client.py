@@ -89,6 +89,43 @@ class NemotronClientTests(unittest.TestCase):
         parsed = parse_json_response(raw)
         self.assertEqual(parsed["final_decision"]["reason"], "choice_text_ok")
 
+    def test_cloud_provider_parses_output_array_shape(self) -> None:
+        def fake_post(url: str, **kwargs: object) -> httpx.Response:
+            request = httpx.Request("POST", url)
+            payload = {
+                "output": [
+                    {
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": '{"final_decision":{"symbol":"TEST/USD","action":"HOLD","side":null,"size":0,"reason":"output_array_ok","debug":{}}}',
+                            }
+                        ]
+                    }
+                ]
+            }
+            return httpx.Response(200, request=request, json=payload)
+
+        with patch.dict(
+            "os.environ",
+            {
+                "NEMOTRON_PROVIDER": "cloud",
+                "NEMOTRON_CLOUD_API_KEY": "test-cloud-key",
+                "NEMOTRON_CLOUD_URL": "https://integrate.api.nvidia.com/v1",
+                "NEMOTRON_CLOUD_MODEL": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            },
+            clear=False,
+        ):
+            with patch("core.llm.client.httpx.post", side_effect=fake_post):
+                raw = nemotron_chat(
+                    {"symbol": "TEST/USD"},
+                    system="Return final_decision JSON only.",
+                    max_tokens=64,
+                )
+
+        parsed = parse_json_response(raw)
+        self.assertEqual(parsed["final_decision"]["reason"], "output_array_ok")
+
     def test_cloud_strategist_prompt_selector_uses_cloud_prompt(self) -> None:
         with patch.dict(
             "os.environ",
@@ -229,6 +266,46 @@ class NemotronClientTests(unittest.TestCase):
         self.assertEqual(parsed["final_decision"]["symbol"], "TEST/USD")
         self.assertEqual(parsed["final_decision"]["action"], "HOLD")
         self.assertEqual(parsed["final_decision"]["reason"], "openai_ok")
+
+    def test_openai_provider_repairs_non_json_prefix(self) -> None:
+        calls = {"count": 0}
+
+        def fake_post(url: str, **kwargs: object) -> httpx.Response:
+            request = httpx.Request("POST", url)
+            calls["count"] += 1
+            if calls["count"] == 1:
+                payload = {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": 'analysis first\n{"final_decision":{"symbol":"TEST/USD","action":"HOLD","side":null,"size":0,"reason":"repair_ok","debug":{}}}'
+                            }
+                        }
+                    ]
+                }
+                return httpx.Response(200, request=request, json=payload)
+            self.fail("repair path should not require a second request for prefixed JSON")
+
+        with patch.dict(
+            "os.environ",
+            {
+                "NEMOTRON_PROVIDER": "openai",
+                "NEMOTRON_STRATEGIST_PROVIDER": "openai",
+                "OPENAI_API_KEY": "test-openai-key",
+                "OPENAI_API_URL": "https://api.openai.com/v1",
+                "OPENAI_MODEL": "gpt-4.1-mini",
+            },
+            clear=False,
+        ):
+            with patch("core.llm.client.httpx.post", side_effect=fake_post):
+                raw = nemotron_chat(
+                    {"symbol": "TEST/USD"},
+                    system="Return final_decision JSON only.",
+                    max_tokens=64,
+                )
+
+        parsed = parse_json_response(raw)
+        self.assertEqual(parsed["final_decision"]["reason"], "repair_ok")
 
     def test_cloud_provider_alias_uses_nvidia_route_and_cloud_env_names(self) -> None:
         def fake_post(url: str, **kwargs: object) -> httpx.Response:
@@ -399,6 +476,28 @@ class NemotronBatchParsingTests(unittest.TestCase):
             "phi3_ms": 0.0,
         }
 
+    def _strong_buy_candidate(self, symbol: str = "BTC/USD") -> dict[str, object]:
+        candidate = self._candidate(symbol)
+        features = dict(candidate["features"])
+        features.update(
+            {
+                "entry_score": 72.0,
+                "entry_recommendation": "BUY",
+                "reversal_risk": "MEDIUM",
+                "volume_ratio": 1.4,
+                "trade_quality": 92.0,
+                "structure_quality": 70.0,
+                "continuation_quality": 72.0,
+                "short_tf_ready_15m": True,
+                "tp_after_cost_valid": True,
+                "net_edge_pct": 0.4,
+                "trend_1h": 1,
+                "indicators_ready": True,
+            }
+        )
+        candidate["features"] = features
+        return candidate
+
     def test_batch_decide_parses_tool_result_wrapped_decisions(self) -> None:
         strategist = self._make_strategist()
         portfolio_state = PortfolioState(cash=100.0)
@@ -477,6 +576,65 @@ class NemotronBatchParsingTests(unittest.TestCase):
 
         self.assertIs(results["BTC/USD"], single_decision)
         decide_mock.assert_called_once()
+
+    def test_batch_parse_failure_uses_deterministic_open_for_strong_buy_candidate(self) -> None:
+        strategist = self._make_strategist()
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+
+        with patch("core.llm.nemotron.nemotron_chat", return_value=""):
+            with patch("core.llm.nemotron.nemotron_provider_name", return_value="nvidia"):
+                with patch("core.llm.nemotron.strategy_decision", return_value="LONG"):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=[]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            results = strategist.batch_decide(
+                                candidates=[self._strong_buy_candidate()],
+                                portfolio_state=portfolio_state,
+                                positions_state=positions_state,
+                                symbols=["BTC/USD"],
+                            )
+
+        self.assertEqual(results["BTC/USD"].execution["nemotron"]["reason"], "model_parse_failed_deterministic_open")
+        self.assertEqual(results["BTC/USD"].signal, "LONG")
+
+    def test_single_parse_failure_uses_deterministic_open_for_strong_buy_candidate(self) -> None:
+        strategist = self._make_strategist()
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+        candidate = self._strong_buy_candidate()
+
+        with patch("core.llm.nemotron.nemotron_chat", return_value=""):
+            with patch("core.llm.nemotron.build_advisory_bundle") as advisory_mock:
+                advisory_mock.return_value = type(
+                    "Bundle",
+                    (),
+                    {
+                        "reflex": {"reflex": "allow", "micro_state": "stable", "reason": "test"},
+                        "market_state_review": {},
+                        "visual_review": {},
+                        "timings": {"phi3_ms": 0.0, "advisory_ms": 0.0},
+                    },
+                )()
+                with patch("core.llm.nemotron.strategy_decision", return_value="LONG"):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=[]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            result = strategist.decide(
+                                symbol="BTC/USD",
+                                features=candidate["features"],
+                                portfolio_state=portfolio_state,
+                                positions_state=positions_state,
+                                symbols=["BTC/USD"],
+                                proposed_weight=0.1,
+                            )
+
+        self.assertEqual(result.execution["nemotron"]["reason"], "model_parse_failed_deterministic_open")
+        self.assertEqual(result.signal, "LONG")
 
     def test_single_fallback_logging_dedupes_repeated_identical_errors(self) -> None:
         strategist = self._make_strategist()
