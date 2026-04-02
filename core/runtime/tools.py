@@ -62,6 +62,7 @@ def portfolio_evaluate(
         symbols=symbols,
         lane=lane,
         trend_conflict=trend_conflict,
+        features=features,
     )
 
 

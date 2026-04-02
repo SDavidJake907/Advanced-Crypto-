@@ -20,19 +20,31 @@ __global__ void rsi_kernel(
         return;
     }
 
-    double gain = 0.0;
-    double loss = 0.0;
     const int base = asset * n_points;
-    for (int i = n_points - lookback; i < n_points; ++i) {
+
+    // Wilder's RSI: seed with SMA of first `lookback` deltas
+    double avg_gain = 0.0;
+    double avg_loss = 0.0;
+    for (int i = 1; i <= lookback; ++i) {
         const double delta = prices[base + i] - prices[base + i - 1];
         if (delta > 0.0) {
-            gain += delta;
+            avg_gain += delta;
         } else {
-            loss -= delta;
+            avg_loss -= delta;
         }
     }
-    const double avg_gain = gain / lookback;
-    const double avg_loss = loss / lookback;
+    avg_gain /= lookback;
+    avg_loss /= lookback;
+
+    // Apply Wilder's RMA smoothing (alpha = 1/lookback) for remaining bars
+    for (int i = lookback + 1; i < n_points; ++i) {
+        const double delta = prices[base + i] - prices[base + i - 1];
+        const double gain = (delta > 0.0) ? delta : 0.0;
+        const double loss = (delta < 0.0) ? -delta : 0.0;
+        avg_gain = (avg_gain * (lookback - 1) + gain) / lookback;
+        avg_loss = (avg_loss * (lookback - 1) + loss) / lookback;
+    }
+
     if (avg_loss == 0.0) {
         out[asset] = 100.0;
         return;

@@ -1,0 +1,48 @@
+{
+  "generated_at": "2026-03-30",
+  "mode": "live_runtime_baseline",
+  "purpose": "Single-local-Nemo runtime baseline with deterministic prefiltering and small finalist batch review.",
+  "current_recommendation": {
+    "ADVISORY_MODEL_PROVIDER": "local_nemo",
+    "NEMOTRON_PROVIDER": "local",
+    "NEMOTRON_STRATEGIST_PROVIDER": "local",
+    "NEMOTRON_BATCH_MODE": true,
+    "NEMOTRON_BATCH_TOP_N": 5,
+    "NEMOTRON_TOP_CANDIDATE_COUNT": 20,
+    "PORTFOLIO_MAX_OPEN_POSITIONS": 3,
+    "PORTFOLIO_MAX_WEIGHT_PER_SYMBOL": 0.5,
+    "TRADER_PROPOSED_WEIGHT": 0.5,
+    "EXEC_RISK_PER_TRADE_PCT": 10.0,
+    "STABILIZATION_STRICT_ENTRY_ENABLED": true,
+    "STABILIZATION_ALLOWED_LANES": "L2,L3",
+    "STABILIZATION_MIN_ENTRY_SCORE": 64.0,
+    "STABILIZATION_MIN_NET_EDGE_PCT": 0.0,
+    "STABILIZATION_REQUIRE_TP_AFTER_COST_VALID": true,
+    "STABILIZATION_REQUIRE_TREND_CONFIRMED": true,
+    "STABILIZATION_REQUIRE_SHORT_TF_READY_15M": true,
+    "STABILIZATION_BLOCK_RANGING_MARKET": false,
+    "STABILIZATION_REQUIRE_BUY_RECOMMENDATION": false
+  },
+  "principles": [
+    "Score the full active universe deterministically in code.",
+    "Send only the top finalists to local Nemo.",
+    "Keep local strategist payloads compact.",
+    "Do not let local Nemo rank the full 20-symbol universe directly.",
+    "Keep economics and risk gates deterministic."
+  ],
+  "not_recommended": {
+    "full_local_serial_decide": "Too slow for 20 symbols.",
+    "full_20_symbol_local_batch": "Too fragile and too heavy for local 9B runtime.",
+    "long_lesson_dumps": "Use lesson_summary instead."
+  },
+  "readiness_dependencies": [
+    "Stable batch_nemo cycles at top-5 finalist load",
+    "No fresh batch_parse_fallback_hold regressions",
+    "Healthy 1h/7d/30d history for active symbols",
+    "Clean account sync and order reconciliation"
+  ],
+  "notes": [
+    "Treat this as the target operating shape, not as proof of readiness to fund the system more.",
+    "Apply changes gradually and validate through live logs plus replay where possible."
+  ]
+}

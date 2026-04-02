@@ -48,6 +48,9 @@ class _FakeKrakenRestClient:
     def get_trades_history(self) -> dict:
         raise RuntimeError("EAPI:Invalid key")
 
+    def get_ledgers(self, type_filter: str = "all") -> dict:
+        return {"result": {"ledger": {}}}
+
 
 class AccountSyncTests(unittest.TestCase):
     def test_bootstrap_prefers_spot_equity_and_seeds_position_marks(self) -> None:

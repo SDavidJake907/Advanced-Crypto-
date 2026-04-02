@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 import httpx
 
 from core.symbols import normalize_symbol, to_kraken_symbol
+from core.data.rate_limiter import kraken_rest_limiter
 
 
 @dataclass
@@ -42,6 +43,7 @@ class KrakenRestClient:
         return target.replace("/", "")
 
     def _private_request(self, path: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
+        kraken_rest_limiter.acquire()
         if not self._api_key or not self._api_secret:
             raise RuntimeError("Kraken API credentials are not configured")
         payload: dict[str, Any] = dict(data or {})
@@ -64,6 +66,7 @@ class KrakenRestClient:
         return response
 
     def _public_request(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        kraken_rest_limiter.acquire()
         r = self._client.get(path, params=params)
         r.raise_for_status()
         response = r.json()
@@ -159,6 +162,23 @@ class KrakenRestClient:
     def get_trades_history(self, type_filter: str = "all", trades: bool = True) -> dict[str, Any]:
         payload: dict[str, Any] = {"type": type_filter, "trades": trades}
         return self._private_request("/0/private/TradesHistory", payload)
+
+    def get_ledgers(self, type_filter: str = "all") -> dict[str, Any]:
+        payload: dict[str, Any] = {"type": type_filter}
+        return self._private_request("/0/private/Ledgers", payload)
+
+    def get_open_orders(self) -> dict[str, Any]:
+        return self._private_request("/0/private/OpenOrders")
+
+    def query_orders_info(self, txids: list[str], trades: bool = False) -> dict[str, Any]:
+        filtered = [str(txid).strip() for txid in txids if str(txid).strip()]
+        if not filtered:
+            return {"result": {}}
+        payload: dict[str, Any] = {"txid": ",".join(filtered), "trades": trades}
+        return self._private_request("/0/private/QueryOrders", payload)
+
+    def cancel_order(self, txid: str) -> dict[str, Any]:
+        return self._private_request("/0/private/CancelOrder", {"txid": str(txid).strip()})
 
     def add_order(
         self,

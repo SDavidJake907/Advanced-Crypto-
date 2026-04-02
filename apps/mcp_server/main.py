@@ -10,11 +10,17 @@ from dotenv import load_dotenv
 import uvicorn
 from mcp.server.fastmcp import FastMCP
 
-from core.config.runtime import get_runtime_snapshot, update_runtime_overrides
+from core.config.runtime import (
+    apply_runtime_override_proposal,
+    get_runtime_snapshot,
+    load_runtime_override_proposals,
+    stage_runtime_override_proposal,
+)
 from core.execution.cpp_exec import CppExecutor
-from core.llm.client import nemotron_chat
+from core.llm.client import nemotron_chat, nemotron_provider_api_url, nemotron_provider_model, nemotron_provider_name
 from core.llm.nemotron import NemotronStrategist
 from core.llm.phi3_reflex import phi3_reflex
+from core.memory.setup_reliability import build_setup_reliability_summary
 from core.memory.trade_memory import TradeMemoryStore
 from core.risk.basic_risk import BasicRiskEngine
 from core.risk.portfolio import PortfolioConfig, Position, PositionState
@@ -29,6 +35,17 @@ MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")
 MCP_PORT = int(os.getenv("MCP_PORT", "8765"))
 
 mcp = FastMCP("KrakenSK MCP", host=MCP_HOST, streamable_http_path="/")
+
+
+def _mcp_llm_config() -> dict[str, Any]:
+    provider = nemotron_provider_name()
+    config: dict[str, Any] = {
+        "provider": provider,
+        "phi3_url": os.getenv("PHI3_BASE_URL", "http://127.0.0.1:8084"),
+        "model": nemotron_provider_model(),
+        "api_url": nemotron_provider_api_url(),
+    }
+    return config
 
 
 def _safe_path(path: str) -> Path:
@@ -135,12 +152,14 @@ def _visual_feed_status(limit: int = 20) -> dict[str, Any]:
 
 @mcp.tool()
 def healthcheck() -> dict[str, Any]:
+    llm = _mcp_llm_config()
     return {
         "status": "ok",
         "project_root": str(ROOT),
         "mcp_path": "/",
-        "nemotron_url": os.getenv("NEMOTRON_BASE_URL", "http://127.0.0.1:8081"),
-        "phi3_url": os.getenv("PHI3_BASE_URL", "http://127.0.0.1:8084"),
+        "llm": llm,
+        "nemotron_url": llm["api_url"],
+        "phi3_url": llm["phi3_url"],
     }
 
 
@@ -213,13 +232,46 @@ def get_runtime_config() -> dict[str, Any]:
 
 
 @mcp.tool()
-def update_runtime_config(updates: dict[str, Any]) -> dict[str, Any]:
-    applied = update_runtime_overrides(updates)
+def update_runtime_config(
+    updates: dict[str, Any],
+    approved_by: str = "",
+    validation: dict[str, Any] | None = None,
+    approval_note: str = "",
+) -> dict[str, Any]:
+    proposal = stage_runtime_override_proposal(
+        updates,
+        source="mcp_manual_apply",
+        summary=approval_note or "manual_runtime_update",
+        validation=validation,
+        context={"approval_note": approval_note},
+    )
+    try:
+        applied = apply_runtime_override_proposal(
+            proposal["id"],
+            approved_by=approved_by,
+            approval_note=approval_note,
+        )
+        status = "applied"
+    except Exception as exc:
+        applied = {}
+        status = "blocked"
+        proposal["apply_error"] = str(exc)
     snapshot = get_runtime_snapshot()
     return {
-        "status": "updated",
+        "status": status,
+        "proposal": proposal,
         "applied": applied,
         "snapshot": snapshot,
+    }
+
+
+@mcp.tool()
+def get_runtime_override_proposals(limit: int = 20) -> dict[str, Any]:
+    limit = max(1, min(limit, 200))
+    proposals = load_runtime_override_proposals()
+    return {
+        "count": len(proposals),
+        "proposals": proposals[-limit:],
     }
 
 
@@ -314,7 +366,7 @@ def get_optimizer_status(limit: int = 10) -> dict[str, Any]:
     return {
         "enabled": os.getenv("NVIDIA_OPTIMIZER_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"},
         "interval_min": int(os.getenv("NVIDIA_OPTIMIZER_INTERVAL_MIN", "30")),
-        "auto_apply": os.getenv("NVIDIA_OPTIMIZER_APPLY", "false").strip().lower() in {"1", "true", "yes", "on"},
+        "auto_apply": False,
         "review_count": len(reviews),
         "latest_review": latest,
         "recent_reviews": reviews,
@@ -338,6 +390,23 @@ def get_lane_supervision_summary() -> dict[str, Any]:
 def get_outcome_review_summary(limit: int = 20) -> dict[str, Any]:
     limit = max(1, min(limit, 200))
     return _outcome_review_summary(limit)
+
+
+@mcp.tool()
+def get_setup_reliability_summary(
+    lookback: int = 200,
+    min_trades: int = 3,
+    limit: int = 5,
+) -> dict[str, Any]:
+    lookback = max(1, min(lookback, 2000))
+    min_trades = max(1, min(min_trades, 50))
+    limit = max(1, min(limit, 20))
+    return build_setup_reliability_summary(
+        store=TradeMemoryStore(),
+        lookback=lookback,
+        min_trades=min_trades,
+        limit=limit,
+    )
 
 
 @mcp.tool()
@@ -417,11 +486,21 @@ def nemotron_adjust_runtime(objective: str, context: dict[str, Any] | None = Non
         updates = parsed.get("updates", {})
         if not isinstance(updates, dict):
             raise ValueError("updates must be an object")
-        applied = update_runtime_overrides(updates) if updates else {}
+        proposal = (
+            stage_runtime_override_proposal(
+                updates,
+                source="mcp_nemotron_runtime_advice",
+                summary=parsed.get("summary", ""),
+                context={"objective": objective, "cautions": parsed.get("cautions", [])},
+            )
+            if updates
+            else {}
+        )
         return {
             "summary": parsed.get("summary", ""),
             "updates": updates,
-            "applied": applied,
+            "applied": {},
+            "proposal": proposal,
             "cautions": parsed.get("cautions", []),
             "runtime_config": get_runtime_snapshot(),
         }
@@ -430,6 +509,7 @@ def nemotron_adjust_runtime(objective: str, context: dict[str, Any] | None = Non
             "summary": "nemotron_adjust_runtime_failed_to_parse",
             "updates": {},
             "applied": {},
+            "proposal": {},
             "cautions": [raw],
             "runtime_config": get_runtime_snapshot(),
         }

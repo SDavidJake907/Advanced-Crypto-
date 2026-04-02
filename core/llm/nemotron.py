@@ -3,20 +3,27 @@ from __future__ import annotations
 import copy
 from dataclasses import asdict, dataclass
 import json
+import os
 from pathlib import Path
 import time
 from typing import Any
 
-from core.config.runtime import get_runtime_setting, get_runtime_snapshot
+from core.config.runtime import get_runtime_setting
 from core.execution.cpp_exec import CppExecutor
-from core.llm.client import NEMOTRON_DEBUG_VERBOSE, run_nemotron_tool_loop, sanitize_for_json
+from core.llm.client import (
+    NEMOTRON_DEBUG_VERBOSE,
+    nemotron_chat,
+    nemotron_provider_name,
+    parse_json_response,
+    sanitize_for_json,
+)
+from core.llm.contracts import normalize_trade_reviewer_output
 from core.llm.orchestrator import build_advisory_bundle
-from core.llm.nemotron_client import NemotronClient
-from core.llm.prompts import NEMOTRON_STRATEGIST_SYSTEM_PROMPT
+from core.llm.prompts import get_nemotron_batch_strategist_prompt, get_nemotron_strategist_system_prompt
+from core.memory.trade_memory import TradeMemoryStore
 from core.policy.nemotron_gate import (
+    _get_leader_metrics,
     load_universe_candidate_context,
-    passes_deterministic_candidate_gate,
-    should_run_nemotron,
 )
 from core.risk.basic_risk import BasicRiskEngine
 from core.risk.portfolio import PortfolioConfig, PositionState
@@ -24,6 +31,9 @@ from core.runtime.tools import execution_place_order, portfolio_evaluate, risk_a
 from core.runtime.log_rotation import rotate_jsonl_if_needed
 from core.state.portfolio import PortfolioState
 from core.strategy.simple_momo import SimpleMomentumStrategy
+
+NEMOTRON_EVENT_LOG = os.getenv("NEMOTRON_EVENT_LOG", "false").strip().lower() in {"1", "true", "yes", "on"}
+NEMOTRON_FALLBACK_LOG_DEDUPE_SEC = float(os.getenv("NEMOTRON_FALLBACK_LOG_DEDUPE_SEC", "60") or 60.0)
 
 
 @dataclass
@@ -53,6 +63,65 @@ class NemotronStrategist:
         self.portfolio_config = portfolio_config
         self.executor = executor
         self._decision_cache: dict[str, dict[str, Any]] = {}
+        self._memory_store = TradeMemoryStore()
+        self._last_fallback_log_ts_by_error: dict[str, float] = {}
+
+    def _build_portfolio_summary(
+        self,
+        *,
+        portfolio_state: PortfolioState,
+        positions_state: PositionState,
+        current_price: float,
+        current_symbol: str,
+    ) -> dict[str, Any]:
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        open_count = positions_state.count()
+        max_positions = self.portfolio_config.max_open_positions
+        equity = portfolio_state.cash
+        for sym, qty in (portfolio_state.positions or {}).items():
+            mark = (portfolio_state.position_marks or {}).get(sym, 0.0)
+            equity += float(qty) * float(mark)
+
+        pos_details = []
+        for p in positions_state.all():
+            entry_price = p.entry_price or 0.0
+            price = current_price if p.symbol == current_symbol else 0.0
+            pnl_pct = None
+            if entry_price > 0 and price > 0:
+                if p.side == "LONG":
+                    pnl_pct = round(((price / entry_price) - 1.0) * 100.0, 2)
+                else:
+                    pnl_pct = round(((entry_price / price) - 1.0) * 100.0, 2)
+            hold_minutes = None
+            if p.entry_bar_ts:
+                try:
+                    entry_dt = datetime.fromisoformat(str(p.entry_bar_ts).replace("Z", "+00:00"))
+                    hold_minutes = round((now - entry_dt).total_seconds() / 60.0, 1)
+                except Exception:
+                    pass
+            pos_details.append({
+                "symbol": p.symbol,
+                "side": p.side,
+                "lane": p.lane or "L3",
+                "entry_price": round(entry_price, 6),
+                "stop_loss": round(p.stop_loss or 0.0, 6),
+                "take_profit": round(p.take_profit or 0.0, 6),
+                "pnl_pct": pnl_pct,
+                "hold_minutes": hold_minutes,
+                "exit_posture": p.exit_posture,
+            })
+
+        return {
+            "open_positions_count": open_count,
+            "max_open_positions": max_positions,
+            "open_slots": max(0, max_positions - open_count),
+            "equity_usd": round(equity, 2),
+            "cash_usd": round(portfolio_state.cash, 2),
+            "risk_per_trade_pct": float(get_runtime_setting("EXEC_RISK_PER_TRADE_PCT")),
+            "positions": pos_details,
+        }
 
     def _integrate_reflex(self, features: dict[str, Any], reflex: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -98,6 +167,9 @@ class NemotronStrategist:
         reason = str(final_decision.get("reason", "nemotron_integrated"))
         debug = final_decision.get("debug", {}) if isinstance(final_decision.get("debug", {}), dict) else {}
         decision_symbol = str(final_decision.get("symbol", symbol) or symbol)
+        # Model sometimes echoes a prompt placeholder or few-shot example symbol — treat as current symbol
+        if decision_symbol in {"SYMBOL", "<current_symbol>", "CURRENT_SYMBOL", "LINK/USD", "BTC/USD", "ETH/USD"}:
+            decision_symbol = symbol
 
         if action not in {"OPEN", "CLOSE", "HOLD"}:
             return {
@@ -219,158 +291,28 @@ class NemotronStrategist:
     def _build_payload(
         self,
         *,
-        symbol: str,
-        symbols: list[str],
-        features: dict[str, Any],
+        candidate_packet: dict[str, Any],
         reflex: dict[str, Any],
         portfolio_state: PortfolioState,
         positions_state: PositionState,
-        candidate_review: dict[str, Any] | None = None,
         market_state_review: dict[str, Any] | None = None,
-        posture_review: dict[str, Any] | None = None,
-        visual_review: dict[str, Any] | None = None,
         universe_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        from core.policy.candidate_packet import build_local_nemotron_candidate_packet
+
         return sanitize_for_json(
             {
-                "features": {
-                    "symbol": features.get("symbol"),
-                    "lane": features.get("lane"),
-                    "momentum": features.get("momentum"),
-                    "momentum_5": features.get("momentum_5"),
-                    "momentum_14": features.get("momentum_14"),
-                    "momentum_30": features.get("momentum_30"),
-                    "rotation_score": features.get("rotation_score"),
-                    "volatility": features.get("volatility"),
-                    "volume": features.get("volume"),
-                    "volume_ratio": features.get("volume_ratio"),
-                    "volume_surge": features.get("volume_surge"),
-                    "volume_surge_flag": features.get("volume_surge_flag"),
-                    "price_zscore": features.get("price_zscore"),
-                    "history_points": features.get("history_points"),
-                    "indicators_ready": features.get("indicators_ready"),
-                    "rsi": features.get("rsi"),
-                    "atr": features.get("atr"),
-                    "hurst": features.get("hurst"),
-                    "entropy": features.get("entropy"),
-                    "autocorr": features.get("autocorr"),
-                    "bb_middle": features.get("bb_middle"),
-                    "bb_upper": features.get("bb_upper"),
-                    "bb_lower": features.get("bb_lower"),
-                    "bb_bandwidth": features.get("bb_bandwidth"),
-                    "price": features.get("price"),
-                    "book_imbalance": features.get("book_imbalance"),
-                    "book_wall_pressure": features.get("book_wall_pressure"),
-                    "book_bid_depth": features.get("book_bid_depth"),
-                    "book_ask_depth": features.get("book_ask_depth"),
-                    "bar_ts": features.get("bar_ts"),
-                    "bar_idx": features.get("bar_idx"),
-                    "bar_interval_seconds": features.get("bar_interval_seconds"),
-                    "correlation_row": features.get("correlation_row"),
-                    "correlation_symbols": features.get("correlation_symbols"),
-                    "market_fingerprint": features.get("market_fingerprint"),
-                    "market_regime": features.get("market_regime"),
-                    "trend_1h": features.get("trend_1h"),
-                    "regime_7d": features.get("regime_7d"),
-                    "macro_30d": features.get("macro_30d"),
-                    "entry_score": features.get("entry_score"),
-                    "entry_recommendation": features.get("entry_recommendation"),
-                    "reversal_risk": features.get("reversal_risk"),
-                    "entry_reasons": features.get("entry_reasons"),
-                    "sentiment_fng_value": features.get("sentiment_fng_value"),
-                    "sentiment_fng_label": features.get("sentiment_fng_label"),
-                    "sentiment_btc_dominance": features.get("sentiment_btc_dominance"),
-                    "sentiment_market_cap_change_24h": features.get("sentiment_market_cap_change_24h"),
-                    "sentiment_symbol_trending": features.get("sentiment_symbol_trending"),
-                    "ma_7": features.get("ma_7"),
-                    "ma_26": features.get("ma_26"),
-                    "macd": features.get("macd"),
-                    "macd_signal": features.get("macd_signal"),
-                    "macd_hist": features.get("macd_hist"),
-                    "trend_confirmed": features.get("trend_confirmed"),
-                    "ranging_market": features.get("ranging_market"),
-                    "momentum_5m": features.get("momentum_5m"),
-                    "trend_5m": features.get("trend_5m"),
-                    "momentum_15m": features.get("momentum_15m"),
-                    "trend_15m": features.get("trend_15m"),
-                    "finbert_score": features.get("finbert_score"),
-                    "xgb_score": features.get("xgb_score"),
-                },
+                "candidate": build_local_nemotron_candidate_packet(candidate_packet),
                 "reflex": reflex,
-                "micro_state": reflex.get("micro_state"),
-                "symbol": symbol,
-                "symbols": symbols,
-                "runtime_config": get_runtime_snapshot().get("values", {}),
-                "portfolio_config": asdict(self.portfolio_config),
-                "portfolio_state": portfolio_state.to_dict(),
-                "positions_state": [asdict(position) for position in positions_state.all()],
-                "universe_context": universe_context or self._load_universe_candidate_context(symbol),
-                "candidate_review": candidate_review or {},
+                "portfolio_summary": self._build_portfolio_summary(
+                    portfolio_state=portfolio_state,
+                    positions_state=positions_state,
+                    current_price=float(candidate_packet.get("price") or 0.0),
+                    current_symbol=str(candidate_packet.get("symbol") or ""),
+                ),
+                "universe_context": universe_context or self._load_universe_candidate_context(str(candidate_packet.get("symbol") or "")),
                 "market_state_review": market_state_review or {},
-                "posture_review": posture_review or {},
-                "visual_review": visual_review or {},
             }
-        )
-
-    def _build_gated_hold_decision(
-        self,
-        *,
-        features: dict[str, Any],
-        portfolio_state: PortfolioState,
-        gate_reason: str,
-        t_total_start: float,
-    ) -> NemotronDecision:
-        reflex = {
-            "reflex": "allow",
-            "micro_state": "pre_gate_skip",
-            "reason": gate_reason,
-        }
-        integrated_reflex = {
-            "action": "HOLD",
-            "reason": "deterministic_candidate_gate",
-            "debug": {"gate_reason": gate_reason},
-            "override_signal": "FLAT",
-            "size_factor_hint": 1.0,
-            "reflex": reflex["reflex"],
-            "micro_state": reflex["micro_state"],
-            "candidate_review": {
-                "promotion_decision": "demote",
-                "priority": 0.2,
-                "action_bias": "hold_preferred",
-                "reason": gate_reason,
-            },
-            "market_state_review": {},
-            "posture_review": {},
-            "visual_review": {},
-        }
-        signal = strategy_decision(self.strategy, features, reflex_decision=integrated_reflex)
-        risk_checks = risk_adjust(
-            self.risk_engine,
-            signal=signal,
-            features=features,
-            portfolio_state=portfolio_state,
-        )
-        execution = {
-            "status": "no_trade",
-            "bar_ts": features.get("bar_ts"),
-            "bar_idx": features.get("bar_idx"),
-            "reflex": reflex,
-            "nemotron": integrated_reflex,
-        }
-        timings = {
-            "phi3_ms": 0.0,
-            "advisory_ms": 0.0,
-            "nemotron_ms": 0.0,
-            "execution_ms": 0.0,
-            "total_ms": round((time.perf_counter() - t_total_start) * 1000.0, 2),
-        }
-        return NemotronDecision(
-            signal=signal,
-            risk_checks=risk_checks,
-            portfolio_decision={"decision": "allow", "size_factor": 1.0, "reasons": []},
-            execution=execution,
-            reflex={"phi3": reflex, "nemotron": integrated_reflex},
-            timings=timings,
         )
 
     def _build_filtered_hold_decision(
@@ -380,8 +322,6 @@ class NemotronStrategist:
         portfolio_state: PortfolioState,
         reflex: dict[str, Any],
         market_state_review: dict[str, Any],
-        candidate_review: dict[str, Any],
-        posture_review: dict[str, Any],
         reason: str,
         phi3_ms: float,
         t_total_start: float,
@@ -396,8 +336,6 @@ class NemotronStrategist:
             "micro_state": reflex.get("micro_state", "unknown"),
             "visual_review": {},
             "market_state_review": market_state_review,
-            "posture_review": posture_review,
-            "candidate_review": candidate_review,
         }
         signal = strategy_decision(self.strategy, features, reflex_decision=integrated_reflex)
         risk_checks = risk_adjust(
@@ -430,12 +368,18 @@ class NemotronStrategist:
         )
 
     def _log_fallback(self, payload: dict[str, Any], exc: Exception) -> None:
+        error_text = str(exc)
+        now = time.time()
+        last_logged_at = self._last_fallback_log_ts_by_error.get(error_text, 0.0)
+        if (now - last_logged_at) < NEMOTRON_FALLBACK_LOG_DEDUPE_SEC:
+            return
+        self._last_fallback_log_ts_by_error[error_text] = now
         path = Path("logs/nemotron_debug.jsonl")
         path.parent.mkdir(parents=True, exist_ok=True)
         rotate_jsonl_if_needed(path)
         event = {
             "event": "nemotron_fallback",
-            "error": str(exc),
+            "error": error_text,
         }
         if NEMOTRON_DEBUG_VERBOSE:
             event["payload"] = payload
@@ -444,6 +388,8 @@ class NemotronStrategist:
             f.write(json.dumps(event) + "\n")
 
     def _log_event(self, event: dict[str, Any]) -> None:
+        if not NEMOTRON_EVENT_LOG:
+            return
         path = Path("logs/nemotron_debug.jsonl")
         path.parent.mkdir(parents=True, exist_ok=True)
         rotate_jsonl_if_needed(path)
@@ -461,21 +407,10 @@ class NemotronStrategist:
         symbols: list[str],
         proposed_weight: float,
     ) -> NemotronDecision:
+        from core.policy.candidate_packet import build_candidate_packet
+
         t_total_start = time.perf_counter()
         universe_context = load_universe_candidate_context(symbol)
-        gate_passed, gate_reason = passes_deterministic_candidate_gate(
-            symbol=symbol,
-            positions_state=positions_state,
-            features=features,
-            universe_context=universe_context,
-        )
-        if not gate_passed:
-            return self._build_gated_hold_decision(
-                features=features,
-                portfolio_state=portfolio_state,
-                gate_reason=gate_reason,
-                t_total_start=t_total_start,
-            )
         advisory_bundle = build_advisory_bundle(
             symbol=symbol,
             features=features,
@@ -483,114 +418,13 @@ class NemotronStrategist:
         )
         reflex = advisory_bundle.reflex
         market_state_review = advisory_bundle.market_state_review
-        candidate_review = advisory_bundle.candidate_review
-        posture_review = advisory_bundle.posture_review
         visual_review = advisory_bundle.visual_review
         phi3_ms = float(advisory_bundle.timings.get("phi3_ms", 0.0))
         advisory_ms = float(advisory_bundle.timings.get("advisory_ms", 0.0))
-        entry_recommendation = str(features.get("entry_recommendation", "")).upper()
-        buy_candidate = entry_recommendation in {"BUY", "STRONG_BUY"}
-        if candidate_review.get("reason") == "light_advisory_pre_filter" and not buy_candidate:
-            return self._build_filtered_hold_decision(
-                features=features,
-                portfolio_state=portfolio_state,
-                reflex=reflex,
-                market_state_review=market_state_review,
-                candidate_review=candidate_review,
-                posture_review=posture_review,
-                reason="light_advisory_pre_filter",
-                phi3_ms=phi3_ms,
-                t_total_start=t_total_start,
-            )
-        if (
-            candidate_review.get("promotion_decision") == "demote"
-            and candidate_review.get("action_bias") == "hold_preferred"
-            and str(candidate_review.get("reason", "")).strip().lower() == "weak_or_risky_setup"
-            and not buy_candidate
-        ):
-            return self._build_filtered_hold_decision(
-                features=features,
-                portfolio_state=portfolio_state,
-                reflex=reflex,
-                market_state_review=market_state_review,
-                candidate_review={
-                    "promotion_decision": "demote",
-                    "priority": candidate_review.get("priority", 0.2),
-                    "action_bias": "hold_preferred",
-                    "reason": "weak_or_risky_setup_filtered",
-                },
-                posture_review={
-                    "posture": posture_review.get("posture", "neutral"),
-                    "promotion_bias": posture_review.get("promotion_bias", "normal"),
-                    "exit_bias": posture_review.get("exit_bias", "standard"),
-                    "size_bias": posture_review.get("size_bias", "normal"),
-                    "reason": "weak_or_risky_setup_filtered",
-                },
-                reason="weak_or_risky_setup_filtered",
-                phi3_ms=phi3_ms,
-                t_total_start=t_total_start,
-            )
-        if not bool(features.get("indicators_ready", True)):
-            integrated_reflex = {
-                "action": "HOLD",
-                "reason": "nemotron_skipped_indicator_warmup",
-                "debug": {},
-                "override_signal": None,
-                "size_factor_hint": 1.0,
-                "reflex": reflex.get("reflex", "allow"),
-                "micro_state": reflex.get("micro_state", "unknown"),
-                "visual_review": visual_review,
-                "market_state_review": market_state_review,
-                "posture_review": posture_review,
-                "candidate_review": candidate_review,
-            }
-            signal = strategy_decision(self.strategy, features, reflex_decision=integrated_reflex)
-            risk_checks = risk_adjust(
-                self.risk_engine,
-                signal=signal,
-                features=features,
-                portfolio_state=portfolio_state,
-            )
-            execution = {
-                "status": "no_trade",
-                "bar_ts": features.get("bar_ts"),
-                "bar_idx": features.get("bar_idx"),
-                "reflex": reflex,
-                "nemotron": integrated_reflex,
-            }
-            timings = {
-                "phi3_ms": round(phi3_ms, 2),
-                "advisory_ms": round(advisory_ms, 2),
-                "nemotron_ms": 0.0,
-                "execution_ms": 0.0,
-                "total_ms": round((time.perf_counter() - t_total_start) * 1000.0, 2),
-            }
-            return NemotronDecision(
-                signal=signal,
-                risk_checks=risk_checks,
-                portfolio_decision={"decision": "allow", "size_factor": 1.0, "reasons": []},
-                execution=execution,
-                reflex={"phi3": reflex, "nemotron": integrated_reflex},
-                timings=timings,
-            )
-        if not should_run_nemotron(
-            symbol=symbol,
-            features=features,
-            positions_state=positions_state,
-            universe_context=universe_context,
-            candidate_review=candidate_review,
-        ):
-            return self._build_filtered_hold_decision(
-                features=features,
-                portfolio_state=portfolio_state,
-                reflex=reflex,
-                market_state_review=market_state_review,
-                candidate_review=candidate_review,
-                posture_review=posture_review,
-                reason="phi3_candidate_manager",
-                phi3_ms=phi3_ms,
-                t_total_start=t_total_start,
-            )
+        # All pre-gates disabled — once a symbol reaches single-symbol strategist review,
+        # Nemo should make the call instead of being short-circuited by legacy advisory gating.
+        leader_urgency, leader_takeover = _get_leader_metrics(symbol, universe_context)
+        lane = str(features.get("lane", "L3") or "L3").upper()
         fingerprint = self._decision_fingerprint(
             symbol=symbol,
             features=features,
@@ -600,26 +434,21 @@ class NemotronStrategist:
         cached_decision = self._get_cached_decision(symbol=symbol, fingerprint=fingerprint)
         if cached_decision is not None:
             return cached_decision
-        client = NemotronClient(
-            strategy=self.strategy,
-            risk=self.risk_engine,
-            portfolio_config=self.portfolio_config,
-            execution=self.executor,
-            portfolio_state=portfolio_state,
+        lesson_summary = self._memory_store.build_symbol_lesson_block(symbol)
+        behavior_score = self._memory_store.build_behavior_score_block(lookback=50) or None
+        candidate_packet = build_candidate_packet(
+            features=features,
             positions_state=positions_state,
-            symbols=symbols,
+            portfolio_state=portfolio_state,
+            lesson_summary=lesson_summary,
+            behavior_score=behavior_score,
         )
         payload = self._build_payload(
-            symbol=symbol,
-            symbols=symbols,
-            features=features,
+            candidate_packet=candidate_packet,
             reflex=reflex,
             portfolio_state=portfolio_state,
             positions_state=positions_state,
-            candidate_review=candidate_review,
             market_state_review=market_state_review,
-            posture_review=posture_review,
-            visual_review=visual_review,
             universe_context=universe_context,
         )
         self._log_event(
@@ -633,12 +462,11 @@ class NemotronStrategist:
         nemotron_ms = 0.0
         try:
             t_nemo_start = time.perf_counter()
-            client.set_features(features)
-            parsed = run_nemotron_tool_loop(
+            raw = nemotron_chat(
                 payload,
-                system=NEMOTRON_STRATEGIST_SYSTEM_PROMPT,
-                tool_registry=client.tools,
+                system=get_nemotron_strategist_system_prompt(),
             )
+            parsed = parse_json_response(raw)
             nemotron_ms = (time.perf_counter() - t_nemo_start) * 1000.0
             self._log_event(
                 {
@@ -647,6 +475,7 @@ class NemotronStrategist:
                     "parsed": parsed,
                 }
             )
+            parsed = normalize_trade_reviewer_output(parsed, symbol=symbol)
             final_decision = parsed.get("final_decision", {})
             integrated_reflex = {
                 **self._validate_final_decision(
@@ -657,65 +486,16 @@ class NemotronStrategist:
                 "reflex": reflex.get("reflex", "allow"),
                 "micro_state": reflex.get("micro_state", "unknown"),
                 "visual_review": visual_review,
-                "candidate_review": candidate_review,
                 "market_state_review": market_state_review,
-                "posture_review": posture_review,
             }
-            if (
-                integrated_reflex.get("action") == "OPEN"
-                and candidate_review.get("action_bias") == "hold_preferred"
-                and str(features.get("entry_recommendation", "")).upper() == "WATCH"
-            ):
-                integrated_reflex = {
-                    "action": "HOLD",
-                    "reason": "candidate_review_hold_preferred",
-                    "debug": {"candidate_review": candidate_review},
-                    "override_signal": "FLAT",
-                    "size_factor_hint": 1.0,
-                    "reflex": reflex.get("reflex", "allow"),
-                    "micro_state": reflex.get("micro_state", "unknown"),
-                    "visual_review": visual_review,
-                    "candidate_review": candidate_review,
-                    "market_state_review": market_state_review,
-                    "posture_review": posture_review,
-                }
-            elif integrated_reflex.get("action") == "OPEN" and candidate_review.get("action_bias") == "reduce_size":
-                integrated_reflex["size_factor_hint"] = float(integrated_reflex.get("size_factor_hint", 1.0)) * 0.5
-            if integrated_reflex.get("action") == "OPEN":
-                size_factor_hint = float(integrated_reflex.get("size_factor_hint", 1.0))
-                if posture_review.get("size_bias") == "reduce":
-                    integrated_reflex["size_factor_hint"] = size_factor_hint * 0.75
-                elif posture_review.get("size_bias") == "increase":
-                    integrated_reflex["size_factor_hint"] = min(size_factor_hint * 1.1, 2.0)
         except Exception as exc:
             self._log_fallback(payload, exc)
             integrated_reflex = self._integrate_reflex(features, reflex)
-            filtered_candidate_review = candidate_review
-            filtered_posture_review = posture_review
             filtered_visual_review = visual_review
-            if (
-                candidate_review.get("promotion_decision") == "demote"
-                and candidate_review.get("action_bias") == "hold_preferred"
-            ):
-                filtered_candidate_review = {
-                    "promotion_decision": "demote",
-                    "priority": candidate_review.get("priority", 0.2),
-                    "action_bias": "hold_preferred",
-                    "reason": "fallback_phi3_only",
-                }
-                filtered_posture_review = {
-                    "posture": posture_review.get("posture", "neutral"),
-                    "promotion_bias": posture_review.get("promotion_bias", "normal"),
-                    "exit_bias": posture_review.get("exit_bias", "standard"),
-                    "size_bias": posture_review.get("size_bias", "normal"),
-                    "reason": "fallback_phi3_only",
-                }
-                filtered_visual_review = {}
-                advisory_ms = 0.0
-            integrated_reflex["candidate_review"] = filtered_candidate_review
+            filtered_visual_review = {}
+            advisory_ms = 0.0
             integrated_reflex["visual_review"] = filtered_visual_review
             integrated_reflex["market_state_review"] = market_state_review
-            integrated_reflex["posture_review"] = filtered_posture_review
         signal = strategy_decision(self.strategy, features, reflex_decision=integrated_reflex)
         if self._reflex_is_hard_block(reflex):
             signal = "FLAT"
@@ -755,6 +535,15 @@ class NemotronStrategist:
                 "bar_idx": features.get("bar_idx"),
             }
             execution_ms = 0.0
+        elif portfolio_decision["decision"] == "replace":
+            execution = {
+                "status": "no_trade",
+                "reason": ["replacement_required"],
+                "replace_symbol": portfolio_decision.get("replace_symbol"),
+                "bar_ts": features.get("bar_ts"),
+                "bar_idx": features.get("bar_idx"),
+            }
+            execution_ms = 0.0
         else:
             t_execution_start = time.perf_counter()
             execution = execution_place_order(
@@ -787,3 +576,313 @@ class NemotronStrategist:
         )
         self._store_cached_decision(symbol=symbol, fingerprint=fingerprint, decision=decision)
         return decision
+
+    def batch_decide(
+        self,
+        *,
+        candidates: list[dict[str, Any]],
+        portfolio_state: "PortfolioState",
+        positions_state: PositionState,
+        symbols: list[str],
+        market_state_summary: str = "",
+    ) -> "dict[str, NemotronDecision]":
+        """Single Nemo call for all candidates — comparative ranking instead of 15 serial calls."""
+        if not candidates:
+            return {}
+
+        t_start = time.perf_counter()
+        open_count = positions_state.count()
+        max_positions = self.portfolio_config.max_open_positions
+        open_slots = max(0, max_positions - open_count)
+        cash = float(portfolio_state.cash)
+        risk_pct = float(get_runtime_setting("EXEC_RISK_PER_TRADE_PCT"))
+        max_trade = cash * risk_pct / 100.0
+
+        positions_lines = [
+            f"  HOLDING {sym}"
+            for sym, qty in (portfolio_state.positions or {}).items()
+            if float(qty or 0) > 0
+        ]
+        positions_block = "\n".join(positions_lines) if positions_lines else "  (none)"
+
+        rows = []
+        for c in candidates:
+            sym = c["symbol"]
+            f = c["features"]
+            phi3 = str(c.get("reflex", {}).get("reflex", "allow"))
+            pattern_candidate = f.get("pattern_candidate", {}) if isinstance(f.get("pattern_candidate", {}), dict) else {}
+            pattern_verification = f.get("pattern_verification", {}) if isinstance(f.get("pattern_verification", {}), dict) else {}
+            lane = str(f.get("lane", "L3") or "L3")
+            score = float(f.get("entry_score", 0.0) or 0.0)
+            rec = str(f.get("entry_recommendation", "WATCH") or "WATCH")[:10]
+            risk = str(f.get("reversal_risk", "MEDIUM") or "MEDIUM")[:6]
+            m5 = float(f.get("momentum_5", 0.0) or 0.0) * 100.0
+            rsi = float(f.get("rsi", 50.0) or 50.0)
+            vol = float(f.get("volume_ratio", 1.0) or 1.0)
+            macd_h = float(f.get("macd_hist", 0.0) or 0.0)
+            adx = float(f.get("adx", 0.0) or 0.0)
+            trend_ok = bool(f.get("trend_confirmed", False))
+            ranging = bool(f.get("ranging_market", False))
+            structure_quality = float(f.get("structure_quality", 0.0) or 0.0)
+            trade_quality = float(f.get("trade_quality", 0.0) or 0.0)
+            risk_quality = float(f.get("risk_quality", 0.0) or 0.0)
+            ema9 = bool(f.get("ema9_above_ema20", False))
+            brk = bool(f.get("range_breakout_1h", False))
+            pb = bool(f.get("pullback_hold", False))
+            hl = int(f.get("higher_low_count", 0) or 0)
+            vs = float(f.get("volume_surge", 0.0) or 0.0) * 100.0
+            m14 = float(f.get("momentum_14", 0.0) or 0.0) * 100.0
+            rot = float(f.get("rotation_score", 0.0) or 0.0)
+            _pb = f.get("point_breakdown") or {}
+            net_edge = float(_pb.get("net_edge_pct", 0.0) or 0.0)
+            cost_penalty = float(_pb.get("cost_penalty_pts", 0.0) or 0.0)
+            pattern_name = str(pattern_candidate.get("pattern", "none") or "none")
+            pattern_validity = str(pattern_verification.get("validity", "unclear") or "unclear")
+            pattern_quality = float(pattern_verification.get("pattern_quality_score", 0.0) or 0.0)
+            extension_risk = float(pattern_verification.get("extension_risk_score", 0.0) or 0.0)
+            rows.append(
+                f"{sym:<14}|{lane:<3}|score:{score:>4.0f}|{rec:<10}|{risk:<6}"
+                f"|m5:{m5:>+5.1f}%|m14:{m14:>+5.1f}%|rsi:{rsi:>4.0f}|vol:{vol:>4.1f}x|vs:{vs:>4.1f}%"
+                f"|macd_h:{macd_h:>+7.4f}|adx:{adx:>4.0f}|rot:{rot:>4.2f}"
+                f"|sq:{structure_quality:>4.0f}|tq:{trade_quality:>4.0f}|rq:{risk_quality:>4.0f}"
+                f"|trend:{'Y' if trend_ok else 'N'}|chop:{'Y' if ranging else 'N'}"
+                f"|ema:{'Y' if ema9 else 'N'}|brk:{'Y' if brk else 'N'}|pb:{'Y' if pb else 'N'}|hl:{hl}"
+                f"|net_edge:{net_edge:>+5.2f}%|cost_pen:{cost_penalty:>+4.0f}pts"
+                f"|phi3:{phi3}|pat:{pattern_name}|pver:{pattern_validity}|pqs:{pattern_quality:>3.2f}|ext:{extension_risk:>3.2f}"
+            )
+        table = "\n".join(rows)
+
+        payload = {
+            "open_slots": open_slots,
+            "max_positions": max_positions,
+            "cash_usd": round(cash, 2),
+            "risk_pct": round(risk_pct, 1),
+            "max_trade_usd": round(max_trade, 2),
+            "open_positions": positions_block,
+            "market_context": market_state_summary or "unknown",
+            "candidates": table,
+        }
+
+        # Inject learned lessons so Nemo improves from past trades
+        lessons_block = self._memory_store.build_lessons_block(max_lessons=8)
+        if lessons_block:
+            payload["learned_lessons"] = lessons_block
+
+        # Inject AI behavior score so Nemo self-calibrates entry strictness
+        behavior_block = self._memory_store.build_behavior_score_block(lookback=50)
+        if behavior_block:
+            payload["behavior_score"] = behavior_block
+
+        t_nemo = time.perf_counter()
+        reasoning = ""
+        decision_map: dict[str, dict[str, Any]] = {}
+        batch_parse_failed = False
+        raw = ""
+
+        def _extract_batch_decisions(parsed: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+            reasoning_text = str(parsed.get("reasoning", ""))
+            decisions = parsed.get("decisions")
+            if isinstance(decisions, list):
+                return reasoning_text, [d for d in decisions if isinstance(d, dict)]
+
+            tool_result = parsed.get("tool_result")
+            if isinstance(tool_result, dict):
+                nested_result = tool_result.get("result")
+                if isinstance(nested_result, dict):
+                    nested_reasoning = str(nested_result.get("reasoning", reasoning_text))
+                    nested_decisions = nested_result.get("decisions")
+                    if isinstance(nested_decisions, list):
+                        return nested_reasoning, [d for d in nested_decisions if isinstance(d, dict)]
+
+            args = parsed.get("args")
+            if isinstance(args, dict):
+                nested_reasoning = str(args.get("reasoning", reasoning_text))
+                nested_decisions = args.get("decisions")
+                if isinstance(nested_decisions, list):
+                    return nested_reasoning, [d for d in nested_decisions if isinstance(d, dict)]
+
+            raise ValueError("batch response missing decisions list")
+
+        def _deterministic_batch_fallback(features: dict[str, Any]) -> dict[str, Any]:
+            # Never open positions when Nemo fails JSON — only real Nemo decisions may open trades.
+            # The old deterministic OPEN path was causing entries during model failures/downtrends.
+            return {
+                "action": "HOLD",
+                "reason": "batch_parse_fallback_hold",
+                "size": 0,
+            }
+        try:
+            batch_max_tokens = max(600, int(os.getenv("NEMOTRON_BATCH_MAX_TOKENS", "1800") or 1800))
+            raw = nemotron_chat(
+                payload,
+                system=get_nemotron_batch_strategist_prompt(),
+                max_tokens=batch_max_tokens,
+            )
+            nemo_ms = (time.perf_counter() - t_nemo) * 1000.0
+            # Strip chain-of-thought prefix — find the JSON object
+            parsed = parse_json_response(raw)
+            reasoning, parsed_decisions = _extract_batch_decisions(parsed)
+            for d in parsed_decisions:
+                sym = str(d.get("symbol", ""))
+                if sym:
+                    decision_map[sym] = d
+        except Exception as exc:
+            nemo_ms = (time.perf_counter() - t_nemo) * 1000.0
+            reasoning = f"batch_error:{exc}"
+            batch_parse_failed = True
+            self._log_event(
+                {
+                    "event": "nemotron_batch_failure",
+                    "provider": nemotron_provider_name(),
+                    "candidate_count": len(candidates),
+                    "raw_response": raw,
+                    "error": str(exc),
+                }
+            )
+
+        if (
+            batch_parse_failed
+            and nemotron_provider_name() == "local"
+            and os.getenv("NEMOTRON_LOCAL_BATCH_SINGLE_FALLBACK", "true").lower() in {"1", "true", "yes", "on"}
+        ):
+            return {
+                c["symbol"]: self.decide(
+                    symbol=c["symbol"],
+                    features=c["features"],
+                    portfolio_state=portfolio_state,
+                    positions_state=positions_state,
+                    symbols=symbols,
+                    proposed_weight=float(c.get("proposed_weight", 0.1) or 0.1),
+                )
+                for c in candidates
+            }
+
+        results: dict[str, NemotronDecision] = {}
+        slots_used = 0
+
+        for c in candidates:
+            sym = c["symbol"]
+            features = c["features"]
+            proposed_weight = float(c.get("proposed_weight", 0.1))
+            reflex = c.get("reflex", {"reflex": "allow", "micro_state": "stable", "reason": "batch"})
+            t_sym = time.perf_counter()
+
+            if sym in decision_map:
+                d = decision_map[sym]
+            elif batch_parse_failed:
+                d = _deterministic_batch_fallback(features)
+            else:
+                d = {"action": "HOLD", "reason": "not_ranked_by_batch"}
+            action = str(d.get("action", "HOLD")).upper()
+            side_raw = d.get("side")
+            side = str(side_raw).upper() if side_raw else None
+            if side == "BUY":
+                side = "LONG"
+            elif side == "SELL":
+                side = "SHORT"
+            reason = str(d.get("reason", "batch_hold"))
+            size_raw = d.get("size", 0)
+
+            # Enforce slot limit across batch
+            if action == "OPEN" and slots_used >= open_slots:
+                action = "HOLD"
+                reason = "batch_slots_exhausted"
+                side = None
+
+            # Cooldown: block re-entry if this symbol was recently closed
+            if action == "OPEN":
+                cooldown_min = float(get_runtime_setting("REENTRY_COOLDOWN_MIN") if hasattr(get_runtime_setting("REENTRY_COOLDOWN_MIN"), "__float__") else 240.0)
+                try:
+                    cooldown_min = float(get_runtime_setting("REENTRY_COOLDOWN_MIN"))
+                except Exception:
+                    cooldown_min = 240.0
+                if self._memory_store.is_in_cooldown(sym, cooldown_minutes=cooldown_min):
+                    action = "HOLD"
+                    reason = "reentry_cooldown"
+                    side = None
+
+            integrated_reflex = {
+                "action": action,
+                "reason": reason,
+                "debug": {"batch": True, "batch_reasoning": reasoning[:120]},
+                "override_signal": side if action == "OPEN" and side in {"LONG", "SHORT"} else "FLAT",
+                "size_factor_hint": 1.0,
+                "reflex": reflex.get("reflex", "allow"),
+                "micro_state": reflex.get("micro_state", "stable"),
+            }
+
+            signal = strategy_decision(self.strategy, features, reflex_decision=integrated_reflex)
+            if self._reflex_is_hard_block(reflex):
+                signal = "FLAT"
+
+            risk_checks = risk_adjust(
+                self.risk_engine,
+                signal=signal,
+                features=features,
+                portfolio_state=portfolio_state,
+            )
+            portfolio_decision = portfolio_evaluate(
+                config=self.portfolio_config,
+                positions=positions_state,
+                symbol=sym,
+                signal=signal,
+                proposed_weight=proposed_weight,
+                features=features,
+                symbols=symbols,
+            )
+            if portfolio_decision["reasons"]:
+                risk_checks.extend(portfolio_decision["reasons"])
+            if portfolio_decision["decision"] == "block" and "block" not in risk_checks:
+                risk_checks.append("block")
+
+            if (
+                action == "OPEN"
+                and side in {"LONG", "SHORT"}
+                and not self._reflex_is_hard_block(reflex)
+                and portfolio_decision["decision"] != "replace"
+                and "block" not in risk_checks
+            ):
+                try:
+                    size_hint = float(size_raw) / max(max_trade, 1.0) if float(size_raw or 0) > 0 else 1.0
+                except (TypeError, ValueError):
+                    size_hint = 1.0
+                execution = execution_place_order(
+                    self.executor,
+                    signal=signal,
+                    symbol=sym,
+                    features=features,
+                    portfolio_state=portfolio_state,
+                    size_factor=portfolio_decision["size_factor"] * min(size_hint, 2.0),
+                )
+                if execution.get("status") == "filled":
+                    slots_used += 1
+            else:
+                execution = {
+                    "status": "no_trade",
+                    "bar_ts": features.get("bar_ts"),
+                    "bar_idx": features.get("bar_idx"),
+                }
+                if portfolio_decision["decision"] == "replace":
+                    execution["reason"] = ["replacement_required"]
+                    execution["replace_symbol"] = portfolio_decision.get("replace_symbol")
+
+            execution["reflex"] = reflex
+            execution["nemotron"] = integrated_reflex
+            amortized_ms = round(nemo_ms / max(len(candidates), 1), 2)
+            timings = {
+                "phi3_ms": round(float(c.get("phi3_ms", 0.0)), 2),
+                "advisory_ms": 0.0,
+                "nemotron_ms": amortized_ms,
+                "execution_ms": round((time.perf_counter() - t_sym) * 1000.0, 2),
+                "total_ms": round((time.perf_counter() - t_start) * 1000.0, 2),
+            }
+            results[sym] = NemotronDecision(
+                signal=signal,
+                risk_checks=risk_checks,
+                portfolio_decision=portfolio_decision,
+                execution=execution,
+                reflex={"phi3": reflex, "nemotron": integrated_reflex},
+                timings=timings,
+            )
+
+        return results

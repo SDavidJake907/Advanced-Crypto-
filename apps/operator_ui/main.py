@@ -48,6 +48,21 @@ def _read_jsonl_tail(path: Path, limit: int) -> list[dict[str, Any]]:
     return items[-limit:]
 
 
+def _summarize_alerts(items: list[dict[str, Any]]) -> dict[str, Any]:
+    level_counts: dict[str, int] = {}
+    source_counts: dict[str, int] = {}
+    for item in items:
+        level = str(item.get("level", "unknown") or "unknown").lower()
+        source = str(item.get("source", "unknown") or "unknown").lower()
+        level_counts[level] = level_counts.get(level, 0) + 1
+        source_counts[source] = source_counts.get(source, 0) + 1
+    return {
+        "count": len(items),
+        "levels": level_counts,
+        "sources": source_counts,
+    }
+
+
 def _load_universe() -> dict[str, Any]:
     return _read_json(ROOT / "universe.json")
 
@@ -173,6 +188,7 @@ def _summarize_decisions(items: list[dict[str, Any]]) -> dict[str, Any]:
     action_counts: dict[str, int] = {}
     range_blocks = 0
     fallback_holds = 0
+    blocked_reasons: dict[str, int] = {}
     for item in items:
         nemotron = item.get("nemotron", {})
         if isinstance(nemotron, dict):
@@ -186,10 +202,26 @@ def _summarize_decisions(items: list[dict[str, Any]]) -> dict[str, Any]:
                 range_blocks += 1
             if reason == "nemotron_fallback_hold":
                 fallback_holds += 1
+        if str(item.get("execution_status", "")).lower() == "blocked":
+            raw_reason = item.get("execution_reason", "")
+            if isinstance(raw_reason, list):
+                for reason in raw_reason:
+                    key = str(reason or "").strip()
+                    if key:
+                        blocked_reasons[key] = blocked_reasons.get(key, 0) + 1
+            else:
+                key = str(raw_reason or "").strip()
+                if key:
+                    blocked_reasons[key] = blocked_reasons.get(key, 0) + 1
     return {
         "actions": action_counts,
         "reasons": sorted(
             ({"reason": key, "count": value} for key, value in reason_counts.items()),
+            key=lambda item: item["count"],
+            reverse=True,
+        )[:8],
+        "blocked_reasons": sorted(
+            ({"reason": key, "count": value} for key, value in blocked_reasons.items()),
             key=lambda item: item["count"],
             reverse=True,
         )[:8],
@@ -212,6 +244,11 @@ def _summarize_lane_metrics(items: list[dict[str, Any]]) -> dict[str, Any]:
                 "holds": 0,
                 "no_trade": 0,
                 "top_reasons": {},
+                "llm_approve": 0,
+                "llm_reject": 0,
+                "llm_defer": 0,
+                "llm_normalized_fields": 0,
+                "llm_defer_reasons": {},
             },
         )
         row["total"] += 1
@@ -230,6 +267,21 @@ def _summarize_lane_metrics(items: list[dict[str, Any]]) -> dict[str, Any]:
         if reason:
             top_reasons = row["top_reasons"]
             top_reasons[reason] = top_reasons.get(reason, 0) + 1
+        llm_metrics = item.get("llm_metrics", {}) if isinstance(item.get("llm_metrics", {}), dict) else {}
+        aggregate = llm_metrics.get("aggregate", {}) if isinstance(llm_metrics.get("aggregate", {}), dict) else {}
+        row["llm_approve"] += int(aggregate.get("approve", 0) or 0)
+        row["llm_reject"] += int(aggregate.get("reject", 0) or 0)
+        row["llm_defer"] += int(aggregate.get("defer", 0) or 0)
+        row["llm_normalized_fields"] += int(aggregate.get("normalized_fields", 0) or 0)
+        roles = llm_metrics.get("roles", []) if isinstance(llm_metrics.get("roles", []), list) else []
+        for role_item in roles:
+            if not isinstance(role_item, dict):
+                continue
+            if str(role_item.get("decision", "")).lower() != "defer":
+                continue
+            reason_key = str(role_item.get("defer_reason_category", "") or "unknown")
+            defer_reasons = row["llm_defer_reasons"]
+            defer_reasons[reason_key] = defer_reasons.get(reason_key, 0) + 1
     ranked = []
     for row in per_lane.values():
         top_reasons = sorted(
@@ -237,7 +289,12 @@ def _summarize_lane_metrics(items: list[dict[str, Any]]) -> dict[str, Any]:
             key=lambda item: item["count"],
             reverse=True,
         )[:3]
-        ranked.append({**row, "top_reasons": top_reasons})
+        llm_defer_reasons = sorted(
+            ({"reason": key, "count": value} for key, value in row["llm_defer_reasons"].items()),
+            key=lambda item: item["count"],
+            reverse=True,
+        )[:5]
+        ranked.append({**row, "top_reasons": top_reasons, "llm_defer_reasons": llm_defer_reasons})
     ranked.sort(key=lambda item: item["lane"])
     return {"lanes": ranked}
 
@@ -287,6 +344,60 @@ def _summarize_collector_depth(collector: dict[str, Any]) -> dict[str, Any]:
     return {"top_depth": ranked[:8]}
 
 
+def _summarize_collector_status(collector: dict[str, Any]) -> str:
+    if not isinstance(collector, dict) or not collector:
+        return "missing"
+    telemetry = collector.get("trade_counts", {})
+    top_depth = collector.get("top_depth", {})
+    if isinstance(telemetry, dict):
+        processed = int(telemetry.get("processed", 0) or 0)
+        invalid_volume = int(telemetry.get("invalid_volume", 0) or 0)
+        dropped = int(telemetry.get("dropped_unknown_symbol", 0) or 0)
+        if processed > 0:
+            if invalid_volume > 0 or dropped > 0:
+                return "degraded"
+            return "healthy"
+    if isinstance(top_depth, dict) and top_depth:
+        return "healthy"
+    return "stale"
+
+
+def _summarize_nemo_recommendations(items: list[dict[str, Any]]) -> dict[str, Any]:
+    action_counts: dict[str, int] = {}
+    symbol_counts: dict[str, int] = {}
+    for item in items:
+        action = str(item.get("action", "") or "").upper()
+        symbol = str(item.get("symbol", "") or "")
+        if action:
+            action_counts[action] = action_counts.get(action, 0) + 1
+        if symbol:
+            symbol_counts[symbol] = symbol_counts.get(symbol, 0) + 1
+    return {
+        "count": len(items),
+        "actions": action_counts,
+        "symbols": sorted(
+            ({"symbol": key, "count": value} for key, value in symbol_counts.items()),
+            key=lambda item: item["count"],
+            reverse=True,
+        )[:8],
+    }
+
+
+def _summarize_runtime_profile() -> dict[str, Any]:
+    runtime_overrides = _read_json(ROOT / "configs" / "runtime_overrides.json")
+    overrides = runtime_overrides.get("overrides", {}) if isinstance(runtime_overrides.get("overrides", {}), dict) else {}
+    return {
+        "max_open_positions": int(overrides.get("PORTFOLIO_MAX_OPEN_POSITIONS", 0) or 0),
+        "max_weight_per_symbol": float(overrides.get("PORTFOLIO_MAX_WEIGHT_PER_SYMBOL", 0.0) or 0.0),
+        "max_total_gross_exposure": float(overrides.get("PORTFOLIO_MAX_TOTAL_GROSS_EXPOSURE", 0.0) or 0.0),
+        "strict_entry_enabled": bool(overrides.get("STABILIZATION_STRICT_ENTRY_ENABLED", False)),
+        "min_entry_score": float(overrides.get("STABILIZATION_MIN_ENTRY_SCORE", 0.0) or 0.0),
+        "allowed_lanes": str(overrides.get("STABILIZATION_ALLOWED_LANES", "") or ""),
+        "require_trend_confirmed": bool(overrides.get("STABILIZATION_REQUIRE_TREND_CONFIRMED", False)),
+        "require_short_tf_ready_15m": bool(overrides.get("STABILIZATION_REQUIRE_SHORT_TF_READY_15M", False)),
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
     return (APP_DIR / "dashboard.html").read_text(encoding="utf-8")
@@ -304,10 +415,13 @@ def status() -> dict[str, Any]:
     open_orders = _read_open_orders()
     optimizer_reviews = _read_jsonl_tail(ROOT / "logs" / "nvidia_optimizer_reviews.jsonl", 5)
     decision_debug = _read_jsonl_tail(ROOT / "logs" / "decision_debug.jsonl", 12)
+    alerts = _read_jsonl_tail(ROOT / "logs" / "alerts.jsonl", 20)
+    nemo_recommendations = _read_jsonl_tail(ROOT / "logs" / "nemo_recommendations.jsonl", 20)
     visual_feed = _read_jsonl_tail(ROOT / "logs" / "visual_phi3_feed.jsonl", 5)
     universe = _load_universe()
     universe_summary = _summarize_universe_meta(universe)
     collector_depth = _summarize_collector_depth(collector)
+    runtime_profile = _summarize_runtime_profile()
 
     latest_decision = decision_debug[-1] if decision_debug else {}
     latest_visual = next(
@@ -340,6 +454,7 @@ def status() -> dict[str, Any]:
             "dust_count": len(account_sync.get("ignored_dust", {})),
         },
         "accounting": _build_accounting_summary(account_sync, open_orders),
+        "runtime_profile": runtime_profile,
         "universe": {
             "active_count": len(active_pairs),
             "active_pairs": active_pairs[:20],
@@ -347,13 +462,18 @@ def status() -> dict[str, Any]:
             "lane_supervision_count": len(lane_supervision),
         },
         "collector": collector,
+        "collector_status": _summarize_collector_status(collector),
         "collector_depth": collector_depth,
         "latest_decision": latest_decision,
+        "alerts": alerts[-10:],
+        "alert_summary": _summarize_alerts(alerts),
         "decision_summary": _summarize_decisions(decision_debug),
         "lane_metrics": _summarize_lane_metrics(decision_debug),
         "recent_decisions": decision_debug[-5:],
         "latest_visual_review": latest_visual,
         "optimizer_reviews": optimizer_reviews,
+        "nemo_recommendations": nemo_recommendations[-10:],
+        "nemo_recommendation_summary": _summarize_nemo_recommendations(nemo_recommendations),
         "universe_summary": universe_summary,
         "diagnostics": {
             "trades_history_error": (

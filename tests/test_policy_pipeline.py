@@ -1,8 +1,10 @@
 import unittest
 
+from core.policy.nemotron_gate import _passes_market_state_entry_gate, passes_deterministic_candidate_gate
 from core.policy.candidate_score import score_candidate
 from core.policy.pipeline import apply_policy_pipeline
 from core.policy.verdict import extract_policy_verdict
+from core.risk.portfolio import PositionState
 
 
 class PolicyPipelineTests(unittest.TestCase):
@@ -128,6 +130,198 @@ class PolicyPipelineTests(unittest.TestCase):
         self.assertIn("volume_expansion", reasons)
         self.assertIn("rotation_leader", reasons)
         self.assertIn("lane3_rsi_hot", reasons)
+
+    def test_low_volume_becomes_soft_warning_not_hard_filter(self) -> None:
+        policy = apply_policy_pipeline(
+            "TEST/USD",
+            {
+                "symbol": "TEST/USD",
+                "lane": "L3",
+                "momentum": 0.01,
+                "momentum_5": 0.004,
+                "momentum_14": 0.006,
+                "momentum_30": 0.002,
+                "trend_1h": 1,
+                "volume_ratio": 0.35,
+                "volume_surge": 0.01,
+                "price_zscore": 0.3,
+                "rsi": 55.0,
+                "regime_7d": "trending",
+                "macro_30d": "bull",
+                "price": 100.0,
+                "atr": 1.0,
+                "bb_bandwidth": 0.02,
+                "spread_pct": 0.001,
+                "rotation_score": 0.08,
+                "market_regime": {"breadth": 0.5, "rv_mkt": 0.0},
+                "correlation_row": [],
+                "hurst": 0.58,
+                "autocorr": 0.05,
+                "entropy": 0.5,
+            },
+        )
+        self.assertTrue(policy["lane_filter_pass"])
+        self.assertEqual(policy["lane_filter_reason"], "lane3_vol_low_warning")
+        self.assertEqual(policy["lane_filter_severity"], "soft")
+        self.assertEqual(policy["entry_recommendation"], "BUY")
+        self.assertEqual(policy["promotion_tier"], "skip")
+
+    def test_lane2_real_mover_gets_promoted(self) -> None:
+        policy = apply_policy_pipeline(
+            "APT/USD",
+            {
+                "symbol": "APT/USD",
+                "lane": "L2",
+                "indicators_ready": True,
+                "momentum": 0.01,
+                "momentum_5": 0.006,
+                "momentum_14": 0.01,
+                "momentum_30": 0.002,
+                "trend_1h": 1,
+                "volume_ratio": 0.95,
+                "volume_surge": 0.3,
+                "price_zscore": 0.2,
+                "rsi": 55.0,
+                "regime_7d": "trending",
+                "macro_30d": "bull",
+                "price": 100.0,
+                "atr": 1.0,
+                "bb_bandwidth": 0.02,
+                "spread_pct": 0.001,
+                "rotation_score": 0.09,
+                "market_regime": {"breadth": 0.5, "rv_mkt": 0.0},
+                "correlation_row": [],
+                "hurst": 0.58,
+                "autocorr": 0.05,
+                "entropy": 0.5,
+                "short_tf_ready_5m": True,
+                "trade_quality": 58.0,
+                "continuation_quality": 62.0,
+                "structure_quality": 60.0,
+            },
+        )
+        self.assertEqual(policy["entry_recommendation"], "STRONG_BUY")
+        self.assertEqual(policy["promotion_tier"], "promote")
+        self.assertEqual(policy["promotion_reason"], "strong_buy_low_risk")
+
+    def test_watch_path_without_mover_signal_does_not_crash(self) -> None:
+        policy = apply_policy_pipeline(
+            "TEST/USD",
+            {
+                "symbol": "TEST/USD",
+                "lane": "L2",
+                "indicators_ready": True,
+                "momentum": 0.0,
+                "momentum_5": 0.0,
+                "momentum_14": 0.001,
+                "momentum_30": 0.0,
+                "trend_1h": 0,
+                "trend_confirmed": False,
+                "volume_ratio": 0.2,
+                "volume_surge": 0.0,
+                "price_zscore": 0.0,
+                "rsi": 50.0,
+                "regime_7d": "sideways",
+                "macro_30d": "sideways",
+                "price": 100.0,
+                "atr": 1.0,
+                "bb_bandwidth": 0.02,
+                "spread_pct": 0.001,
+                "rotation_score": 0.0,
+                "market_regime": {"breadth": 0.5, "rv_mkt": 0.0},
+                "correlation_row": [],
+                "hurst": 0.5,
+                "autocorr": 0.0,
+                "entropy": 0.5,
+                "short_tf_ready_5m": False,
+                "short_tf_ready_15m": False,
+            },
+        )
+        self.assertEqual(policy["promotion_tier"], "skip")
+        self.assertIn(policy["entry_recommendation"], {"WATCH", "MEDIUM", "AVOID"})
+
+    def test_market_state_gate_blocks_lane2_downtrend_without_strong_override(self) -> None:
+        passed, reason = _passes_market_state_entry_gate(
+            {
+                "symbol": "TEST/USD",
+                "lane": "L2",
+                "trend_1h": -1,
+                "trend_confirmed": False,
+                "momentum_5": -0.001,
+                "momentum_14": -0.002,
+                "ranging_market": False,
+            }
+        )
+        self.assertFalse(passed)
+        self.assertEqual(reason, "market_state_downtrend_block")
+
+    def test_market_state_gate_blocks_lane3_transition_without_breakout_support(self) -> None:
+        passed, reason = _passes_market_state_entry_gate(
+            {
+                "symbol": "TEST/USD",
+                "lane": "L3",
+                "trend_1h": 0,
+                "trend_confirmed": False,
+                "momentum_5": 0.0,
+                "momentum_14": 0.002,
+                "ranging_market": False,
+                "range_breakout_1h": False,
+                "pullback_hold": False,
+            }
+        )
+        self.assertFalse(passed)
+        self.assertEqual(reason, "market_state_transition_weak_block")
+
+    def test_market_state_gate_keeps_range_safe_lane2_mover_override(self) -> None:
+        passed, reason = _passes_market_state_entry_gate(
+            {
+                "symbol": "TEST/USD",
+                "lane": "L2",
+                "entry_score": 68.0,
+                "volume_ratio": 1.05,
+                "volume_surge": 0.22,
+                "net_edge_pct": 0.4,
+                "tp_after_cost_valid": True,
+                "trend_1h": -1,
+                "trend_confirmed": False,
+                "momentum_5": 0.01,
+                "momentum_14": 0.004,
+                "ranging_market": True,
+                "short_tf_ready_15m": True,
+                "range_breakout_1h": True,
+                "pullback_hold": False,
+                "trade_quality": 65.0,
+                "structure_quality": 66.0,
+                "continuation_quality": 67.0,
+                "rotation_score": 0.12,
+            }
+        )
+        self.assertTrue(passed)
+        self.assertEqual(reason, "market_state_ranging_override")
+
+    def test_deterministic_gate_returns_market_state_reason_before_stabilization(self) -> None:
+        passed, reason = passes_deterministic_candidate_gate(
+            symbol="TEST/USD",
+            positions_state=PositionState(),
+            universe_context={},
+            features={
+                "symbol": "TEST/USD",
+                "lane": "L3",
+                "indicators_ready": True,
+                "entry_score": 62.0,
+                "volume_ratio": 1.2,
+                "net_edge_pct": 0.2,
+                "trend_1h": 0,
+                "trend_confirmed": False,
+                "momentum_5": 0.0,
+                "momentum_14": 0.002,
+                "ranging_market": False,
+                "promotion_tier": "promote",
+                "promotion_reason": "strong_buy_low_risk",
+            },
+        )
+        self.assertFalse(passed)
+        self.assertEqual(reason, "market_state_transition_weak_block")
 
 
 if __name__ == "__main__":

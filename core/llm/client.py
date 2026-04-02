@@ -108,7 +108,58 @@ def _chat_completion(
     )
     response.raise_for_status()
     data = response.json()
-    return str(data["choices"][0]["message"]["content"])
+    return _extract_chat_content(data)
+
+
+def _extract_text_from_content_part(part: Any) -> str:
+    if isinstance(part, str):
+        return part
+    if not isinstance(part, dict):
+        return ""
+    if isinstance(part.get("text"), str):
+        return str(part["text"])
+    if part.get("type") == "text":
+        inner = part.get("text")
+        if isinstance(inner, str):
+            return inner
+        if isinstance(inner, dict):
+            for key in ("value", "content"):
+                value = inner.get(key)
+                if isinstance(value, str):
+                    return value
+    return ""
+
+
+def _extract_chat_content(data: dict[str, Any]) -> str:
+    choices = data.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+    choice0 = choices[0] if isinstance(choices[0], dict) else {}
+    message = choice0.get("message")
+    if isinstance(message, dict):
+        content = message.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            text_parts = [_extract_text_from_content_part(part) for part in content]
+            joined = "".join(part for part in text_parts if part)
+            if joined.strip():
+                return joined
+    for key in ("text", "output_text"):
+        value = choice0.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    delta = choice0.get("delta")
+    if isinstance(delta, dict):
+        content = delta.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            text_parts = [_extract_text_from_content_part(part) for part in content]
+            joined = "".join(part for part in text_parts if part)
+            if joined.strip():
+                return joined
+    return ""
 
 
 def _completion_completion(
@@ -180,7 +231,7 @@ def _ollama_generate_completion(
     return str(data.get("response", ""))
 
 
-def phi3_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int = 200) -> str:
+def phi3_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int = 400) -> str:
     base_url = os.getenv("PHI3_BASE_URL", "http://127.0.0.1:8084")
     model = os.getenv("PHI3_MODEL", "phi3")
     return _chat_completion(
@@ -194,31 +245,113 @@ def phi3_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int = 20
     )
 
 
+def phi3_advisory_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int = 400) -> str:
+    return phi3_chat(user_payload, system=system, max_tokens=max_tokens)
+
+
+def _normalize_nemotron_provider(raw: str) -> str:
+    raw = str(raw or "").strip().lower()
+    if raw in {"cloud", "nvidia_cloud"}:
+        return "nvidia"
+    return raw
+
+
 def _nemotron_provider() -> str:
-    return os.getenv("NEMOTRON_PROVIDER", "local").strip().lower()
+    raw = os.getenv("NEMOTRON_STRATEGIST_PROVIDER", "").strip()
+    if not raw:
+        raw = os.getenv("NEMOTRON_PROVIDER", "local")
+    return _normalize_nemotron_provider(raw)
+
+
+def _advisory_provider() -> str:
+    raw = str(os.getenv("ADVISORY_MODEL_PROVIDER", "phi3") or "").strip().lower()
+    if raw in {"local_nemo", "local_nemotron", "nemo9b"}:
+        return "local_nemo"
+    return "phi3"
 
 
 def _nemotron_cloud_headers() -> dict[str, str]:
-    api_key = os.getenv("NVIDIA_API_KEY", "").strip()
+    api_key = os.getenv("NEMOTRON_CLOUD_API_KEY", os.getenv("NVIDIA_API_KEY", "")).strip()
     if not api_key:
-        raise RuntimeError("NVIDIA_API_KEY not set for nvidia Nemotron provider")
+        raise RuntimeError("NEMOTRON_CLOUD_API_KEY or NVIDIA_API_KEY not set for nvidia Nemotron provider")
     return {"Authorization": f"Bearer {api_key}"}
 
 
 def _nemotron_cloud_base_url() -> str:
-    return os.getenv("NVIDIA_API_URL", "https://integrate.api.nvidia.com/v1").strip()
+    return os.getenv(
+        "NEMOTRON_CLOUD_URL",
+        os.getenv("NVIDIA_API_URL", "https://integrate.api.nvidia.com/v1"),
+    ).strip()
 
 
 def _nemotron_cloud_model() -> str:
-    return os.getenv("NVIDIA_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1.5").strip()
+    return os.getenv(
+        "NEMOTRON_CLOUD_MODEL",
+        os.getenv("NVIDIA_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1.5"),
+    ).strip()
+
+
+def nemotron_provider_name() -> str:
+    return _nemotron_provider()
+
+
+def nemotron_provider_model() -> str:
+    provider = _nemotron_provider()
+    if provider == "nvidia":
+        return _nemotron_cloud_model()
+    if provider == "openai":
+        return _openai_model()
+    return os.getenv("NEMOTRON_MODEL", "nemotron-9b").strip()
+
+
+def nemotron_provider_api_url() -> str:
+    provider = _nemotron_provider()
+    if provider == "nvidia":
+        return _nemotron_cloud_base_url()
+    if provider == "openai":
+        return _openai_base_url()
+    return os.getenv("NEMOTRON_BASE_URL", "http://127.0.0.1:8081").strip()
+
+
+def advisory_provider_name() -> str:
+    return _advisory_provider()
+
+
+def advisory_provider_model() -> str:
+    if _advisory_provider() == "local_nemo":
+        return os.getenv("ADVISORY_LOCAL_MODEL", os.getenv("NEMOTRON_MODEL", "nemotron-9b")).strip()
+    return os.getenv("PHI3_MODEL", "phi3").strip()
+
+
+def advisory_provider_api_url() -> str:
+    if _advisory_provider() == "local_nemo":
+        return os.getenv("ADVISORY_LOCAL_BASE_URL", os.getenv("NEMOTRON_BASE_URL", "http://127.0.0.1:11434")).strip()
+    return os.getenv("PHI3_BASE_URL", "http://127.0.0.1:8084").strip()
+
+
+def _openai_headers() -> dict[str, str]:
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not set for openai Nemotron provider")
+    return {"Authorization": f"Bearer {api_key}"}
+
+
+def _openai_base_url() -> str:
+    return os.getenv("OPENAI_API_URL", "https://api.openai.com/v1").strip()
+
+
+def _openai_model() -> str:
+    return os.getenv("OPENAI_MODEL", os.getenv("NEMOTRON_MODEL", "gpt-4.1-mini")).strip()
 
 
 def _strip_reasoning_blocks(raw: str) -> str:
     text = raw.strip()
-    while "<think>" in text and "</think>" in text:
+    while "<think>" in text:
         start = text.find("<think>")
         end = text.find("</think>", start)
         if end == -1:
+            # Truncated think block (token limit hit) — discard everything from <think> onward
+            text = text[:start].strip()
             break
         text = (text[:start] + text[end + len("</think>") :]).strip()
     return text.strip()
@@ -252,27 +385,32 @@ def _extract_first_object(candidate: str) -> str:
     raise json.JSONDecodeError("Unterminated JSON object", candidate, start)
 
 
-def _local_nemotron_extra_body() -> dict[str, Any]:
+def _local_nemotron_extra_body(max_tokens: int = 2048) -> dict[str, Any]:
     return {
         "stream": False,
-        "response_format": {"type": "json_object"},
-        "keep_alive": "30m",
+        "keep_alive": "1440h",
+        "presence_penalty": 0.0,
+        "frequency_penalty": 0.0,
         "options": {
             "temperature": 0,
-            "top_p": 0.9,
-            "num_predict": 900,
+            "top_p": 1.0,
+            "num_predict": max(max_tokens, 6000),  # thinking model: ~4000 think + ~600 json
+            "num_ctx": 24576,  # thinking models need more ctx: input(~2000) + think(~6000) + json(~600)
         },
     }
 
 
-def _local_nemotron_completion_extra_body() -> dict[str, Any]:
+def _local_nemotron_completion_extra_body(max_tokens: int = 2048) -> dict[str, Any]:
     return {
         "stream": False,
-        "keep_alive": "30m",
+        "keep_alive": "1440h",
+        "presence_penalty": 0.0,
+        "frequency_penalty": 0.0,
         "options": {
             "temperature": 0,
-            "top_p": 0.9,
-            "num_predict": 900,
+            "top_p": 1.0,
+            "num_predict": max_tokens,
+            "num_ctx": 12288,
         },
     }
 
@@ -304,7 +442,7 @@ def _repair_json_response(
                 max_tokens=400,
                 headers=headers,
                 timeout_s=timeout_s,
-                extra_body=_local_nemotron_completion_extra_body(),
+                extra_body=_local_nemotron_completion_extra_body(max_tokens=400),
             )
         else:
             repaired = _chat_completion(
@@ -316,13 +454,27 @@ def _repair_json_response(
                 max_tokens=400,
                 headers=headers,
                 timeout_s=timeout_s,
-                extra_body=_local_nemotron_extra_body(),
+                extra_body=_local_nemotron_extra_body(max_tokens=400),
             )
         return _extract_first_object(_strip_reasoning_blocks(repaired))
 
 
+def cleanup_nemotron_lock() -> None:
+    """Delete a stale lock file left by a crashed or killed process.
+
+    Call this at startup before acquiring the lock. Safe to call even if
+    another process legitimately holds the lock — the delete will fail
+    silently in that case and the normal timeout logic handles it.
+    """
+    try:
+        if _LOCAL_NEMOTRON_LOCK.exists():
+            _LOCAL_NEMOTRON_LOCK.unlink(missing_ok=True)
+    except OSError:
+        pass  # File held by another live process — timeout logic will handle it
+
+
 class _LocalNemotronLock:
-    def __init__(self, path: Path, timeout_s: float = 120.0) -> None:
+    def __init__(self, path: Path, timeout_s: float = 30.0) -> None:
         self.path = path
         self.timeout_s = timeout_s
         self._fh: Any | None = None
@@ -359,7 +511,7 @@ def nvidia_nemotron_chat(
     user_payload: dict[str, Any],
     *,
     system: str,
-    max_tokens: int = 1200,
+    max_tokens: int = 400,
     model: str | None = None,
 ) -> str:
     return _chat_completion(
@@ -374,35 +526,248 @@ def nvidia_nemotron_chat(
     )
 
 
-def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int = 800) -> str:
+def warm_nemotron_model() -> bool:
+    """Pre-load Nemotron into GPU and run 3 inference passes to fully warm CUDA kernels.
+
+    The model requires 3-5 real inference calls before reaching full speed.
+    First call alone can take 3-5 minutes (model load + kernel compilation).
+    Returns True if warmup succeeded, False otherwise.
+    """
+    provider = _nemotron_provider()
+    if provider != "local":
+        return True  # Cloud providers manage their own warm state
+    model = os.getenv("NEMOTRON_MODEL", "nemotron-9b")
+    ollama_host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+    endpoint = f"{ollama_host}/api/generate"
+    warmup_payload = {
+        "model": model,
+        "prompt": '{"action":"HOLD"}',
+        "stream": False,
+        "keep_alive": "1440h",
+        "options": {"num_predict": 30, "temperature": 0, "num_ctx": 8192},
+    }
+    print("[warm_nemotron] Loading model and warming CUDA kernels (3 passes, may take 5+ min)...")
+    success = False
+    for i in range(3):
+        try:
+            resp = httpx.post(endpoint, json=warmup_payload, timeout=360.0)
+            resp.raise_for_status()
+            print(f"[warm_nemotron] Pass {i + 1}/3 done.")
+            success = True
+        except Exception as exc:
+            print(f"[warm_nemotron] Pass {i + 1}/3 failed: {exc}")
+    return success
+
+
+def unload_nemotron_model() -> None:
+    """Tell Ollama to unload Nemotron from VRAM immediately.
+
+    Call this at graceful shutdown so the GPU is freed and the lock file
+    can be deleted cleanly on the next startup. Using keep_alive=0 instructs
+    Ollama to evict the model right away.
+    """
+    provider = _nemotron_provider()
+    if provider != "local":
+        return
+    model = os.getenv("NEMOTRON_MODEL", "nemotron-9b")
+    ollama_host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+    try:
+        httpx.post(
+            f"{ollama_host}/api/generate",
+            json={"model": model, "keep_alive": 0},
+            timeout=10.0,
+        )
+    except Exception:
+        pass
+
+
+def _local_model_chat(
+    *,
+    base_url: str,
+    model: str,
+    system: str,
+    user_payload: dict[str, Any],
+    max_tokens: int,
+    timeout_s: float,
+) -> str:
+    local_max_tokens = max(max_tokens, 80)
+    retry_token_budgets = [
+        local_max_tokens,
+        max(200, local_max_tokens // 2),
+        max(150, local_max_tokens // 3),
+    ]
+    extra_body = _local_nemotron_extra_body(max_tokens=local_max_tokens)
+    completion_extra_body = _local_nemotron_completion_extra_body(max_tokens=local_max_tokens)
+    use_ollama_generate = os.getenv("NEMOTRON_USE_OLLAMA_GENERATE", "false").lower() == "true"
+    last_raw = ""
+    with _LocalNemotronLock(_LOCAL_NEMOTRON_LOCK, timeout_s=max(timeout_s, 300.0)):
+        for token_budget in retry_token_budgets:
+            try:
+                if use_ollama_generate:
+                    last_raw = _ollama_generate_completion(
+                        base_url=base_url,
+                        model=model,
+                        system=system,
+                        user_payload=user_payload,
+                        temperature=0.0,
+                        max_tokens=token_budget,
+                        headers=None,
+                        timeout_s=timeout_s,
+                        extra_body=completion_extra_body,
+                    )
+                    if last_raw.strip():
+                        return _repair_json_response(
+                            base_url=base_url,
+                            model=model,
+                            raw=last_raw,
+                            headers=None,
+                            timeout_s=timeout_s,
+                            use_completion_api=True,
+                        )
+                    continue
+                try:
+                    last_raw = _chat_completion(
+                        base_url=base_url,
+                        model=model,
+                        system=system,
+                        user_payload=user_payload,
+                        temperature=0.0,
+                        max_tokens=token_budget,
+                        headers=None,
+                        timeout_s=timeout_s,
+                        extra_body=extra_body,
+                    )
+                    if last_raw.strip():
+                        return _repair_json_response(
+                            base_url=base_url,
+                            model=model,
+                            raw=last_raw,
+                            headers=None,
+                            timeout_s=timeout_s,
+                        )
+                except httpx.HTTPStatusError as exc:
+                    if exc.response is None or exc.response.status_code != 404:
+                        raise
+                    try:
+                        last_raw = _completion_completion(
+                            base_url=base_url,
+                            model=model,
+                            system=system,
+                            user_payload=user_payload,
+                            temperature=0.0,
+                            max_tokens=token_budget,
+                            headers=None,
+                            timeout_s=timeout_s,
+                            extra_body=completion_extra_body,
+                        )
+                    except httpx.HTTPStatusError as completion_exc:
+                        if completion_exc.response is None or completion_exc.response.status_code != 404:
+                            raise
+                        last_raw = _ollama_generate_completion(
+                            base_url=base_url,
+                            model=model,
+                            system=system,
+                            user_payload=user_payload,
+                            temperature=0.0,
+                            max_tokens=token_budget,
+                            headers=None,
+                            timeout_s=timeout_s,
+                            extra_body=completion_extra_body,
+                        )
+                    if last_raw.strip():
+                        return _repair_json_response(
+                            base_url=base_url,
+                            model=model,
+                            raw=last_raw,
+                            headers=None,
+                            timeout_s=timeout_s,
+                            use_completion_api=True,
+                        )
+                    continue
+            except httpx.HTTPStatusError as exc:
+                if exc.response is None or exc.response.status_code < 500:
+                    raise
+            except httpx.ConnectError:
+                break
+            except (httpx.RequestError, TimeoutError, json.JSONDecodeError):
+                pass
+            time.sleep(1.0)
+    return last_raw
+
+
+def advisory_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int = 400) -> str:
+    if _advisory_provider() == "local_nemo":
+        return _local_model_chat(
+            base_url=advisory_provider_api_url(),
+            model=advisory_provider_model(),
+            system=system,
+            user_payload=user_payload,
+            max_tokens=max_tokens,
+            timeout_s=float(os.getenv("ADVISORY_LOCAL_TIMEOUT_SEC", os.getenv("NEMOTRON_LOCAL_TIMEOUT_SEC", "120"))),
+        )
+    return phi3_chat(user_payload, system=system, max_tokens=max_tokens)
+
+
+def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int = 400) -> str:
     provider = _nemotron_provider()
     if provider == "nvidia":
         base_url = _nemotron_cloud_base_url()
         model = _nemotron_cloud_model()
         headers = _nemotron_cloud_headers()
-        timeout_s = 60.0
+        timeout_s = float(os.getenv("NEMOTRON_CLOUD_TIMEOUT_SEC", "60"))
+        retry_token_budgets = [max_tokens, max(400, max_tokens // 2), 300]
+        extra_body = None
+    elif provider == "openai":
+        base_url = _openai_base_url()
+        model = _openai_model()
+        headers = _openai_headers()
+        timeout_s = float(os.getenv("NEMOTRON_OPENAI_TIMEOUT_SEC", "60"))
         retry_token_budgets = [max_tokens, max(400, max_tokens // 2), 300]
         extra_body = None
     else:
         base_url = os.getenv("NEMOTRON_BASE_URL", "http://127.0.0.1:8081")
         model = os.getenv("NEMOTRON_MODEL", "nemotron-9b")
         headers = None
-        timeout_s = 90.0
+        timeout_s = float(os.getenv("NEMOTRON_LOCAL_TIMEOUT_SEC", "120"))
         local_max_tokens = max(max_tokens, 80)
         retry_token_budgets = [
             local_max_tokens,
-            max(80, local_max_tokens // 2),
-            max(60, local_max_tokens // 3),
+            max(200, local_max_tokens // 2),
+            max(150, local_max_tokens // 3),
         ]
-        extra_body = _local_nemotron_extra_body()
-        completion_extra_body = _local_nemotron_completion_extra_body()
+        extra_body = _local_nemotron_extra_body(max_tokens=local_max_tokens)
+        completion_extra_body = _local_nemotron_completion_extra_body(max_tokens=local_max_tokens)
+        # Skip OpenAI-compatible endpoints for completion-only models — go straight to Ollama native
+        use_ollama_generate = os.getenv("NEMOTRON_USE_OLLAMA_GENERATE", "false").lower() == "true"
     last_raw = ""
     lock_ctx: Any
-    lock_ctx = _LocalNemotronLock(_LOCAL_NEMOTRON_LOCK, timeout_s=max(timeout_s, 120.0)) if provider != "nvidia" else nullcontext()
+    lock_ctx = _LocalNemotronLock(_LOCAL_NEMOTRON_LOCK, timeout_s=max(timeout_s, 300.0)) if provider == "local" else nullcontext()
     with lock_ctx:
         for token_budget in retry_token_budgets:
             try:
-                if provider != "nvidia":
+                if provider == "local":
+                    if use_ollama_generate:
+                        last_raw = _ollama_generate_completion(
+                            base_url=base_url,
+                            model=model,
+                            system=system,
+                            user_payload=user_payload,
+                            temperature=0.0,
+                            max_tokens=token_budget,
+                            headers=headers,
+                            timeout_s=timeout_s,
+                            extra_body=completion_extra_body,
+                        )
+                        if last_raw.strip():
+                            return _repair_json_response(
+                                base_url=base_url,
+                                model=model,
+                                raw=last_raw,
+                                headers=headers,
+                                timeout_s=timeout_s,
+                                use_completion_api=True,
+                            )
+                        continue
                     try:
                         last_raw = _chat_completion(
                             base_url=base_url,
@@ -479,6 +844,8 @@ def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int 
             except httpx.HTTPStatusError as exc:
                 if exc.response is None or exc.response.status_code < 500:
                     raise
+            except httpx.ConnectError:
+                break  # server is down — retrying with smaller token budgets won't help
             except (httpx.RequestError, TimeoutError, json.JSONDecodeError):
                 pass
             time.sleep(1.0)
@@ -520,6 +887,28 @@ def _coerce_object(value: Any) -> dict[str, Any] | None:
     return None
 
 
+def _expected_symbol_from_payload(payload: dict[str, Any]) -> str | None:
+    raw_symbol = payload.get("symbol")
+    if isinstance(raw_symbol, str) and raw_symbol.strip():
+        return raw_symbol.strip()
+    features = payload.get("features")
+    if isinstance(features, dict):
+        feature_symbol = features.get("symbol")
+        if isinstance(feature_symbol, str) and feature_symbol.strip():
+            return feature_symbol.strip()
+    return None
+
+
+def _sanitize_final_decision_symbol(final_decision: dict[str, Any], *, expected_symbol: str | None) -> dict[str, Any]:
+    if not expected_symbol:
+        return final_decision
+    cleaned = dict(final_decision)
+    raw_symbol = str(cleaned.get("symbol", "") or "").strip()
+    if raw_symbol in {"", "SYMBOL", "<current_symbol>", "CURRENT_SYMBOL", "LINK/USD", "BTC/USD", "ETH/USD"}:
+        cleaned["symbol"] = expected_symbol
+    return cleaned
+
+
 def run_nemotron_tool_loop(
     initial_payload: dict[str, Any],
     *,
@@ -528,8 +917,9 @@ def run_nemotron_tool_loop(
     max_round_trips: int = 2,
 ) -> dict[str, Any]:
     payload = sanitize_for_json(initial_payload)
+    expected_symbol = _expected_symbol_from_payload(payload)
     for round_trip in range(max_round_trips):
-        raw = nemotron_chat(payload, system=system)
+        raw = nemotron_chat(payload, system=system, max_tokens=400)
         _append_nemotron_debug(
             {
                 "event": "nemotron_raw_response",
@@ -539,15 +929,22 @@ def run_nemotron_tool_loop(
             }
         )
         response = parse_json_response(raw)
-        final_decision = _coerce_object(response.get("final_decision"))
-        if final_decision is not None:
-            return {"final_decision": final_decision}
         tool_name = response.get("tool")
         if isinstance(tool_name, dict):
             tool_name = tool_name.get("name")
-        args = _coerce_object(response.get("args")) or {}
+        final_decision = _coerce_object(response.get("final_decision"))
+        if final_decision is not None:
+            final_decision = _sanitize_final_decision_symbol(final_decision, expected_symbol=expected_symbol)
+        # Model always echoes tool call even after receiving a result.
+        # Round 0: run the tool (ignore embedded final_decision).
+        # Round 1+: model still includes tool but we already ran it — trust final_decision.
+        if tool_name is not None and final_decision is not None and round_trip > 0:
+            return {"final_decision": final_decision}
         if tool_name is None:
+            if final_decision is not None:
+                return {"final_decision": final_decision}
             return response
+        args = _coerce_object(response.get("args")) or {}
         if tool_name not in tool_registry:
             raise ValueError(f"Unknown tool requested: {tool_name}")
         if round_trip >= max_round_trips - 1:

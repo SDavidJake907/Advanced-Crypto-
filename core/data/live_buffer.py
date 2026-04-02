@@ -120,6 +120,7 @@ class LiveMarketDataFeed:
         }
         self._intervals = intervals
         self._max_bars = max_bars
+        self._book_ts: dict[str, datetime] = {}
         self.set_symbols(symbols)
 
     def set_symbols(self, symbols: list[str]) -> None:
@@ -139,6 +140,7 @@ class LiveMarketDataFeed:
         for symbol in stale_symbols:
             del self._buffers[symbol]
             self._order_books.pop(symbol, None)
+            self._book_ts.pop(symbol, None)
         self.symbols = ordered
 
     def on_trade(self, symbol: str, ts: datetime, price: float, volume: float) -> None:
@@ -164,22 +166,45 @@ class LiveMarketDataFeed:
     def on_book(self, symbol: str, bids: list[tuple[float, float]], asks: list[tuple[float, float]]) -> None:
         if symbol not in self._order_books:
             return
-        sanitized_bids = [
-            BookLevel(price=float(price), qty=float(qty))
-            for price, qty in bids
-            if float(price) > 0.0 and float(qty) > 0.0
-        ]
-        sanitized_asks = [
-            BookLevel(price=float(price), qty=float(qty))
-            for price, qty in asks
-            if float(price) > 0.0 and float(qty) > 0.0
-        ]
-        sanitized_bids.sort(key=lambda level: level.price, reverse=True)
-        sanitized_asks.sort(key=lambda level: level.price)
+        existing = self._order_books[symbol]
+        # Merge update into existing book — Kraken sends partial updates (only changed levels).
+        # Replacing entirely would wipe unchanged side and set it to empty → book_valid=False.
+        existing_bids: dict[float, float] = {lvl.price: lvl.qty for lvl in existing.get("bids", [])}
+        existing_asks: dict[float, float] = {lvl.price: lvl.qty for lvl in existing.get("asks", [])}
+        for price, qty in bids:
+            p, q = float(price), float(qty)
+            if p > 0.0:
+                if q > 0.0:
+                    existing_bids[p] = q
+                else:
+                    existing_bids.pop(p, None)  # qty=0 means level deleted
+        for price, qty in asks:
+            p, q = float(price), float(qty)
+            if p > 0.0:
+                if q > 0.0:
+                    existing_asks[p] = q
+                else:
+                    existing_asks.pop(p, None)
+        merged_bids = sorted(
+            [BookLevel(price=p, qty=q) for p, q in existing_bids.items()],
+            key=lambda lvl: lvl.price, reverse=True
+        )
+        merged_asks = sorted(
+            [BookLevel(price=p, qty=q) for p, q in existing_asks.items()],
+            key=lambda lvl: lvl.price
+        )
+        # Partial depth updates can leave stale crossed levels on the opposite side.
+        # Prune impossible top-of-book states until the best bid/ask no longer cross.
+        while merged_bids and merged_asks and merged_bids[0].price > merged_asks[0].price:
+            if merged_bids[0].qty <= merged_asks[0].qty:
+                merged_bids.pop(0)
+            else:
+                merged_asks.pop(0)
         self._order_books[symbol] = {
-            "bids": sanitized_bids[:10],
-            "asks": sanitized_asks[:10],
+            "bids": merged_bids[:10],
+            "asks": merged_asks[:10],
         }
+        self._book_ts[symbol] = datetime.now(timezone.utc)
 
     def get_market_snapshot(self, symbol: str) -> dict[str, float]:
         if symbol not in self._order_books:
@@ -190,6 +215,13 @@ class LiveMarketDataFeed:
         best_bid = float(bids[0].price) if bids else 0.0
         best_ask = float(asks[0].price) if asks else 0.0
         book_valid = best_bid > 0.0 and best_ask > 0.0 and best_ask >= best_bid
+        book_partial = best_bid > 0.0 or best_ask > 0.0
+        if not book_valid:
+            best_bid = 0.0
+            best_ask = 0.0
+        now_utc = datetime.now(timezone.utc)
+        book_age_sec = (now_utc - self._book_ts.get(symbol, now_utc)).total_seconds()
+        book_fresh = book_age_sec < 5.0
         bid_depth = float(sum(level.qty for level in bids))
         ask_depth = float(sum(level.qty for level in asks))
         imbalance = 0.0
@@ -207,14 +239,16 @@ class LiveMarketDataFeed:
         if book_valid and mid > 0.0:
             spread_pct = ((best_ask - best_bid) / mid) * 100.0
         return {
-            "bid": best_bid if book_valid else 0.0,
-            "ask": best_ask if book_valid else 0.0,
+            "bid": best_bid,
+            "ask": best_ask,
             "spread_pct": spread_pct,
             "book_bid_depth": bid_depth if book_valid else 0.0,
             "book_ask_depth": ask_depth if book_valid else 0.0,
             "book_imbalance": imbalance,
             "book_wall_pressure": wall_pressure,
             "book_valid": book_valid,
+            "book_partial": book_partial,
+            "book_fresh": book_fresh,
         }
 
     def seed_ohlc(self, symbol: str, timeframe: str, frame: pd.DataFrame) -> None:

@@ -1,13 +1,26 @@
 from __future__ import annotations
 
+import logging
+import os
 from typing import Any
 
+from core.config.runtime import get_runtime_setting, stage_runtime_override_proposal
 from core.execution.cpp_exec import CppExecutor
 from core.risk.basic_risk import BasicRiskEngine
 from core.risk.portfolio import PortfolioConfig, PositionState
 from core.runtime.tools import strategy_decision
 from core.state.portfolio import PortfolioState
 from core.strategy.simple_momo import SimpleMomentumStrategy
+
+_LOGGER = logging.getLogger(__name__)
+
+# Keys Nemo is allowed to adjust, with (type, min, max) bounds
+_ADJUSTABLE_KEYS: dict[str, tuple[type, float, float]] = {
+    "PORTFOLIO_MAX_OPEN_POSITIONS": (int, 1, 6),
+    "MEME_MAX_OPEN_POSITIONS": (int, 0, 3),
+    "EXEC_RISK_PER_TRADE_PCT": (float, 5.0, 75.0),
+    "MEME_EXEC_RISK_PER_TRADE_PCT": (float, 5.0, 75.0),
+}
 
 
 class NemotronClient:
@@ -32,6 +45,7 @@ class NemotronClient:
         self._current_features: dict[str, Any] = {}
         self.tools = {
             "strategy_decision": self._tool_strategy_decision,
+            "portfolio_adjust": self._tool_portfolio_adjust,
         }
 
     def set_features(self, features: dict[str, Any]) -> None:
@@ -79,4 +93,59 @@ class NemotronClient:
                 "reversal_risk": reversal_risk,
                 "rotation_score": round(rotation_score, 3),
             },
+        }
+
+    def _tool_portfolio_adjust(self, **kwargs: Any) -> dict[str, Any]:
+        """Stage a single portfolio parameter adjustment for replay/shadow/human review."""
+        key = str(kwargs.get("key", "")).strip().upper()
+        raw_value = kwargs.get("value")
+        reason = str(kwargs.get("reason", "nemo_adjustment"))
+
+        if key not in _ADJUSTABLE_KEYS:
+            return {
+                "success": False,
+                "error": f"Key '{key}' is not adjustable. Allowed: {list(_ADJUSTABLE_KEYS)}",
+            }
+
+        target_type, min_val, max_val = _ADJUSTABLE_KEYS[key]
+        try:
+            value = target_type(raw_value)
+        except (TypeError, ValueError):
+            return {"success": False, "error": f"Invalid value {raw_value!r} for {key}"}
+
+        # Clamp to safe bounds
+        clamped = target_type(max(min_val, min(max_val, value)))
+
+        if os.getenv("VALIDATION_MODE", "").strip().lower() in {"1", "true", "yes", "on"}:
+            return {
+                "success": True,
+                "staged": False,
+                "effective_immediately": False,
+                "key": key,
+                "proposed_value": clamped,
+                "reason": reason,
+                "proposal_id": "",
+                "validation_mode": True,
+            }
+
+        try:
+            proposal = stage_runtime_override_proposal(
+                {key: clamped},
+                source="nemotron_tool",
+                summary=reason,
+                context={"requested_value": raw_value},
+            )
+        except Exception as exc:
+            _LOGGER.warning("portfolio_adjust: failed to stage override %s=%s: %s", key, clamped, exc)
+            return {"success": False, "error": str(exc)}
+
+        _LOGGER.info("portfolio_adjust: %s → %s (was %s) reason=%s", key, clamped, raw_value, reason)
+        return {
+            "success": True,
+            "staged": True,
+            "effective_immediately": False,
+            "key": key,
+            "proposed_value": clamped,
+            "reason": reason,
+            "proposal_id": proposal["id"],
         }

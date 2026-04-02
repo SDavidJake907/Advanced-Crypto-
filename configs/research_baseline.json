@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-03-27",
+  "mode": "offline_research",
+  "history_dir": "logs/history",
+  "runner": "scripts/vectorbt_research.py",
+  "current_baseline": {
+    "entry_score_threshold": 70,
+    "lane": "L3",
+    "require_bullish_divergence": false,
+    "preferred_hold_bars": 24,
+    "min_net_edge_pct": -1.0
+  },
+  "high_confidence_variant": {
+    "entry_score_threshold": 70,
+    "lane": "L3",
+    "require_bullish_divergence": true,
+    "preferred_hold_bars": 24,
+    "min_net_edge_pct": -1.0
+  },
+  "notes": [
+    "Use the current_baseline for broader L3 research runs.",
+    "Use the high_confidence_variant when testing stricter selectivity and lower drawdown.",
+    "Do not treat this file as live runtime config without follow-up validation."
+  ],
+  "artifacts": {
+    "baseline_aggregate": "logs/research_l3_70_h24_nodiv_aggregate.csv",
+    "baseline_per_symbol": "logs/research_l3_70_h24_nodiv_per_symbol.csv",
+    "high_confidence_aggregate": "logs/research_l3_div70_h24_aggregate.csv",
+    "high_confidence_per_symbol": "logs/research_l3_div70_h24_per_symbol.csv"
+  }
+}

@@ -7,13 +7,15 @@ from core.config.runtime import get_runtime_setting, get_symbol_lane
 from core.state.store import load_sector_tags
 
 
-DecisionType = Literal["allow", "block", "scale_down"]
+DecisionType = Literal["allow", "block", "scale_down", "replace"]
 
 
 class PortfolioDecision(TypedDict):
     decision: DecisionType
     size_factor: float
     reasons: List[str]
+    replace_symbol: str | None
+    replace_reason: str | None
 
 
 @dataclass
@@ -62,9 +64,24 @@ class Position:
     entry_thesis: str = ""
     expected_hold_style: str = ""
     invalidate_on: str = ""
+    monitor_state: str = "RUN"
+    monitor_reason: str = ""
+    monitor_confidence: float = 0.0
     exit_posture: str = "RUN"
     exit_posture_reason: str = ""
     exit_posture_confidence: float = 0.0
+    structure_state: str = "intact"
+    max_price_seen: float | None = None
+    min_price_seen: float | None = None
+    mfe_pct: float = 0.0
+    mae_pct: float = 0.0
+    mfe_ts: str = ""
+    mae_ts: str = ""
+    mfe_r: float = 0.0
+    mae_r: float = 0.0
+    etd_pct: float = 0.0
+    etd_r: float = 0.0
+    expected_edge_pct: float = 0.0
 
 
 class PositionState:
@@ -91,12 +108,128 @@ class PositionState:
 
 
 def _sector_for_symbol(symbol: str, lane: str | None = None) -> str:
+    resolved_lane = str(lane or "").strip().upper()
+    if resolved_lane:
+        return f"lane:{resolved_lane}"
     sector_tags = load_sector_tags()
     normalized = str(symbol).strip().upper()
     if normalized in sector_tags:
         return sector_tags[normalized]
-    resolved_lane = str(lane or get_symbol_lane(symbol)).upper()
+    resolved_lane = str(get_symbol_lane(symbol)).upper()
     return f"lane:{resolved_lane}"
+
+
+def _position_weakness_score(position: Position) -> float:
+    monitor_score = {
+        "RUN": 0.0,
+        "STALL": 2.0,
+        "WEAKEN": 3.0,
+        "FAIL": 4.0,
+        "ROTATE": 5.0,
+    }.get(str(position.monitor_state or "RUN").upper(), 0.0)
+    posture_score = {
+        "RUN": 0.0,
+        "STALE": 2.0,
+        "TIGHTEN": 3.0,
+        "EXIT": 4.0,
+    }.get(str(position.exit_posture or "RUN").upper(), 0.0)
+    structure_score = {
+        "intact": 0.0,
+        "fragile": 2.0,
+        "broken": 4.0,
+    }.get(str(position.structure_state or "intact").lower(), 0.0)
+    return monitor_score + posture_score + structure_score
+
+
+def _candidate_is_replacement_quality(features: dict | None) -> bool:
+    if not isinstance(features, dict):
+        return False
+    entry_score = float(features.get("entry_score", 0.0) or 0.0)
+    entry_recommendation = str(features.get("entry_recommendation", "WATCH") or "WATCH").upper()
+    trend_confirmed = bool(features.get("trend_confirmed", False))
+    tp_after_cost_valid = bool(features.get("tp_after_cost_valid", False))
+    point_breakdown = features.get("point_breakdown") if isinstance(features.get("point_breakdown"), dict) else {}
+    net_edge_pct = float(
+        features.get(
+            "net_edge_pct",
+            point_breakdown.get("net_edge_pct", 0.0) if isinstance(point_breakdown, dict) else 0.0,
+        )
+        or 0.0
+    )
+    return bool(
+        entry_score >= 72.0
+        and tp_after_cost_valid
+        and net_edge_pct > 0.0
+        and (trend_confirmed or entry_recommendation in {"BUY", "STRONG_BUY"})
+    )
+
+
+def build_opportunity_snapshot(
+    *,
+    positions: PositionState,
+    candidate_symbol: str,
+    features: dict | None,
+) -> dict[str, object]:
+    weakest_overall: Position | None = None
+    weakest_overall_score = -1.0
+    for position in positions.all():
+        if position.symbol == candidate_symbol:
+            continue
+        weakness = _position_weakness_score(position)
+        if weakness > weakest_overall_score:
+            weakest_overall = position
+            weakest_overall_score = weakness
+
+    replacement = _select_replacement_candidate(
+        positions=positions,
+        incoming_symbol=candidate_symbol,
+        features=features,
+    )
+    point_breakdown = features.get("point_breakdown") if isinstance(features, dict) else {}
+    candidate_net_edge_pct = 0.0
+    if isinstance(features, dict):
+        candidate_net_edge_pct = float(
+            features.get(
+                "net_edge_pct",
+                point_breakdown.get("net_edge_pct", 0.0) if isinstance(point_breakdown, dict) else 0.0,
+            )
+            or 0.0
+        )
+    return {
+        "candidate_symbol": candidate_symbol,
+        "candidate_entry_score": float(features.get("entry_score", 0.0) or 0.0) if isinstance(features, dict) else 0.0,
+        "candidate_net_edge_pct": candidate_net_edge_pct,
+        "candidate_replacement_quality": _candidate_is_replacement_quality(features),
+        "weakest_held_symbol": weakest_overall.symbol if weakest_overall is not None else None,
+        "weakest_held_monitor_state": getattr(weakest_overall, "monitor_state", None) if weakest_overall is not None else None,
+        "weakest_held_exit_posture": getattr(weakest_overall, "exit_posture", None) if weakest_overall is not None else None,
+        "weakest_held_structure_state": getattr(weakest_overall, "structure_state", None) if weakest_overall is not None else None,
+        "weakest_held_weakness_score": weakest_overall_score if weakest_overall is not None else 0.0,
+        "replace_ready_symbol": replacement.symbol if replacement is not None else None,
+        "replace_ready": replacement is not None,
+    }
+
+
+def _select_replacement_candidate(
+    *,
+    positions: PositionState,
+    incoming_symbol: str,
+    features: dict | None,
+) -> Position | None:
+    if not _candidate_is_replacement_quality(features):
+        return None
+    weakest: Position | None = None
+    weakest_score = 0.0
+    for position in positions.all():
+        if position.symbol == incoming_symbol:
+            continue
+        score = _position_weakness_score(position)
+        if score < 4.0:
+            continue
+        if weakest is None or score > weakest_score:
+            weakest = position
+            weakest_score = score
+    return weakest
 
 
 def evaluate_trade(
@@ -110,24 +243,39 @@ def evaluate_trade(
     symbols: List[str],
     lane: str | None = None,
     trend_conflict: bool = False,
+    features: dict | None = None,
 ) -> PortfolioDecision:
     reasons: List[str] = []
     lane = lane or get_symbol_lane(symbol)
 
     if proposed_weight > config.max_weight_per_symbol:
         reasons.append("proposed_weight_exceeds_per_symbol_cap")
-        return {"decision": "block", "size_factor": 0.0, "reasons": reasons}
+        return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
 
     if lane == "L4":
         max_meme_positions = int(get_runtime_setting("MEME_MAX_OPEN_POSITIONS"))
         meme_positions = sum(1 for position in positions.all() if position.lane == "L4")
         if meme_positions >= max_meme_positions and symbol not in positions.positions:
             reasons.append("max_meme_positions_reached")
-            return {"decision": "block", "size_factor": 0.0, "reasons": reasons}
+            return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
 
     if positions.count() >= config.max_open_positions and symbol not in positions.positions:
+        replacement = _select_replacement_candidate(
+            positions=positions,
+            incoming_symbol=symbol,
+            features=features,
+        )
+        if replacement is not None:
+            reasons.extend(["replace_weakest_position", f"replace_symbol:{replacement.symbol}"])
+            return {
+                "decision": "replace",
+                "size_factor": 1.0,
+                "reasons": reasons,
+                "replace_symbol": replacement.symbol,
+                "replace_reason": "candidate_stronger_than_weak_hold",
+            }
         reasons.append("max_open_positions_reached")
-        return {"decision": "block", "size_factor": 0.0, "reasons": reasons}
+        return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
 
     current_sector = _sector_for_symbol(symbol, lane)
     sector_positions = sum(
@@ -137,12 +285,26 @@ def evaluate_trade(
     )
     if sector_positions >= config.max_positions_per_sector:
         reasons.append(f"sector_limit_reached:{current_sector}")
-        return {"decision": "block", "size_factor": 0.0, "reasons": reasons}
+        return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
 
     total_gross = positions.total_gross_exposure()
     if total_gross + abs(proposed_weight) > config.max_total_gross_exposure:
+        replacement = _select_replacement_candidate(
+            positions=positions,
+            incoming_symbol=symbol,
+            features=features,
+        )
+        if replacement is not None:
+            reasons.extend(["replace_weakest_position", f"replace_symbol:{replacement.symbol}"])
+            return {
+                "decision": "replace",
+                "size_factor": 1.0,
+                "reasons": reasons,
+                "replace_symbol": replacement.symbol,
+                "replace_reason": "gross_exposure_replacement",
+            }
         reasons.append("total_gross_exposure_limit")
-        return {"decision": "block", "size_factor": 0.0, "reasons": reasons}
+        return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
 
     size_factor = 1.0
     if lane == "L4" and trend_conflict:
@@ -175,9 +337,9 @@ def evaluate_trade(
             size_factor = min(size_factor, config.avg_corr_scale_down)
 
     if high_corr_count > config.max_high_corr_same_direction:
-        return {"decision": "block", "size_factor": 0.0, "reasons": reasons}
+        return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
 
     if size_factor < 1.0:
-        return {"decision": "scale_down", "size_factor": size_factor, "reasons": reasons}
+        return {"decision": "scale_down", "size_factor": size_factor, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
 
-    return {"decision": "allow", "size_factor": 1.0, "reasons": reasons}
+    return {"decision": "allow", "size_factor": 1.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}

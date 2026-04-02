@@ -27,10 +27,17 @@ if ($nemotronProvider -eq "local") {
 
 $results = @()
 
-if ($nemotronProvider -ne "local") {
+if ($nemotronProvider -eq "nvidia") {
     $results += [pscustomobject]@{
         Service = "Nemotron"
         Url = "NVIDIA API"
+        Status = "configured"
+        Device = "cloud"
+    }
+} elseif ($nemotronProvider -eq "openai") {
+    $results += [pscustomobject]@{
+        Service = "Nemotron"
+        Url = "OpenAI API"
         Status = "configured"
         Device = "cloud"
     }

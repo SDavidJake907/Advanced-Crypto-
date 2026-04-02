@@ -1,19 +1,22 @@
 $root = "C:\Users\kitti\Desktop\KrakenSK"
 $python = Join-Path $root ".venv\Scripts\python.exe"
 $phiProject = "C:\Users\kitti\Projects\kraken-hybrad9"
-$phiScript = Join-Path $phiProject "phi3_server.py"
 $phiPython = Join-Path $phiProject "npu-env-real\Scripts\python.exe"
 $ollamaExe = "C:\Users\kitti\AppData\Local\Programs\Ollama\ollama.exe"
 $envFile = Join-Path $root ".env"
 
-# --- Clean up any existing KrakenSK stack before starting ---
-Write-Host "Stopping any existing KrakenSK processes..."
+# --- Clean up all KrakenSK app processes before starting ---
+Write-Host "Stopping existing KrakenSK app processes..."
+$myPid = $PID
+# Kill by window title
 cmd /c "taskkill /F /FI `"WINDOWTITLE eq KrakenSK*`" /T" 2>$null | Out-Null
-cmd /c "taskkill /F /IM ollama.exe /T" 2>$null | Out-Null
-Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 3
-Write-Host "Clean slate ready."
-# -----------------------------------------------------------
+# Kill ALL python processes referencing the KrakenSK root
+Get-WmiObject Win32_Process -Filter "Name LIKE 'python%'" | Where-Object { $_.CommandLine -like "*KrakenSK*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+# Kill ALL powershell watchdog windows referencing KrakenSK (except this script's own session)
+Get-WmiObject Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.ProcessId -ne $myPid -and $_.CommandLine -like "*KrakenSK*" -and $_.CommandLine -like "*NoExit*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Seconds 5
+Write-Host "App stack clean slate ready."
+# ---------------------------------------------------------
 
 function Get-EnvValue {
     param(
@@ -66,7 +69,7 @@ function Test-NemotronBackend {
     if ($Provider -ne "local") {
         $result.Ready = $true
         $result.ChatMode = "cloud"
-        $result.Message = "NVIDIA cloud provider configured."
+        $result.Message = "Cloud provider configured."
         return [pscustomobject]$result
     }
 
@@ -128,20 +131,12 @@ if (-not (Test-Path $python)) {
     exit 1
 }
 
-if (-not (Test-Path $phiScript)) {
-    Write-Error "Phi-3 server script not found at $phiScript"
-    exit 1
-}
-
-if (-not (Test-Path $phiPython)) {
-    Write-Error "Phi-3 Python executable not found at $phiPython"
-    exit 1
-}
-
 $replayEnabled = (Get-EnvValue "START_REPLAY_ON_START" "false").ToLower() -eq "true"
 $visualPhilEnabled = (Get-EnvValue "START_VISUAL_PHIL_ON_START" "false").ToLower() -eq "true"
 $visualPhilFeedEnabled = (Get-EnvValue "START_VISUAL_PHIL_FEED_ON_START" "true").ToLower() -eq "true"
 $operatorUiEnabled = (Get-EnvValue "START_OPERATOR_UI_ON_START" "false").ToLower() -eq "true"
+$mcpServerEnabled = (Get-EnvValue "START_MCP_SERVER_ON_START" "true").ToLower() -eq "true"
+$mcpPublicEnabled = (Get-EnvValue "MCP_PUBLIC_ENABLED" "false").ToLower() -eq "true"
 $replaySymbols = Get-EnvValue "REPLAY_SYMBOLS" "BTC/USD DOGE/USD AVAX/USD"
 $replayStartCash = Get-EnvValue "REPLAY_START_CASH" "1000"
 $replayWarmupBars = Get-EnvValue "REPLAY_WARMUP_BARS" "60"
@@ -160,11 +155,17 @@ $visualPhilProcessName = Get-EnvValue "VISUAL_PHI3_PROCESS_NAME" "KrakenDesktop.
 $visualPhilProcessPid = Get-EnvValue "VISUAL_PHI3_PROCESS_PID" "0"
 $operatorUiHost = Get-EnvValue "OPERATOR_UI_HOST" "127.0.0.1"
 $operatorUiPort = Get-EnvValue "OPERATOR_UI_PORT" "8780"
+$mcpHost = Get-EnvValue "MCP_HOST" "0.0.0.0"
+$mcpPort = Get-EnvValue "MCP_PORT" "8765"
 $traderDecisionEngine = Get-EnvValue "TRADER_DECISION_ENGINE" "classic"
 $policyProfile = Get-EnvValue "POLICY_PROFILE" "custom"
+$aggressionMode = Get-EnvValue "AGGRESSION_MODE" "NORMAL"
+$advisoryModelProvider = Get-EnvValue "ADVISORY_MODEL_PROVIDER" "local_nemo"
 $nemotronProvider = Get-EnvValue "NEMOTRON_PROVIDER" "nvidia"
+$nemotronStrategistProvider = Get-EnvValue "NEMOTRON_STRATEGIST_PROVIDER" ""
 $nemotronBaseUrl = Get-EnvValue "NEMOTRON_BASE_URL" "http://127.0.0.1:8081"
 $nemotronModel = Get-EnvValue "NEMOTRON_MODEL" "nemotron-9b"
+$startModelsOnStart = (Get-EnvValue "START_MODELS_ON_START" "true").ToLower() -eq "true"
 $nemotronTopCandidateCount = Get-EnvValue "NEMOTRON_TOP_CANDIDATE_COUNT" "15"
 $nemotronAllowBuyLowOutsideTop = Get-EnvValue "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP" "true"
 $nemotronAllowBuyMediumOutsideTop = Get-EnvValue "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP" "true"
@@ -174,40 +175,192 @@ $advisoryMinVolumeRatio = Get-EnvValue "ADVISORY_MIN_VOLUME_RATIO" "1.1"
 $nvidiaApiKey = Get-EnvValue "NVIDIA_API_KEY" ""
 $nvidiaApiUrl = Get-EnvValue "NVIDIA_API_URL" "https://integrate.api.nvidia.com/v1"
 $nvidiaModel = Get-EnvValue "NVIDIA_MODEL" "nvidia/llama-3.3-nemotron-super-49b-v1.5"
-
-# 0) Phi-3 advisory server on NPU
-Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", "`$host.UI.RawUI.WindowTitle='KrakenSK - phi3_npu'; cd `"$phiProject`"; `$env:PHI3_DEVICE='NPU'; & `"$phiPython`" `"$phiScript`""
-[void](Wait-HttpReady -Url "http://127.0.0.1:8084/health" -TimeoutSec 90)
-
-# 0b) Local Nemotron host via Ollama, if configured for local mode
-if ($nemotronProvider -eq "local" -and (Test-Path $ollamaExe)) {
-    $ollamaRunning = Get-Process ollama -ErrorAction SilentlyContinue
-    foreach ($proc in $ollamaRunning) {
-        try {
-            Stop-Process -Id $proc.Id -Force -ErrorAction Stop
-        } catch {
-        }
-    }
-    Start-Sleep -Seconds 2
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle='KrakenSK - ollama'; `$env:OLLAMA_KEEP_ALIVE='-1'; & `"$ollamaExe`" serve"
-    [void](Wait-HttpReady -Url "http://127.0.0.1:11434/api/tags" -TimeoutSec 60)
+$openaiApiKey = Get-EnvValue "OPENAI_API_KEY" ""
+$openaiApiUrl = Get-EnvValue "OPENAI_API_URL" "https://api.openai.com/v1"
+$openaiModel = Get-EnvValue "OPENAI_MODEL" "gpt-4.1-mini"
+$watchdogEnabled = (Get-EnvValue "WATCHDOG_ENABLED" "true").ToLower() -eq "true"
+if ([string]::IsNullOrWhiteSpace($nemotronStrategistProvider)) {
+    $nemotronStrategistProvider = $nemotronProvider
 }
 
-$nemotronStatus = Test-NemotronBackend -Provider $nemotronProvider -BaseUrl $nemotronBaseUrl -Model $nemotronModel
+# --- Clean up stale AI model watchdogs/processes from older runs ---
+Write-Host "Stopping stale AI model processes that do not match current config..."
+
+# Kill dedicated AI watchdog windows from older start_models runs.
+Get-WmiObject Win32_Process -Filter "Name='powershell.exe'" |
+    Where-Object {
+        $_.ProcessId -ne $myPid -and
+        $_.CommandLine -like "*AI-Models*" -and
+        $_.CommandLine -like "*NoExit*"
+    } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+# Phi-3 should not remain alive unless explicitly selected for advisory.
+if ($advisoryModelProvider -ne "phi3") {
+    Get-WmiObject Win32_Process -Filter "Name LIKE 'python%'" |
+        Where-Object {
+            $_.ExecutablePath -ieq $phiPython -or
+            $_.CommandLine -like "*phi3_server.py*"
+        } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+
+# Stop Ollama only when the current run does not use local Nemotron anywhere.
+$needsLocalOllama = ($advisoryModelProvider -eq "local_nemo") -or
+    ($nemotronProvider -eq "local") -or
+    ($nemotronStrategistProvider -eq "local")
+if (-not $needsLocalOllama) {
+    Get-WmiObject Win32_Process -Filter "Name='ollama.exe'" |
+        Where-Object {
+            $_.ExecutablePath -ieq $ollamaExe -or
+            $_.CommandLine -like "*ollama*serve*"
+        } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+
+Start-Sleep -Seconds 2
+
+$needsPhi3 = $advisoryModelProvider -eq "phi3"
+$needsLocalOllama = ($advisoryModelProvider -eq "local_nemo") -or
+    ($nemotronProvider -eq "local") -or
+    ($nemotronStrategistProvider -eq "local")
+
+if ($startModelsOnStart -and ($needsPhi3 -or $needsLocalOllama)) {
+    Write-Host "Starting required AI model services via start_models.ps1..."
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $root "scripts\start_models.ps1")
+}
+
+$nemotronStatus = Test-NemotronBackend -Provider $nemotronStrategistProvider -BaseUrl $nemotronBaseUrl -Model $nemotronModel
 if (-not $nemotronStatus.Ready) {
-    Write-Warning $nemotronStatus.Message
+    Write-Warning "$($nemotronStatus.Message) Start Phi-3/Nemotron separately via .\scripts\start_models.ps1 or your external host."
 } else {
     Write-Host "Nemotron backend: $($nemotronStatus.Message)"
 }
 
-# 1) Universe manager (one-shot refresh)
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle='KrakenSK - universe_manager'; cd `"$root`"; & `"$python`" -m apps.universe_manager.main"
+# Check Phi-3 is running before starting the trader
+if ($advisoryModelProvider -eq "phi3") {
+    Write-Host "Checking Phi-3 (http://127.0.0.1:8084/health)..."
+    $phi3Ready = Wait-HttpReady -Url "http://127.0.0.1:8084/health" -TimeoutSec 15
+    if (-not $phi3Ready) {
+        Write-Warning "Phi-3 not detected on port 8084. Run .\scripts\start_models.ps1 first."
+    } else {
+        Write-Host "Phi-3 ready."
+    }
+} else {
+    Write-Host "Advisory backend set to $advisoryModelProvider - skipping Phi-3 readiness check."
+}
 
-# 2) NVIDIA optimizer / review scheduler
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle='KrakenSK - review_scheduler'; cd `"$root`"; `$env:NEMOTRON_PROVIDER='$nemotronProvider'; `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl'; `$env:NEMOTRON_MODEL='$nemotronModel'; `$env:NVIDIA_API_KEY='$nvidiaApiKey'; `$env:NVIDIA_API_URL='$nvidiaApiUrl'; `$env:NVIDIA_MODEL='$nvidiaModel'; & `"$python`" -m apps.review_scheduler.main"
+# 1) Universe manager - first run is synchronous so trader starts with a fresh universe
+Write-Host "Running universe_manager (this may take 1-3 minutes)..."
+$universeRefreshMin = [int](Get-EnvValue "UNIVERSE_REFRESH_INTERVAL_MIN" "5")
+$universeProc = Start-Process powershell -ArgumentList "-Command", "cd `"$root`"; & `"$python`" -m apps.universe_manager.main" -PassThru -Wait
+Write-Host "Universe ready."
 
-# 3) Trader (starts live collector in-process)
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle='KrakenSK - trader'; cd `"$root`"; `$env:NEMOTRON_PROVIDER='$nemotronProvider'; `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl'; `$env:NEMOTRON_MODEL='$nemotronModel'; `$env:NVIDIA_API_KEY='$nvidiaApiKey'; `$env:NVIDIA_API_URL='$nvidiaApiUrl'; `$env:NVIDIA_MODEL='$nvidiaModel'; & `"$python`" -m apps.trader.main"
+# 1b) Universe refresh loop - auto-restart
+if ($watchdogEnabled) {
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+        `$host.UI.RawUI.WindowTitle='KrakenSK - universe_manager';
+        cd '$root';
+        while (`$true) {
+            Write-Host '[watchdog] Starting universe_manager...';
+            `$env:UNIVERSE_LOOP_MODE='true';
+            `$env:UNIVERSE_REFRESH_INTERVAL_MIN='$universeRefreshMin';
+            & '$python' -m apps.universe_manager.main;
+            Write-Host '[watchdog] universe_manager exited. Restarting in 15s...';
+            Start-Sleep -Seconds 15
+        }"
+} else {
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+        `$host.UI.RawUI.WindowTitle='KrakenSK - universe_manager';
+        cd '$root';
+        `$env:UNIVERSE_LOOP_MODE='true';
+        `$env:UNIVERSE_REFRESH_INTERVAL_MIN='$universeRefreshMin';
+        & '$python' -m apps.universe_manager.main;
+    "
+}
+Write-Host "Universe refresh loop started (every ${universeRefreshMin}m)."
+
+# 2) NVIDIA optimizer / review scheduler - auto-restart
+if ($watchdogEnabled) {
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+        `$host.UI.RawUI.WindowTitle='KrakenSK - review_scheduler';
+        cd '$root';
+        while (`$true) {
+            Write-Host '[watchdog] Starting review_scheduler...';
+            `$env:ADVISORY_MODEL_PROVIDER='$advisoryModelProvider';
+            `$env:NEMOTRON_PROVIDER='$nemotronProvider';
+            `$env:NEMOTRON_STRATEGIST_PROVIDER='$nemotronStrategistProvider';
+            `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl';
+            `$env:NEMOTRON_MODEL='$nemotronModel';
+            `$env:NVIDIA_API_KEY='$nvidiaApiKey';
+            `$env:NVIDIA_API_URL='$nvidiaApiUrl';
+            `$env:NVIDIA_MODEL='$nvidiaModel';
+            `$env:OPENAI_API_KEY='$openaiApiKey';
+            `$env:OPENAI_API_URL='$openaiApiUrl';
+            `$env:OPENAI_MODEL='$openaiModel';
+            & '$python' -m apps.review_scheduler.main;
+            Write-Host '[watchdog] review_scheduler exited. Restarting in 15s...';
+            Start-Sleep -Seconds 15
+        }"
+} else {
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+        `$host.UI.RawUI.WindowTitle='KrakenSK - review_scheduler';
+        cd '$root';
+        `$env:ADVISORY_MODEL_PROVIDER='$advisoryModelProvider';
+        `$env:NEMOTRON_PROVIDER='$nemotronProvider';
+        `$env:NEMOTRON_STRATEGIST_PROVIDER='$nemotronStrategistProvider';
+        `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl';
+        `$env:NEMOTRON_MODEL='$nemotronModel';
+        `$env:NVIDIA_API_KEY='$nvidiaApiKey';
+        `$env:NVIDIA_API_URL='$nvidiaApiUrl';
+        `$env:NVIDIA_MODEL='$nvidiaModel';
+        `$env:OPENAI_API_KEY='$openaiApiKey';
+        `$env:OPENAI_API_URL='$openaiApiUrl';
+        `$env:OPENAI_MODEL='$openaiModel';
+        & '$python' -m apps.review_scheduler.main;
+    "
+}
+
+# 3) Trader - auto-restart
+if ($watchdogEnabled) {
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+        `$host.UI.RawUI.WindowTitle='KrakenSK - trader';
+        cd '$root';
+        while (`$true) {
+            Write-Host '[watchdog] Starting trader...';
+            `$env:ADVISORY_MODEL_PROVIDER='$advisoryModelProvider';
+            `$env:NEMOTRON_PROVIDER='$nemotronProvider';
+            `$env:NEMOTRON_STRATEGIST_PROVIDER='$nemotronStrategistProvider';
+            `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl';
+            `$env:NEMOTRON_MODEL='$nemotronModel';
+            `$env:NVIDIA_API_KEY='$nvidiaApiKey';
+            `$env:NVIDIA_API_URL='$nvidiaApiUrl';
+            `$env:NVIDIA_MODEL='$nvidiaModel';
+            `$env:OPENAI_API_KEY='$openaiApiKey';
+            `$env:OPENAI_API_URL='$openaiApiUrl';
+            `$env:OPENAI_MODEL='$openaiModel';
+            & '$python' -m apps.trader.main;
+            Write-Host '[watchdog] Trader exited. Restarting in 10s...';
+            Start-Sleep -Seconds 10
+        }"
+} else {
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+        `$host.UI.RawUI.WindowTitle='KrakenSK - trader';
+        cd '$root';
+        `$env:ADVISORY_MODEL_PROVIDER='$advisoryModelProvider';
+        `$env:NEMOTRON_PROVIDER='$nemotronProvider';
+        `$env:NEMOTRON_STRATEGIST_PROVIDER='$nemotronStrategistProvider';
+        `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl';
+        `$env:NEMOTRON_MODEL='$nemotronModel';
+        `$env:NVIDIA_API_KEY='$nvidiaApiKey';
+        `$env:NVIDIA_API_URL='$nvidiaApiUrl';
+        `$env:NVIDIA_MODEL='$nvidiaModel';
+        `$env:OPENAI_API_KEY='$openaiApiKey';
+        `$env:OPENAI_API_URL='$openaiApiUrl';
+        `$env:OPENAI_MODEL='$openaiModel';
+        & '$python' -m apps.trader.main;
+    "
+}
 
 # 4) Optional replay harness
 if ($replayEnabled) {
@@ -216,32 +369,177 @@ if ($replayEnabled) {
 }
 
 # 5) Optional visual Phil server
-if ($visualPhilEnabled) {
+if ($visualPhilEnabled -and $advisoryModelProvider -ne "phi3") {
+    Write-Host "Skipping visual Phi-3 server because advisory backend is $advisoryModelProvider."
+} elseif ($visualPhilEnabled) {
+    if (-not (Test-Path $phiPython)) {
+        Write-Error "Phi-3 Python executable not found at $phiPython"
+        exit 1
+    }
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle='KrakenSK - visual_phil'; cd `"$root`"; `$env:VISUAL_PHI3_PORT='$visualPhilPort'; `$env:VISUAL_PHI3_DEVICE='$visualPhilDevice'; `$env:VISUAL_PHI3_MODEL_DIR='$visualPhilModelDir'; & `"$phiPython`" -m apps.visual_phi3.main"
     [void](Wait-HttpReady -Url "http://127.0.0.1:${visualPhilPort}/health" -TimeoutSec 90)
 }
 
-if ($visualPhilFeedEnabled) {
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle='KrakenSK - visual_feed'; cd `"$root`"; `$env:VISUAL_PHI3_REVIEW_URL='$visualPhilReviewUrl'; `$env:VISUAL_PHI3_INTERVAL_SEC='$visualPhilIntervalSec'; `$env:VISUAL_PHI3_WINDOW_TITLE='$visualPhilWindowTitle'; `$env:VISUAL_PHI3_PROCESS_NAME='$visualPhilProcessName'; `$env:VISUAL_PHI3_PROCESS_PID='$visualPhilProcessPid'; `$env:VISUAL_OLLAMA_MODEL='$visualOllamaModel'; `$env:VISUAL_OLLAMA_URL='$visualOllamaUrl'; & `"$python`" -m apps.visual_feed.main"
+if ($visualPhilFeedEnabled -and $advisoryModelProvider -ne "phi3") {
+    Write-Host "Skipping visual Phi-3 feed because advisory backend is $advisoryModelProvider."
+} elseif ($visualPhilFeedEnabled) {
+    if ($watchdogEnabled) {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+            `$host.UI.RawUI.WindowTitle='KrakenSK - visual_feed';
+            cd '$root';
+            while (`$true) {
+                Write-Host '[watchdog] Starting visual_feed...';
+                `$env:VISUAL_PHI3_REVIEW_URL='$visualPhilReviewUrl';
+                `$env:VISUAL_PHI3_INTERVAL_SEC='$visualPhilIntervalSec';
+                `$env:VISUAL_PHI3_WINDOW_TITLE='$visualPhilWindowTitle';
+                `$env:VISUAL_PHI3_PROCESS_NAME='$visualPhilProcessName';
+                `$env:VISUAL_PHI3_PROCESS_PID='$visualPhilProcessPid';
+                `$env:VISUAL_OLLAMA_MODEL='$visualOllamaModel';
+                `$env:VISUAL_OLLAMA_URL='$visualOllamaUrl';
+                & '$python' -m apps.visual_feed.main;
+                Write-Host '[watchdog] visual_feed exited. Restarting in 10s...';
+                Start-Sleep -Seconds 10
+            }"
+    } else {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+            `$host.UI.RawUI.WindowTitle='KrakenSK - visual_feed';
+            cd '$root';
+            `$env:VISUAL_PHI3_REVIEW_URL='$visualPhilReviewUrl';
+            `$env:VISUAL_PHI3_INTERVAL_SEC='$visualPhilIntervalSec';
+            `$env:VISUAL_PHI3_WINDOW_TITLE='$visualPhilWindowTitle';
+            `$env:VISUAL_PHI3_PROCESS_NAME='$visualPhilProcessName';
+            `$env:VISUAL_PHI3_PROCESS_PID='$visualPhilProcessPid';
+            `$env:VISUAL_OLLAMA_MODEL='$visualOllamaModel';
+            `$env:VISUAL_OLLAMA_URL='$visualOllamaUrl';
+            & '$python' -m apps.visual_feed.main;
+        "
+    }
 }
 
 if ($operatorUiEnabled) {
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle='KrakenSK - operator_ui'; cd `"$root`"; `$env:OPERATOR_UI_HOST='$operatorUiHost'; `$env:OPERATOR_UI_PORT='$operatorUiPort'; `$env:NEMOTRON_PROVIDER='$nemotronProvider'; `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl'; `$env:NEMOTRON_MODEL='$nemotronModel'; `$env:NVIDIA_API_KEY='$nvidiaApiKey'; `$env:NVIDIA_API_URL='$nvidiaApiUrl'; `$env:NVIDIA_MODEL='$nvidiaModel'; & `"$python`" -m apps.operator_ui.main"
+    if ($watchdogEnabled) {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+            `$host.UI.RawUI.WindowTitle='KrakenSK - operator_ui';
+            cd '$root';
+            while (`$true) {
+                Write-Host '[watchdog] Starting operator_ui...';
+                `$env:OPERATOR_UI_HOST='$operatorUiHost';
+                `$env:OPERATOR_UI_PORT='$operatorUiPort';
+                `$env:ADVISORY_MODEL_PROVIDER='$advisoryModelProvider';
+                `$env:NEMOTRON_PROVIDER='$nemotronProvider';
+                `$env:NEMOTRON_STRATEGIST_PROVIDER='$nemotronStrategistProvider';
+                `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl';
+                `$env:NEMOTRON_MODEL='$nemotronModel';
+                `$env:NVIDIA_API_KEY='$nvidiaApiKey';
+                `$env:NVIDIA_API_URL='$nvidiaApiUrl';
+                `$env:NVIDIA_MODEL='$nvidiaModel';
+                `$env:OPENAI_API_KEY='$openaiApiKey';
+                `$env:OPENAI_API_URL='$openaiApiUrl';
+                `$env:OPENAI_MODEL='$openaiModel';
+                & '$python' -m apps.operator_ui.main;
+                Write-Host '[watchdog] operator_ui exited. Restarting in 10s...';
+                Start-Sleep -Seconds 10
+            }"
+    } else {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+            `$host.UI.RawUI.WindowTitle='KrakenSK - operator_ui';
+            cd '$root';
+            `$env:OPERATOR_UI_HOST='$operatorUiHost';
+            `$env:OPERATOR_UI_PORT='$operatorUiPort';
+            `$env:ADVISORY_MODEL_PROVIDER='$advisoryModelProvider';
+            `$env:NEMOTRON_PROVIDER='$nemotronProvider';
+            `$env:NEMOTRON_STRATEGIST_PROVIDER='$nemotronStrategistProvider';
+            `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl';
+            `$env:NEMOTRON_MODEL='$nemotronModel';
+            `$env:NVIDIA_API_KEY='$nvidiaApiKey';
+            `$env:NVIDIA_API_URL='$nvidiaApiUrl';
+            `$env:NVIDIA_MODEL='$nvidiaModel';
+            `$env:OPENAI_API_KEY='$openaiApiKey';
+            `$env:OPENAI_API_URL='$openaiApiUrl';
+            `$env:OPENAI_MODEL='$openaiModel';
+            & '$python' -m apps.operator_ui.main;
+        "
+    }
 }
 
-Write-Host "Started KrakenSK project stack:"
-Write-Host " - phi3_npu"
-if ($nemotronProvider -eq "local") {
-    Write-Host " - ollama (local nemotron host)"
+if ($mcpServerEnabled) {
+    if ($watchdogEnabled) {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+            `$host.UI.RawUI.WindowTitle='KrakenSK - mcp_server';
+            cd '$root';
+            while (`$true) {
+                Write-Host '[watchdog] Starting mcp_server...';
+                `$env:MCP_HOST='$mcpHost';
+                `$env:MCP_PORT='$mcpPort';
+                `$env:NEMOTRON_PROVIDER='$nemotronProvider';
+                `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl';
+                `$env:NEMOTRON_MODEL='$nemotronModel';
+                `$env:NVIDIA_API_KEY='$nvidiaApiKey';
+                `$env:NVIDIA_API_URL='$nvidiaApiUrl';
+                `$env:NVIDIA_MODEL='$nvidiaModel';
+                `$env:OPENAI_API_KEY='$openaiApiKey';
+                `$env:OPENAI_API_URL='$openaiApiUrl';
+                `$env:OPENAI_MODEL='$openaiModel';
+                & '$python' -m apps.mcp_server.main;
+                Write-Host '[watchdog] mcp_server exited. Restarting in 10s...';
+                Start-Sleep -Seconds 10
+            }"
+    } else {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+            `$host.UI.RawUI.WindowTitle='KrakenSK - mcp_server';
+            cd '$root';
+            `$env:MCP_HOST='$mcpHost';
+            `$env:MCP_PORT='$mcpPort';
+            `$env:NEMOTRON_PROVIDER='$nemotronProvider';
+            `$env:NEMOTRON_BASE_URL='$nemotronBaseUrl';
+            `$env:NEMOTRON_MODEL='$nemotronModel';
+            `$env:NVIDIA_API_KEY='$nvidiaApiKey';
+            `$env:NVIDIA_API_URL='$nvidiaApiUrl';
+            `$env:NVIDIA_MODEL='$nvidiaModel';
+            `$env:OPENAI_API_KEY='$openaiApiKey';
+            `$env:OPENAI_API_URL='$openaiApiUrl';
+            `$env:OPENAI_MODEL='$openaiModel';
+            & '$python' -m apps.mcp_server.main;
+        "
+    }
+    [void](Wait-HttpReady -Url "http://127.0.0.1:${mcpPort}/" -TimeoutSec 30)
 }
+
+if ($mcpServerEnabled -and $mcpPublicEnabled) {
+    if ($watchdogEnabled) {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+            `$host.UI.RawUI.WindowTitle='KrakenSK - mcp_tunnel';
+            cd '$root';
+            while (`$true) {
+                Write-Host '[watchdog] Starting mcp_tunnel...';
+                & powershell -ExecutionPolicy Bypass -File '.\scripts\start_mcp_tunnel.ps1';
+                Write-Host '[watchdog] mcp_tunnel exited. Restarting in 10s...';
+                Start-Sleep -Seconds 10
+            }"
+    } else {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+            `$host.UI.RawUI.WindowTitle='KrakenSK - mcp_tunnel';
+            cd '$root';
+            & powershell -ExecutionPolicy Bypass -File '.\scripts\start_mcp_tunnel.ps1';
+        "
+    }
+}
+
+Write-Host "Started KrakenSK app stack:"
+Write-Host " - external_ai_services (bring your own Phi-3/Nemotron)"
 Write-Host " - universe_manager"
 Write-Host " - review_scheduler"
 Write-Host " - trader"
 Write-Host " - trader_decision_engine ($traderDecisionEngine)"
 Write-Host " - policy_profile ($policyProfile)"
-Write-Host " - nemotron_provider ($nemotronProvider)"
+Write-Host " - aggression_mode ($aggressionMode)"
+Write-Host " - advisory_provider ($advisoryModelProvider)"
+Write-Host " - nemotron_provider ($nemotronStrategistProvider)"
 Write-Host " - nemotron_model ($nemotronModel)"
-if ($nemotronProvider -eq "local") {
+if ($nemotronStrategistProvider -eq "openai") {
+    Write-Host " - openai_model ($openaiModel)"
+}
+if ($nemotronStrategistProvider -eq "local") {
     Write-Host " - nemotron_backend_mode ($($nemotronStatus.ChatMode))"
     Write-Host " - nemotron_status ($($nemotronStatus.Message))"
 }
@@ -263,4 +561,9 @@ if ($visualPhilFeedEnabled) {
 if ($operatorUiEnabled) {
     Write-Host " - operator_ui (http://${operatorUiHost}:${operatorUiPort})"
 }
-Write-Host "MCP server not touched."
+if ($mcpServerEnabled) {
+    Write-Host " - mcp_server (http://127.0.0.1:${mcpPort})"
+}
+if ($mcpServerEnabled -and $mcpPublicEnabled) {
+    Write-Host " - mcp_tunnel (cloudflared)"
+}

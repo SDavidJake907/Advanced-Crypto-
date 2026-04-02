@@ -19,6 +19,8 @@ class PolicyVerdict:
     entry_score: float
     entry_recommendation: str
     reversal_risk: str
+    promotion_tier: str
+    promotion_reason: str
     entry_reasons: list[str]
 
     def to_dict(self) -> dict[str, Any]:
@@ -44,6 +46,8 @@ def build_policy_verdict(
         entry_score=float(entry_verification.get("entry_score", 0.0) or 0.0),
         entry_recommendation=str(entry_verification.get("entry_recommendation", "WATCH") or "WATCH"),
         reversal_risk=str(entry_verification.get("reversal_risk", "MEDIUM") or "MEDIUM"),
+        promotion_tier=str(entry_verification.get("promotion_tier", "skip") or "skip"),
+        promotion_reason=str(entry_verification.get("promotion_reason", "not_qualified") or "not_qualified"),
         entry_reasons=list(dict.fromkeys(entry_reasons)),
     )
 
@@ -71,5 +75,9 @@ def extract_policy_verdict(features: dict[str, Any]) -> PolicyVerdict:
             source.get("entry_recommendation", features.get("entry_recommendation", "WATCH")) or "WATCH"
         ),
         reversal_risk=str(source.get("reversal_risk", features.get("reversal_risk", "MEDIUM")) or "MEDIUM"),
+        promotion_tier=str(source.get("promotion_tier", features.get("promotion_tier", "skip")) or "skip"),
+        promotion_reason=str(
+            source.get("promotion_reason", features.get("promotion_reason", "not_qualified")) or "not_qualified"
+        ),
         entry_reasons=list(dict.fromkeys(entry_reasons)),
     )

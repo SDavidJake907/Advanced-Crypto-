@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from core.runtime.log_rotation import prune_directory_files, rotate_jsonl_if_needed
+
 LOG_PATH = Path("logs/visual_phi3_feed.jsonl")
 SHOT_DIR = Path("logs/screens")
 INTERVAL_SEC = float(os.getenv("VISUAL_PHI3_INTERVAL_SEC", "30"))
@@ -21,6 +23,8 @@ CAPTURE_PROCESS_PID = int(os.getenv("VISUAL_PHI3_PROCESS_PID", "0") or "0")
 FALLBACK_CAPTURE_MODE = os.getenv("VISUAL_PHI3_FALLBACK_CAPTURE", "foreground").strip().lower()
 MIN_CAPTURE_WIDTH = int(os.getenv("VISUAL_PHI3_MIN_CAPTURE_WIDTH", "600"))
 MIN_CAPTURE_HEIGHT = int(os.getenv("VISUAL_PHI3_MIN_CAPTURE_HEIGHT", "400"))
+SCREENSHOT_KEEP_LATEST = int(os.getenv("VISUAL_SCREENSHOT_KEEP_LATEST", "80"))
+SCREENSHOT_MAX_AGE_DAYS = float(os.getenv("VISUAL_SCREENSHOT_MAX_AGE_DAYS", "2"))
 EXCLUDED_TITLE_PARTS = ("krakensk", "visual studio code", "visual_feed", "visual_phil", "review_scheduler", "trader")
 PREFERRED_PROCESS_NAMES = {"krakendesktop.exe", "krakendesktop"}
 
@@ -31,6 +35,7 @@ PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
 def _log(payload: dict) -> None:
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    rotate_jsonl_if_needed(LOG_PATH)
     with LOG_PATH.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, default=str) + "\n")
 
@@ -273,6 +278,12 @@ def _capture_window_image(out_path: Path) -> tuple[bool, str, dict[str, Any]]:
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     image.save(out_path)
+    prune_directory_files(
+        SHOT_DIR,
+        pattern="*.png",
+        keep_latest=SCREENSHOT_KEEP_LATEST,
+        max_age_days=SCREENSHOT_MAX_AGE_DAYS,
+    )
     return True, "captured", debug
 
 

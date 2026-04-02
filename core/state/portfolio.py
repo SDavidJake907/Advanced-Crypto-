@@ -43,7 +43,8 @@ class PortfolioState:
             self.cash += notional - fee
             self.positions[symbol] = self.positions.get(symbol, 0.0) - qty
         mark_price = float(exec_result.get("mark_price", price))
-        if self.positions.get(symbol, 0.0) == 0.0:
+        if abs(float(self.positions.get(symbol, 0.0) or 0.0)) < 1e-12:
+            self.positions.pop(symbol, None)
             self.position_marks.pop(symbol, None)
         else:
             self.position_marks[symbol] = mark_price
@@ -63,3 +64,14 @@ class PortfolioState:
             total_pos_value += qty * mark_price
         equity = self.cash + total_pos_value
         return equity - self.initial_equity
+
+    def mark_to_market(self, marks: Dict[str, float]) -> Dict[str, Any]:
+        for symbol, price in (marks or {}).items():
+            if symbol in self.positions and float(self.positions.get(symbol, 0.0) or 0.0) != 0.0 and float(price or 0.0) > 0.0:
+                self.position_marks[symbol] = float(price)
+        equity = self.cash
+        for symbol, qty in self.positions.items():
+            mark_price = float(self.position_marks.get(symbol, 0.0) or 0.0)
+            equity += float(qty) * mark_price
+        self.pnl = equity - self.initial_equity
+        return {"cash": self.cash, "positions": dict(self.positions), "pnl": self.pnl, "equity": equity}

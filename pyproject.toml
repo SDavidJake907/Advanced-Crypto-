@@ -15,12 +15,26 @@ dependencies = [
   "websockets>=12.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+ml = [
+  "xgboost>=2.0.0",
+]
+research = [
+  "vectorbt>=0.28.5",
+]
+
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["core", "apps"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["core*", "apps*"]
 
 [tool.ruff]
 line-length = 100

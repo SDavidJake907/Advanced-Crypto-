@@ -45,6 +45,7 @@ class BasicRiskEngine(RiskEngine):
         last_fill_bar_idx = state.get("last_fill_bar_idx")
         last_fill_symbol = state.get("last_fill_symbol")
         last_fill_side = state.get("last_fill_side")
+        runtime_health = features.get("runtime_health", {})
 
         current_notional = 0.0
         if symbol and symbol in positions:
@@ -72,6 +73,16 @@ class BasicRiskEngine(RiskEngine):
         leverage = abs(current_notional) / equity if equity > 0 else 0.0
         if leverage > self.max_leverage:
             checks.append("block_max_leverage")
+
+        if isinstance(runtime_health, dict):
+            for reason in runtime_health.get("reasons", []):
+                checks.append(str(reason))
+        if not bool(features.get("book_valid", True)):
+            if signal in {"LONG", "SHORT"}:
+                checks.append("runtime_health_book_invalid")
+                checks.append("block")
+            else:
+                checks.append("warn_book_invalid")
 
         if any(check.startswith("block") for check in checks):
             checks.append("block")

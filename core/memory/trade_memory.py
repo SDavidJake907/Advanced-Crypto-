@@ -17,11 +17,28 @@ class OutcomeRecord:
     symbol: str
     side: str
     pnl_pct: float
+    pnl_usd: float
     hold_minutes: float
     exit_reason: str
     entry_reasons: list[str]
     regime_label: str
     tag: str
+    lane: str = ""
+    entry_score: float = 0.0
+    entry_recommendation: str = ""
+    pattern_name: str = ""
+    setup_key: str = ""
+    mfe_pct: float = 0.0
+    mae_pct: float = 0.0
+    capture_vs_mfe_pct: float = 0.0
+    structure_state: str = ""
+    mfe_r: float = 0.0
+    mae_r: float = 0.0
+    etd_pct: float = 0.0
+    etd_r: float = 0.0
+    expected_edge_pct: float = 0.0
+    realized_edge_pct: float = 0.0
+    edge_capture_ratio: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -42,10 +59,18 @@ class TradeMemoryStore:
         self.base_dir = base_dir or MEMORY_DIR
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.outcomes_path = self.base_dir / "outcomes.jsonl"
+        self.lessons_path = self.base_dir / "lessons.jsonl"
 
     def append_outcome(self, outcome: OutcomeRecord) -> None:
         with self.outcomes_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(outcome.to_dict()) + "\n")
+
+    @staticmethod
+    def _parse_outcome(payload: dict) -> OutcomeRecord:
+        """Deserialise one outcome record, tolerating missing or extra fields."""
+        import dataclasses
+        known = {f.name for f in dataclasses.fields(OutcomeRecord)}
+        return OutcomeRecord(**{k: v for k, v in payload.items() if k in known})
 
     def load_outcomes(self) -> list[OutcomeRecord]:
         if not self.outcomes_path.exists():
@@ -56,8 +81,7 @@ class TradeMemoryStore:
                 if not line.strip():
                     continue
                 try:
-                    payload = json.loads(line)
-                    outcomes.append(OutcomeRecord(**payload))
+                    outcomes.append(self._parse_outcome(json.loads(line)))
                 except Exception:
                     continue
         return outcomes
@@ -73,8 +97,7 @@ class TradeMemoryStore:
         outcomes: list[OutcomeRecord] = []
         for line in recent_lines:
             try:
-                payload = json.loads(line)
-                outcomes.append(OutcomeRecord(**payload))
+                outcomes.append(self._parse_outcome(json.loads(line)))
             except Exception:
                 continue
         return outcomes
@@ -175,9 +198,9 @@ class TradeMemoryStore:
             else:
                 break
         kelly_fraction = self.get_kelly_fraction(symbol)
-        if win_rate < 0.25 and trade_count >= 5:
+        if win_rate < 0.25 and trade_count >= 3:
             verdict = "avoid"
-        elif win_rate < 0.4:
+        elif win_rate < 0.4 and trade_count >= 2:
             verdict = "weak"
         elif win_rate > 0.6 and avg_pnl_pct > 0.005:
             verdict = "strong"
@@ -192,6 +215,58 @@ class TradeMemoryStore:
             "verdict": verdict,
         }
 
+    def save_lesson(self, symbol: str, outcome_class: str, lesson: str, suggested_adjustment: str, confidence: float) -> None:
+        """Persist a lesson from an outcome review so Nemo can learn from it."""
+        record = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "symbol": symbol,
+            "outcome_class": outcome_class,
+            "lesson": lesson,
+            "suggested_adjustment": suggested_adjustment,
+            "confidence": confidence,
+        }
+        with self.lessons_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record) + "\n")
+
+    def build_lessons_block(self, max_lessons: int = 10) -> str:
+        """Return recent lessons as a compact block for LLM injection."""
+        if not self.lessons_path.exists():
+            return ""
+        lines: list[str] = []
+        recent: deque[str] = deque(maxlen=max_lessons)
+        with self.lessons_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    recent.append(line)
+        for line in recent:
+            try:
+                r = json.loads(line)
+                lines.append(
+                    f"- [{r.get('outcome_class','?')}] {r.get('symbol','?')}: "
+                    f"{r.get('lesson','?')} → adjust: {r.get('suggested_adjustment','?')}"
+                )
+            except Exception:
+                continue
+        if not lines:
+            return ""
+        return "=== NEMO LEARNED LESSONS ===\n" + "\n".join(lines)
+
+    def is_in_cooldown(self, symbol: str, cooldown_minutes: float = 240.0) -> bool:
+        """Return True if this symbol was closed within the cooldown window."""
+        outcomes = self.load_recent_outcomes(50)
+        symbol_outcomes = [o for o in outcomes if o.symbol == symbol]
+        if not symbol_outcomes:
+            return False
+        last = symbol_outcomes[-1]
+        try:
+            last_ts = datetime.fromisoformat(last.ts)
+            if last_ts.tzinfo is None:
+                last_ts = last_ts.replace(tzinfo=timezone.utc)
+            elapsed = (datetime.now(timezone.utc) - last_ts).total_seconds() / 60.0
+            return elapsed < cooldown_minutes
+        except Exception:
+            return False
+
     def build_memory_block(self) -> str:
         records = self.compute_track_record()
         if not records:
@@ -205,16 +280,82 @@ class TradeMemoryStore:
             )
         return "\n".join(lines)
 
+    def build_behavior_score_block(self, lookback: int = 50) -> str:
+        """Return a formatted behavior score block for LLM injection.
+
+        Returns an empty string when there are insufficient outcomes.
+        """
+        from core.llm.behavior_score import compute_behavior_score, format_behavior_score_block
+        outcomes = self.load_recent_outcomes(lookback)
+        bs = compute_behavior_score(outcomes, lookback=lookback)
+        if bs is None:
+            return ""
+        return format_behavior_score_block(bs)
+
+    def build_symbol_lesson_block(self, symbol: str, n: int = 3) -> str:
+        """Return the last n outcomes for this symbol as a compact lesson block for LLM injection."""
+        all_outcomes = self.load_recent_outcomes(100)
+        symbol_outcomes = [o for o in all_outcomes if o.symbol == symbol][-n:]
+        if not symbol_outcomes:
+            return ""
+        recent_losses = [o for o in symbol_outcomes if o.pnl_pct < 0]
+        lines = [f"=== RECENT {symbol} LESSONS ==="]
+        for o in symbol_outcomes:
+            tag = "WIN" if o.pnl_pct >= 0 else "LOSS"
+            entry_str = ",".join(o.entry_reasons[:2]) if o.entry_reasons else "unknown"
+            lines.append(
+                f"- [{tag}] exit={o.exit_reason} pnl={o.pnl_pct * 100.0:+.2f}% "
+                f"held={o.hold_minutes:.0f}m entry={entry_str}"
+            )
+        if len(recent_losses) >= 3:
+            lines.append(f"⚠ TEMPORARY AVOID: 3 consecutive losses on {symbol}")
+        return "\n".join(lines)
+
+
+def build_setup_key(
+    *,
+    lane: str = "",
+    pattern_name: str = "",
+    entry_recommendation: str = "",
+    entry_reasons: list[str] | None = None,
+) -> str:
+    primary_reason = ""
+    if entry_reasons:
+        primary_reason = str(entry_reasons[0] or "").strip().lower()
+    parts = [
+        str(lane or "").strip().upper() or "NA",
+        str(pattern_name or "").strip().lower() or "none",
+        str(entry_recommendation or "").strip().upper() or "NA",
+        primary_reason or "none",
+    ]
+    return "|".join(parts)
+
 
 def build_outcome_record(
     *,
     symbol: str,
     side: str,
+    lane: str = "",
     pnl_pct: float,
+    pnl_usd: float = 0.0,
     hold_minutes: float,
     exit_reason: str,
     entry_reasons: list[str],
     regime_label: str,
+    entry_score: float = 0.0,
+    entry_recommendation: str = "",
+    pattern_name: str = "",
+    mfe_pct: float = 0.0,
+    mae_pct: float = 0.0,
+    capture_vs_mfe_pct: float = 0.0,
+    structure_state: str = "",
+    mfe_r: float = 0.0,
+    mae_r: float = 0.0,
+    etd_pct: float = 0.0,
+    etd_r: float = 0.0,
+    expected_edge_pct: float = 0.0,
+    realized_edge_pct: float = 0.0,
+    edge_capture_ratio: float = 0.0,
 ) -> OutcomeRecord:
     tag = "normal"
     if pnl_pct > 0.02:
@@ -229,10 +370,32 @@ def build_outcome_record(
         ts=datetime.now(timezone.utc).isoformat(),
         symbol=symbol,
         side=side,
+        lane=str(lane or ""),
         pnl_pct=pnl_pct,
+        pnl_usd=round(pnl_usd, 4),
         hold_minutes=hold_minutes,
         exit_reason=exit_reason,
         entry_reasons=entry_reasons,
         regime_label=regime_label,
         tag=tag,
+        entry_score=round(float(entry_score or 0.0), 3),
+        entry_recommendation=str(entry_recommendation or ""),
+        pattern_name=str(pattern_name or ""),
+        setup_key=build_setup_key(
+            lane=str(lane or ""),
+            pattern_name=str(pattern_name or ""),
+            entry_recommendation=str(entry_recommendation or ""),
+            entry_reasons=entry_reasons,
+        ),
+        mfe_pct=round(mfe_pct, 6),
+        mae_pct=round(mae_pct, 6),
+        capture_vs_mfe_pct=round(capture_vs_mfe_pct, 6),
+        structure_state=str(structure_state or ""),
+        mfe_r=round(mfe_r, 6),
+        mae_r=round(mae_r, 6),
+        etd_pct=round(etd_pct, 6),
+        etd_r=round(etd_r, 6),
+        expected_edge_pct=round(expected_edge_pct, 4),
+        realized_edge_pct=round(realized_edge_pct, 4),
+        edge_capture_ratio=round(edge_capture_ratio, 4),
     )

@@ -35,11 +35,16 @@ def _heuristic_exit_posture(payload: dict[str, Any]) -> ExitPostureDecision:
     rsi = float(payload.get("rsi", 50.0) or 50.0)
     entry_price = float(payload.get("entry_price", 0.0) or 0.0)
     price = float(payload.get("price", 0.0) or 0.0)
+    lane = str(payload.get("lane", "L3") or "L3").upper()
 
     stale_min_hold = float(get_runtime_setting("EXIT_STALE_MIN_HOLD_MIN"))
     stale_abs_pnl = float(get_runtime_setting("EXIT_STALE_MAX_ABS_PNL_PCT"))
     tighten_min_pnl = float(get_runtime_setting("EXIT_TIGHTEN_MIN_PNL_PCT"))
     neg_pnl_exit = float(get_runtime_setting("EXIT_POSTURE_NEG_PNL_PCT"))
+
+    # L4 meme coins stale out faster — cap stale hold at 1/3 the normal time
+    if lane == "L4":
+        stale_min_hold = max(stale_min_hold / 3.0, 5.0)
 
     if price <= 0.0 or entry_price <= 0.0:
         return ExitPostureDecision("RUN", "posture_data_incomplete", 0.40)
@@ -49,6 +54,10 @@ def _heuristic_exit_posture(payload: dict[str, Any]) -> ExitPostureDecision:
 
     if pnl_pct <= neg_pnl_exit and momentum < 0.0 and trend_1h <= 0.0:
         return ExitPostureDecision("EXIT", "loser_with_trend_decay", 0.84)
+
+    # L4: tighten earlier — meme coins reverse fast, protect profit at half threshold
+    if lane == "L4" and pnl_pct >= tighten_min_pnl * 0.5 and (momentum < 0.0 or rsi >= 68.0):
+        return ExitPostureDecision("TIGHTEN", "l4_protect_profit_early", 0.76)
 
     if pnl_pct >= tighten_min_pnl and (momentum < 0.0 or rsi >= 72.0):
         return ExitPostureDecision("TIGHTEN", "protect_open_profit", 0.74)
@@ -62,7 +71,7 @@ def _heuristic_exit_posture(payload: dict[str, Any]) -> ExitPostureDecision:
 def phi3_exit_posture(payload: dict[str, Any]) -> ExitPostureDecision:
     if bool(get_runtime_setting("EXIT_POSTURE_USE_PHI3")):
         try:
-            raw = phi3_chat(payload, system=PHI3_EXIT_POSTURE_SYSTEM_PROMPT, max_tokens=180)
+            raw = phi3_chat(payload, system=PHI3_EXIT_POSTURE_SYSTEM_PROMPT, max_tokens=400)
             parsed = json.loads(raw)
             posture = str(parsed.get("posture", "RUN")).strip().upper()
             if posture not in {"RUN", "TIGHTEN", "EXIT", "STALE"}:

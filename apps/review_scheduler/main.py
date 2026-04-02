@@ -9,12 +9,16 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from core.config.runtime import get_runtime_snapshot, update_runtime_overrides
+from core.config.runtime import get_runtime_snapshot, stage_runtime_override_proposal
 from core.llm.client import nvidia_nemotron_chat, parse_json_response
+from core.llm.contracts import normalize_runtime_advice
 from core.llm.prompts import NVIDIA_OPTIMIZER_SYSTEM_PROMPT
+from core.memory.daily_review import build_daily_review_report_from_disk, write_daily_review_report
+from core.memory.kelly_sizer import run_kelly_update
 from core.memory.kraken_history import build_history_review_block
 from core.memory.trade_memory import TradeMemoryStore
 from core.runtime.log_rotation import rotate_jsonl_if_needed
+from core.state.system_record import record_optimizer_review
 from core.state.store import load_universe
 
 load_dotenv()
@@ -57,6 +61,7 @@ def _append_review(event: dict[str, Any]) -> None:
     payload = {"ts": datetime.now(timezone.utc).isoformat(), **event}
     with REVIEW_LOG.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload) + "\n")
+    record_optimizer_review(payload)
 
 
 def _allowed_override_keys() -> set[str]:
@@ -77,7 +82,30 @@ def _build_payload() -> dict[str, Any]:
     }
 
 
+def _run_kelly() -> None:
+    trade_zip = os.getenv("KRAKEN_TRADE_HISTORY_ZIP", "").strip()
+    if not trade_zip:
+        return
+    try:
+        summary = run_kelly_update(trade_zip)
+        applied = summary.get("applied", {})
+        diag = summary.get("diagnostics", {})
+        parts = []
+        if "EXEC_RISK_PER_TRADE_PCT" in applied:
+            parts.append(f"std={applied['EXEC_RISK_PER_TRADE_PCT']}% (W={diag.get('standard_win_rate', 0):.0%}, n={diag.get('standard_trips', 0)})")
+        if "MEME_EXEC_RISK_PER_TRADE_PCT" in applied:
+            parts.append(f"meme={applied['MEME_EXEC_RISK_PER_TRADE_PCT']}% (W={diag.get('meme_win_rate', 0):.0%}, n={diag.get('meme_trips', 0)})")
+        if parts:
+            print(f"[kelly_sizer] Updated position sizes: {', '.join(parts)}")
+        else:
+            print(f"[kelly_sizer] No update (insufficient history). diag={diag}")
+    except Exception as exc:
+        print(f"[kelly_sizer] Error: {exc}")
+
+
 def _run_once() -> None:
+    _run_kelly()
+    write_daily_review_report(build_daily_review_report_from_disk(root=ROOT))
     payload = _build_payload()
     raw = nvidia_nemotron_chat(
         payload,
@@ -85,21 +113,24 @@ def _run_once() -> None:
         max_tokens=1200,
         model=os.getenv("NVIDIA_OPTIMIZER_MODEL", os.getenv("NVIDIA_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1.5")),
     )
-    parsed = parse_json_response(raw)
-    updates = parsed.get("recommended_overrides", {})
-    if not isinstance(updates, dict):
-        updates = {}
     allowed = _allowed_override_keys()
-    filtered_updates = {key: value for key, value in updates.items() if key in allowed}
-    applied: dict[str, Any] = {}
-    if _bool_env("NVIDIA_OPTIMIZER_APPLY", False) and filtered_updates:
-        applied = update_runtime_overrides(filtered_updates)
+    parsed = normalize_runtime_advice(parse_json_response(raw), allowed_keys=allowed)
+    filtered_updates = parsed.get("recommended_overrides", {})
+    staged_proposal: dict[str, Any] | None = None
+    if filtered_updates:
+        staged_proposal = stage_runtime_override_proposal(
+            filtered_updates,
+            source="nvidia_optimizer",
+            summary=parsed.get("summary", ""),
+            context={"issues": parsed.get("issues", []), "confidence": parsed.get("confidence", 0.0)},
+        )
     _append_review(
         {
             "summary": parsed.get("summary", ""),
             "issues": parsed.get("issues", []),
             "recommended_overrides": filtered_updates,
-            "applied_overrides": applied,
+            "applied_overrides": {},
+            "staged_proposal": staged_proposal or {},
             "confidence": parsed.get("confidence", 0.0),
         }
     )
