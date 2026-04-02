@@ -18,6 +18,12 @@ This repository was developed through human-directed implementation with assista
 
 AI tools contributed to code generation, refactors, diagnostics, documentation, and testing support. Final runtime decisions, deployment choices, exchange credentials, and live-operation responsibility remain with the operator.
 
+## Risk Disclaimer
+
+This repository is not financial advice. The author/operator is not a financial advisor.
+
+Use this system, its code, configuration, ideas, and documentation at your own risk. Live trading can lose money, fail operationally, or behave differently than replay, shadow, or paper testing.
+
 ## Third-Party Notice
 
 This repository integrates third-party services, runtimes, and model endpoints, including NVIDIA-hosted APIs/models when configured. Those third-party components remain the property of their respective owners.
