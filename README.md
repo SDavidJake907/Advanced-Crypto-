@@ -12,6 +12,17 @@ KrakenSK is a live Kraken spot trading system built around a deterministic tradi
 
 LLMs are still present, but they are constrained. The intended direction is not "AI decides everything." The intended direction is a measurable leader-rotation engine with AI used for review, diagnosis, and structured advisory.
 
+## Third-Party Notice
+
+This repository integrates third-party services, runtimes, and model endpoints, including NVIDIA-hosted APIs/models when configured. Those third-party components remain the property of their respective owners.
+
+This project is not selling NVIDIA software, models, or services as proprietary KrakenSK assets. KrakenSK is an integration and orchestration layer that can call third-party providers when the operator configures them.
+
+You are responsible for:
+- complying with the license and terms of any third-party model, API, or binary you use
+- supplying your own credentials where required
+- reviewing provider usage limits, commercial terms, and attribution requirements before deployment
+
 ## What This Repository Contains
 
 This repository includes:
