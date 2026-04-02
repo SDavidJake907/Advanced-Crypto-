@@ -12,6 +12,85 @@ KrakenSK is a live Kraken spot trading system built around a deterministic tradi
 
 LLMs are still present, but they are constrained. The intended direction is not "AI decides everything." The intended direction is a measurable leader-rotation engine with AI used for review, diagnosis, and structured advisory.
 
+## What This Repository Contains
+
+This repository includes:
+- a live Kraken spot trading loop
+- a universe manager that selects and ranks tradable symbols
+- deterministic feature extraction, scoring, and risk gating
+- optional local LLM services for advisory and finalist review
+- a web-based operator UI for runtime monitoring
+- replay, shadow validation, and review tooling
+- a large supporting doc set for architecture, tuning, runtime flow, and operating rules
+
+If you are reading this on GitHub, start with this README, then use the full docs index in [docs/DOCS_INDEX.md](docs/DOCS_INDEX.md).
+
+## UI Screenshots
+
+Operator UI examples from the current stack:
+
+![Operator control room](docs/screenshots/operator-control-room.png)
+
+![Operator overview](docs/screenshots/operator-overview.png)
+
+![Known entry ledger](docs/screenshots/operator-ledger.png)
+
+![Portfolio view](docs/screenshots/operator-portfolio.png)
+
+## System Requirements
+
+### Required
+
+- Windows with PowerShell support
+- Python `3.11+` as defined in [pyproject.toml](pyproject.toml)
+- A Kraken account and API credentials for live trading
+- Network connectivity to Kraken REST and WebSocket endpoints
+- Enough local disk for logs, state, and optional research outputs
+
+### Recommended Runtime Shape
+
+- Windows 11
+- Local Ollama runtime for Nemotron/local strategist paths
+- CUDA-capable NVIDIA GPU for the accelerated feature stack in [`cpp/src`](cpp/src)
+- Optional Intel/NPU or OpenVINO setup if you want Phi-3 or visual Phil locally
+- A second monitor or large desktop layout for the operator UI while the stack is live
+
+### Python Dependencies
+
+Base dependencies are declared in [pyproject.toml](pyproject.toml):
+- `python-dotenv`
+- `httpx`
+- `pydantic`
+- `pandas`
+- `numpy`
+- `fastapi`
+- `mcp`
+- `uvicorn`
+- `websockets`
+
+Optional dependency groups:
+- `dev`
+- `ml`
+- `research`
+
+### External Services And Binaries
+
+Depending on your runtime mode, you may also need:
+- Kraken live API access
+- Ollama
+- local Nemotron model availability
+- Phi-3 service or OpenVINO-exported Phi-3 assets
+- Cloudflared if you expose MCP publicly
+
+### Hardware Notes
+
+The repository can be explored and tested without a full production workstation, but the intended live shape assumes:
+- a machine stable enough to run collector, trader, universe manager, and review scheduler continuously
+- enough CPU and memory for pandas/numpy feature computation and local services
+- optional GPU/NPU acceleration if you want the full local model and CUDA feature path
+
+This project is not a toy script. Treat it like a small trading platform.
+
 ## Current Runtime
 
 The normal app stack started by [`scripts/start_all.ps1`](scripts/start_all.ps1) is:
@@ -37,16 +116,35 @@ Current reference docs:
 - [Runtime cycle](docs/runtime_cycle.md)
 - [Funding readiness checklist](docs/funding_readiness_checklist.md)
 - [North Star runtime baseline](docs/northstar_runtime_baseline.md)
+- [Full docs index](docs/DOCS_INDEX.md)
 
 ### Docs Map
 
 - [README.md](README.md): front door - what the project is, how it runs, and where to look next
+- [Full docs index](docs/DOCS_INDEX.md): complete documentation directory with all major docs grouped by purpose
 - [Trading playbook](docs/trading_playbook.md): how the system should trade in practice
 - [Runtime cycle](docs/runtime_cycle.md): what the live system actually does on startup and during each decision cycle
 - [Entry/exit research](docs/entry_exit_research.md): where entry and exit behavior actually live in code and config
 - [LLM operating model](docs/llm_operating_model.md): what Nemo/advisory are allowed to do and what code still owns
 - [North Star runtime baseline](docs/northstar_runtime_baseline.md): target runtime shape and recommended operating profile
 - [Funding readiness checklist](docs/funding_readiness_checklist.md): pass/fail checklist for whether the system is ready for more capital
+
+## Adjust To Your Own Settings
+
+Do not copy this repository into live trading unchanged.
+
+Before you run your own stack, adjust:
+- `.env` for your API keys, model providers, ports, and runtime mode
+- [`configs/runtime_overrides.json`](configs/runtime_overrides.json) for entry strictness, risk sizing, exposure limits, and lane behavior
+- [`pair_pool_usd.txt`](pair_pool_usd.txt) for the universe you actually want to trade
+- `MEME_SYMBOLS`, `UNIVERSE_MAJOR_BASES`, and excluded symbols/bases for your own symbol classification
+- local model endpoints and model names if your Ollama/OpenVINO setup differs
+- `PORTFOLIO_MAX_OPEN_POSITIONS`, exposure caps, and risk per trade to fit your account size
+
+If you are not ready for live mode:
+- use replay first
+- use shadow validation next
+- keep `.env` pointed away from real live credentials until the runtime is clean
 
 The live engine entrypoint is [`apps/trader/main.py`](apps/trader/main.py).
 
