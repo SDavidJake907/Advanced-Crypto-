@@ -16,7 +16,7 @@ LLMs are still present, but they are constrained. The intended direction is not 
 
 This repository integrates third-party services, runtimes, and model endpoints, including NVIDIA-hosted APIs/models when configured. Those third-party components remain the property of their respective owners.
 
-This project is not selling NVIDIA software, models, or services as proprietary KrakenSK assets. KrakenSK is an integration and orchestration layer that can call third-party providers when the operator configures them.
+This project is not selling NVIDIA software, models, or services as proprietary first-party assets. KrakenSK is an integration and orchestration layer that can call third-party providers when the operator configures them.
 
 You are responsible for:
 - complying with the license and terms of any third-party model, API, or binary you use
@@ -198,7 +198,7 @@ All indicator computation runs on GPU via custom CUDA kernels (`cpp/src/`):
 
 | Kernel | What it computes |
 |---|---|
-| `cuda_rsi` | **Wilder's RSI** (RMA-smoothed, matches TradingView/Kraken exactly) |
+| `cuda_rsi` | **Wilder's RSI** (RMA-smoothed, matched against exchange-standard / TradingView-style reference behavior) |
 | `cuda_atr` | Average True Range over lookback window |
 | `cuda_bollinger` | Bollinger Bands — middle, upper, lower, bandwidth |
 | `cuda_features` | Momentum, volatility |
@@ -244,7 +244,7 @@ Features per lane struct:
 
 ### Kelly Criterion Position Sizing
 
-[`core/memory/kelly_sizer.py`](core/memory/kelly_sizer.py) computes half-Kelly from Kraken trade history:
+[`core/memory/kelly_sizer.py`](core/memory/kelly_sizer.py) computes half-Kelly from exchange trade history when history is available:
 
 ```
 f* = W - (1-W)/R    →    size = f* / 2
@@ -365,7 +365,7 @@ At each account sync, the dust sweep fires:
 
 Buy qty is floored (not rounded) at `lot_decimals` to prevent fractional remainder dust on exit.
 
-Pre-existing dust from before the bot (tiny GRT, ADA, TRX amounts) is absorbed naturally when the bot next buys that coin — the full balance (dust + new position) is read from Kraken at exit time.
+Pre-existing dust from before the bot (tiny GRT, ADA, TRX amounts) is absorbed naturally when the bot next buys that coin — the full balance (dust + new position) is read from the exchange at exit time.
 
 ## Replay And Shadow Validation
 
@@ -562,7 +562,7 @@ Wave 1 advanced features:
 - VWIO (Volume Weighted Imbalance Oscillator) in entry scoring
 - OBV divergence wired into `reversal_risk`
 - Kelly Criterion dynamic position sizing from live trade history (KELLY_ENABLED=false to lock manual settings)
-- Wilder's RSI in CUDA kernel (matches TradingView/Kraken exactly)
+- Wilder's RSI in CUDA kernel (matched against exchange-standard / TradingView-style reference behavior)
 - Exit thresholds tuned above fee break-even (0.52% round-trip)
 
 Wave 2 structure features:
@@ -571,7 +571,7 @@ Wave 2 structure features:
 - Higher low count, pivot break, pullback hold (retest entry)
 - `channel_breakout` and `channel_retest` promotion paths bypass top-candidate gate
 - Dust prevention: $5 threshold, equity exclusion, floor rounding, sweep on exit
-- Book validity fix: partial Kraken updates no longer zero out bid/ask
+- Book validity fix: partial exchange book updates no longer zero out bid/ask
 
 Wave 3 — point system, self-calibration, and composite scoring:
 - **Phase 1** cost penalty inlined into `entry_verifier.py`: net_edge tiers adjust score −15 to +5 pts before Nemo sees candidates
