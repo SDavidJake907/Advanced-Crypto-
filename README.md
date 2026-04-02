@@ -150,6 +150,7 @@ Current reference docs:
 - [Entry/exit research](docs/entry_exit_research.md)
 - [Trading playbook](docs/trading_playbook.md)
 - [Runtime cycle](docs/runtime_cycle.md)
+- [Symbol classification](docs/symbol_classification.md)
 - [Funding readiness checklist](docs/funding_readiness_checklist.md)
 - [North Star runtime baseline](docs/northstar_runtime_baseline.md)
 - [Full docs index](docs/DOCS_INDEX.md)
@@ -160,6 +161,7 @@ Current reference docs:
 - [Full docs index](docs/DOCS_INDEX.md): complete documentation directory with all major docs grouped by purpose
 - [Trading playbook](docs/trading_playbook.md): how the system should trade in practice
 - [Runtime cycle](docs/runtime_cycle.md): what the live system actually does on startup and during each decision cycle
+- [Symbol classification](docs/symbol_classification.md): which tracked symbols are majors, core alts, or meme/research-disabled names
 - [Entry/exit research](docs/entry_exit_research.md): where entry and exit behavior actually live in code and config
 - [LLM operating model](docs/llm_operating_model.md): what Nemo/advisory are allowed to do and what code still owns
 - [North Star runtime baseline](docs/northstar_runtime_baseline.md): target runtime shape and recommended operating profile

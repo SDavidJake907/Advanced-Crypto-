@@ -21,6 +21,7 @@ This file is the complete documentation front door for the repository.
 
 - [trading_playbook.md](trading_playbook.md): practical trading behavior and expectations
 - [entry_exit_research.md](entry_exit_research.md): where entry and exit behavior live in code and config
+- [symbol_classification.md](symbol_classification.md): current tracked-symbol reference, including majors, core alts, and meme/research-disabled names
 - [coin_profile_design.md](coin_profile_design.md): coin profile and feature design notes
 - [micro_prompts_review.md](micro_prompts_review.md): prompt-shape review and compact advisory guidance
 
