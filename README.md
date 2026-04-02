@@ -148,6 +148,7 @@ Current note: the recommended runtime is `ADVISORY_MODEL_PROVIDER=local_nemo`, `
 Current reference docs:
 - [LLM operating model](docs/llm_operating_model.md)
 - [Entry/exit research](docs/entry_exit_research.md)
+- [Exchange fee and policy references](docs/exchange_fee_policy_refs.md)
 - [Trading playbook](docs/trading_playbook.md)
 - [Runtime cycle](docs/runtime_cycle.md)
 - [Symbol classification](docs/symbol_classification.md)
@@ -162,6 +163,7 @@ Current reference docs:
 - [Trading playbook](docs/trading_playbook.md): how the system should trade in practice
 - [Runtime cycle](docs/runtime_cycle.md): what the live system actually does on startup and during each decision cycle
 - [Symbol classification](docs/symbol_classification.md): which tracked symbols are majors, core alts, or meme/research-disabled names
+- [Exchange fee and policy references](docs/exchange_fee_policy_refs.md): official provider links for fee assumptions, subscription limits, and when not to change live cost settings
 - [Entry/exit research](docs/entry_exit_research.md): where entry and exit behavior actually live in code and config
 - [LLM operating model](docs/llm_operating_model.md): what Nemo/advisory are allowed to do and what code still owns
 - [North Star runtime baseline](docs/northstar_runtime_baseline.md): target runtime shape and recommended operating profile
