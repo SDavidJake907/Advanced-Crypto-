@@ -2,7 +2,7 @@
 
 Operating objective: maximize high-quality wins while protecting capital. The target is not "always win" because no live market system can guarantee that; the target is disciplined execution with a validated path toward winning a high share of selected trades, aiming for 80%+ only when supported by replay, shadow, and live evidence. The system should also learn the way a strong human operator does: review outcomes, keep what works, cut what fails, and tighten behavior over time without moving deterministic truth into prompts.
 
-KrakenSK is a live Kraken spot trading system built around a deterministic trading core:
+KrakenSK is a live crypto trading system built around a deterministic trading core. The current shipped live adapter is Kraken-first, but the architecture is intended to support API-key exchange integrations more generally:
 - symbol-local feature computation (GPU-accelerated via custom CUDA kernels)
 - lane-aware scanning and promotion
 - lane-aware execution
@@ -26,7 +26,7 @@ You are responsible for:
 ## What This Repository Contains
 
 This repository includes:
-- a live Kraken spot trading loop
+- a live exchange trading loop with a current Kraken-first adapter
 - a universe manager that selects and ranks tradable symbols
 - deterministic feature extraction, scoring, and risk gating
 - optional local LLM services for advisory and finalist review
@@ -54,8 +54,8 @@ Operator UI examples from the current stack:
 
 - Windows with PowerShell support
 - Python `3.11+` as defined in [pyproject.toml](pyproject.toml)
-- A Kraken account and API credentials for live trading
-- Network connectivity to Kraken REST and WebSocket endpoints
+- An exchange account and API credentials for live trading
+- Network connectivity to the configured exchange REST and WebSocket endpoints
 - Enough local disk for logs, state, and optional research outputs
 
 ### Recommended Runtime Shape
@@ -100,7 +100,7 @@ Optional dependency groups:
 ### External Services And Binaries
 
 Depending on your runtime mode, you may also need:
-- Kraken live API access
+- live API access for your configured exchange
 - Ollama
 - local Nemotron model availability
 - Phi-3 service or OpenVINO-exported Phi-3 assets
