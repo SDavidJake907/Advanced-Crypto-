@@ -61,10 +61,23 @@ Operator UI examples from the current stack:
 ### Recommended Runtime Shape
 
 - Windows 11
+- Intel Core Ultra 7 / modern Ryzen 7 class CPU or better
+- 32 GB RAM recommended
 - Local Ollama runtime for Nemotron/local strategist paths
-- CUDA-capable NVIDIA GPU for the accelerated feature stack in [`cpp/src`](cpp/src)
+- CUDA-capable NVIDIA GPU recommended for the accelerated feature stack in [`cpp/src`](cpp/src)
+- NVIDIA RTX 16 GB VRAM class GPU recommended for local CUDA/model workflows
+- 1 TB+ SSD recommended for logs, models, research outputs, and replay data
 - Optional Intel/NPU or OpenVINO setup if you want Phi-3 or visual Phil locally
 - A second monitor or large desktop layout for the operator UI while the stack is live
+
+Reference operator machine used during active development:
+- Windows 11 Home `10.0.26200`
+- Intel Core Ultra 7 265F
+- 32 GB RAM
+- NVIDIA GeForce RTX 5060 Ti
+- 16 GB dedicated VRAM
+- 1.8 TB SSD
+- 3440x1440 ultrawide display
 
 ### Python Dependencies
 
