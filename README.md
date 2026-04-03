@@ -445,6 +445,22 @@ Design rule:
 - Nemo uses that evidence for finalist judgment
 - risk and execution still own vetoes
 
+Strategist action vocabulary:
+- `OPEN`
+- `WATCH`
+- `HOLD`
+- `TIGHTEN`
+- `SCALE_IN`
+- `SCALE_OUT`
+- `EXIT`
+- `ROTATE`
+- `SKIP`
+
+Current runtime note:
+- `OPEN` and `EXIT` are execution-relevant
+- `WATCH`, `TIGHTEN`, `SCALE_IN`, `SCALE_OUT`, `ROTATE`, and `SKIP` are accepted and preserved as advisory intent
+- non-executable strategist actions are normalized conservatively until dedicated deterministic handlers are added
+
 ## Entry Scoring
 
 [`core/policy/entry_verifier.py`](core/policy/entry_verifier.py) computes a 0–100 entry score per symbol:

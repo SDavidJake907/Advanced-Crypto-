@@ -77,6 +77,7 @@ This repo is a modular crypto trading system with deterministic scoring, AI-assi
   - warnings
   - compact recommended interpretation
 - Do not let Phi respond with vague chart prose like "looks bullish" when a structured evidence field can be emitted instead.
+- When expanding strategist actions, preserve backward compatibility by mapping new advisory actions safely before changing execution behavior.
 
 ## Implementation rules
 - Make the smallest safe change set.

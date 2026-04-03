@@ -17,7 +17,19 @@ from core.llm.client import (
     parse_json_response,
     sanitize_for_json,
 )
-from core.llm.contracts import normalize_trade_reviewer_output
+from core.llm.contracts import (
+    TRADE_ACTION_CLOSE,
+    TRADE_ACTION_HOLD,
+    TRADE_ACTION_OPEN,
+    TRADE_ACTION_ROTATE,
+    TRADE_ACTION_SCALE_IN,
+    TRADE_ACTION_SCALE_OUT,
+    TRADE_ACTION_SKIP,
+    TRADE_ACTION_TIGHTEN,
+    TRADE_ACTION_WATCH,
+    normalize_trade_action,
+    normalize_trade_reviewer_output,
+)
 from core.llm.orchestrator import build_advisory_bundle
 from core.llm.prompts import get_nemotron_batch_strategist_prompt, get_nemotron_strategist_system_prompt
 from core.memory.trade_memory import TradeMemoryStore
@@ -194,7 +206,7 @@ class NemotronStrategist:
         final_decision: dict[str, Any],
         proposed_weight: float,
     ) -> dict[str, Any]:
-        action = str(final_decision.get("action", "HOLD")).upper()
+        action, normalized_fields = normalize_trade_action(final_decision.get("action", TRADE_ACTION_HOLD))
         raw_side = final_decision.get("side")
         side = str(raw_side).upper() if raw_side is not None else None
         if side == "BUY":
@@ -203,19 +215,14 @@ class NemotronStrategist:
             side = "SHORT"
         reason = str(final_decision.get("reason", "nemotron_integrated"))
         debug = final_decision.get("debug", {}) if isinstance(final_decision.get("debug", {}), dict) else {}
+        if normalized_fields:
+            debug = dict(debug)
+            debug["normalized_fields"] = sorted(set([*(debug.get("normalized_fields", []) if isinstance(debug.get("normalized_fields"), list) else []), *normalized_fields]))
         decision_symbol = str(final_decision.get("symbol", symbol) or symbol)
         # Model sometimes echoes a prompt placeholder or few-shot example symbol — treat as current symbol
         if decision_symbol in {"SYMBOL", "<current_symbol>", "CURRENT_SYMBOL", "LINK/USD", "BTC/USD", "ETH/USD"}:
             decision_symbol = symbol
 
-        if action not in {"OPEN", "CLOSE", "HOLD"}:
-            return {
-                "action": "HOLD",
-                "reason": "invalid_final_decision_contract",
-                "debug": {"contract_error": "invalid_action", "raw_action": action},
-                "override_signal": "FLAT",
-                "size_factor_hint": 1.0,
-            }
         if decision_symbol != symbol and action != "HOLD":
             return {
                 "action": "HOLD",
@@ -224,10 +231,10 @@ class NemotronStrategist:
                 "override_signal": "FLAT",
                 "size_factor_hint": 1.0,
             }
-        if action == "OPEN":
+        if action == TRADE_ACTION_OPEN:
             if side not in {"LONG", "SHORT"}:
                 return {
-                    "action": "HOLD",
+                    "action": TRADE_ACTION_HOLD,
                     "reason": "invalid_final_decision_contract",
                     "debug": {"contract_error": "invalid_open_side", "raw_side": raw_side},
                     "override_signal": "FLAT",
@@ -241,7 +248,7 @@ class NemotronStrategist:
                 raw_size_float = 0.0
             if raw_size_float <= 0:
                 return {
-                    "action": "HOLD",
+                    "action": TRADE_ACTION_HOLD,
                     "reason": "invalid_final_decision_contract",
                     "debug": {"contract_error": "non_positive_open_size", "raw_size": raw_size},
                     "override_signal": "FLAT",
@@ -254,11 +261,19 @@ class NemotronStrategist:
                 "override_signal": side,
                 "size_factor_hint": size_hint,
             }
+        if action in {TRADE_ACTION_WATCH, TRADE_ACTION_TIGHTEN, TRADE_ACTION_SCALE_IN, TRADE_ACTION_SCALE_OUT, TRADE_ACTION_ROTATE, TRADE_ACTION_SKIP}:
+            return {
+                "action": TRADE_ACTION_HOLD,
+                "reason": reason,
+                "debug": {**debug, "advisory_action": action},
+                "override_signal": "FLAT",
+                "size_factor_hint": 1.0,
+            }
         return {
             "action": action,
             "reason": reason,
             "debug": debug,
-            "override_signal": "FLAT" if action == "HOLD" else side,
+            "override_signal": "FLAT" if action in {TRADE_ACTION_HOLD, TRADE_ACTION_CLOSE} else side,
             "size_factor_hint": 1.0,
         }
 
@@ -920,7 +935,7 @@ class NemotronStrategist:
                 d = _safe_batch_model_failure_decision(sym, features, reflex)
             else:
                 d = {"action": "HOLD", "reason": "not_ranked_by_batch"}
-            action = str(d.get("action", "HOLD")).upper()
+            action, _normalized_action_fields = normalize_trade_action(d.get("action", TRADE_ACTION_HOLD))
             side_raw = d.get("side")
             side = str(side_raw).upper() if side_raw else None
             if side == "BUY":
@@ -929,6 +944,8 @@ class NemotronStrategist:
                 side = "SHORT"
             reason = str(d.get("reason", "batch_hold"))
             size_raw = d.get("size", 0)
+            if action in {TRADE_ACTION_WATCH, TRADE_ACTION_TIGHTEN, TRADE_ACTION_SCALE_IN, TRADE_ACTION_SCALE_OUT, TRADE_ACTION_ROTATE, TRADE_ACTION_SKIP, TRADE_ACTION_CLOSE}:
+                action = TRADE_ACTION_HOLD
             phi_chart_support = self._phi_chart_support_level(
                 features=features,
                 market_state_review=market_state_review,

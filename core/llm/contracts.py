@@ -42,6 +42,32 @@ DEFER_REASON_TAXONOMY = {
     DEFER_REASON_INVALID_OUTPUT,
 }
 
+TRADE_ACTION_OPEN = "OPEN"
+TRADE_ACTION_CLOSE = "CLOSE"
+TRADE_ACTION_HOLD = "HOLD"
+TRADE_ACTION_WATCH = "WATCH"
+TRADE_ACTION_TIGHTEN = "TIGHTEN"
+TRADE_ACTION_SCALE_IN = "SCALE_IN"
+TRADE_ACTION_SCALE_OUT = "SCALE_OUT"
+TRADE_ACTION_ROTATE = "ROTATE"
+TRADE_ACTION_SKIP = "SKIP"
+
+TRADE_ACTION_ALIASES = {
+    "EXIT": TRADE_ACTION_CLOSE,
+}
+
+TRADE_ACTION_TAXONOMY = {
+    TRADE_ACTION_OPEN,
+    TRADE_ACTION_CLOSE,
+    TRADE_ACTION_HOLD,
+    TRADE_ACTION_WATCH,
+    TRADE_ACTION_TIGHTEN,
+    TRADE_ACTION_SCALE_IN,
+    TRADE_ACTION_SCALE_OUT,
+    TRADE_ACTION_ROTATE,
+    TRADE_ACTION_SKIP,
+}
+
 
 def _clamp_float(value: Any, *, default: float = 0.0, low: float = 0.0, high: float = 1.0) -> float:
     try:
@@ -64,6 +90,19 @@ def _string_list(value: Any) -> list[str]:
 
 def _llm_identity() -> dict[str, str]:
     return {"provider": nemotron_provider_name(), "model": nemotron_provider_model()}
+
+
+def normalize_trade_action(value: Any) -> tuple[str, list[str]]:
+    normalized_fields: list[str] = []
+    action = str(value or TRADE_ACTION_HOLD).strip().upper()
+    aliased = TRADE_ACTION_ALIASES.get(action)
+    if aliased is not None:
+        action = aliased
+        normalized_fields.append("action")
+    if action not in TRADE_ACTION_TAXONOMY:
+        action = TRADE_ACTION_HOLD
+        normalized_fields.append("action")
+    return action, normalized_fields
 
 
 def classify_defer_reason(reason: Any) -> str:
@@ -134,11 +173,8 @@ def normalize_trade_reviewer_output(
     symbol: str,
 ) -> dict[str, Any]:
     final_decision = parsed.get("final_decision", {}) if isinstance(parsed.get("final_decision", {}), dict) else {}
-    action = str(final_decision.get("action", "HOLD")).upper()
-    if action not in {"OPEN", "CLOSE", "HOLD"}:
-        action = "HOLD"
+    action, normalized_fields = normalize_trade_action(final_decision.get("action", TRADE_ACTION_HOLD))
     side = final_decision.get("side")
-    normalized_fields: list[str] = []
     if side is not None:
         side = str(side).upper()
     if side == "BUY":

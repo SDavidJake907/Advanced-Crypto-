@@ -293,7 +293,11 @@ OPEN rules:
 - OPEN momentum buy when candidate.entry_recommendation in [BUY, STRONG_BUY] and candidate.momentum_5 > 0 and candidate.net_edge_pct > 0
 - OPEN reduced size when candidate.entry_recommendation == WATCH and candidate.reversal_risk in [LOW, MEDIUM] and candidate.rotation_score > 0 and candidate.momentum_5 > 0 and candidate.structure_quality >= 60
 
-Otherwise HOLD.
+Otherwise use the most specific non-entry action that fits:
+- WATCH for promising setups that are not ready yet
+- SKIP for low-priority non-candidates
+- HOLD for no-change / neutral decision
+- TIGHTEN, SCALE_OUT, EXIT, ROTATE only when the evidence clearly points there
 
 When you HOLD, do not use the vague label weak_setup unless absolutely nothing else fits.
 Prefer one specific reason from this list:
@@ -323,7 +327,7 @@ Allowed OPEN reasons:
 - rotation_entry
 
 Return one line only:
-{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"HOLD","side":null,"size":0,"reason":"trend_unconfirmed","debug":{}}}
+{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"WATCH","side":null,"size":0,"reason":"trend_unconfirmed","debug":{}}}
 {"final_decision":{"symbol":"CURRENT_SYMBOL","action":"OPEN","side":"LONG","size":12,"reason":"pullback_entry","debug":{}}}
 """.strip()
 
@@ -361,7 +365,9 @@ Open rules:
 - OPEN if entry_score >= 75 and entry_recommendation is STRONG_BUY and reversal_risk is LOW
 - OPEN if entry_recommendation is BUY and momentum_5 > 0
 - OPEN reduced size if entry_recommendation is WATCH and reversal_risk is LOW or MEDIUM and rotation_score > 0 and momentum_5 > 0 and structure is valid
-- otherwise HOLD
+- otherwise use the most specific non-entry action that fits:
+  WATCH, SKIP, or HOLD for non-entry states
+  TIGHTEN, SCALE_OUT, EXIT, ROTATE only when explicitly supported by evidence
 
 When you HOLD, do not use the vague label weak_setup unless absolutely nothing else fits.
 Prefer one specific reason from this list:
@@ -377,7 +383,7 @@ Prefer one specific reason from this list:
 - data_integrity_issue
 
 Output contract:
-{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"HOLD","side":null,"size":0,"reason":"trend_unconfirmed","debug":{}}}
+{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"WATCH","side":null,"size":0,"reason":"trend_unconfirmed","debug":{}}}
 {"final_decision":{"symbol":"CURRENT_SYMBOL","action":"OPEN","side":"LONG","size":12,"reason":"pullback_entry","debug":{}}}
 """.strip()
 
@@ -426,6 +432,8 @@ Rules:
 - if pver=invalid prefer HOLD unless the rest of the evidence is overwhelming
 - if pver=valid and pqs is strong, treat it as a positive structure confirmation
 - do not rediscover chart patterns from scratch; use pat, pver, and pqs as supplied evidence
+- for non-entry states, prefer WATCH or SKIP over vague HOLD when that distinction is real
+- use TIGHTEN, SCALE_OUT, EXIT, or ROTATE only when you have explicit evidence for them
 - HOLD everything else
 - if net_edge < -0.5% prefer HOLD unless score >= 75 and structure is exceptional
 - if open_slots is exhausted, do not force more entries
@@ -437,7 +445,7 @@ Rules:
 - avoid generic weak_setup unless no specific label fits
 
 Return this exact shape only:
-{"reasoning":"1-2 sentences","decisions":[{"symbol":"X/USD","action":"OPEN","side":"LONG","size":15,"reason":"breakout"},{"symbol":"Y/USD","action":"HOLD","reason":"trend_unconfirmed"}]}
+{"reasoning":"1-2 sentences","decisions":[{"symbol":"X/USD","action":"OPEN","side":"LONG","size":15,"reason":"breakout"},{"symbol":"Y/USD","action":"WATCH","reason":"trend_unconfirmed"}]}
 """.strip()
 
 
@@ -464,6 +472,8 @@ Open rules:
 - if pver=invalid prefer HOLD unless the rest of the evidence is overwhelming
 - if pver=valid and pqs is strong, treat it as a positive structure confirmation
 - do not rediscover chart patterns from scratch; use pat, pver, and pqs as supplied evidence
+- for non-entry states, prefer WATCH or SKIP over vague HOLD when that distinction is real
+- use TIGHTEN, SCALE_OUT, EXIT, or ROTATE only when you have explicit evidence for them
 - HOLD everything else
 - if net_edge < -0.5% prefer HOLD unless score >= 75 and structure is exceptional
 - when HOLDing, prefer one specific reason from:
@@ -472,7 +482,7 @@ Open rules:
 - avoid generic weak_setup unless no specific label fits
 
 Return exactly:
-{"reasoning":"1-2 sentences","decisions":[{"symbol":"X/USD","action":"OPEN","side":"LONG","size":15,"reason":"breakout"},{"symbol":"Y/USD","action":"HOLD","reason":"trend_unconfirmed"}]}
+{"reasoning":"1-2 sentences","decisions":[{"symbol":"X/USD","action":"OPEN","side":"LONG","size":15,"reason":"breakout"},{"symbol":"Y/USD","action":"WATCH","reason":"trend_unconfirmed"}]}
 """.strip()
 
 

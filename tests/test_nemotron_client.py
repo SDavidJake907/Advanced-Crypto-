@@ -839,6 +839,24 @@ class NemotronBatchParsingTests(unittest.TestCase):
         self.assertEqual(results["NEAR/USD"].execution["nemotron"]["debug"]["phi_chart_support"], "strong")
         self.assertEqual(executions[0]["signal"], "LONG")
 
+    def test_validate_final_decision_preserves_advisory_actions_safely(self) -> None:
+        strategist = self._make_strategist()
+
+        watch_decision = strategist._validate_final_decision(
+            symbol="BTC/USD",
+            final_decision={"symbol": "BTC/USD", "action": "WATCH", "reason": "trend_unconfirmed", "debug": {}},
+            proposed_weight=0.1,
+        )
+        self.assertEqual(watch_decision["action"], "HOLD")
+        self.assertEqual(watch_decision["debug"]["advisory_action"], "WATCH")
+
+        exit_decision = strategist._validate_final_decision(
+            symbol="BTC/USD",
+            final_decision={"symbol": "BTC/USD", "action": "EXIT", "reason": "structure_failed", "debug": {}},
+            proposed_weight=0.1,
+        )
+        self.assertEqual(exit_decision["action"], "CLOSE")
+
     def test_single_parse_failure_uses_deterministic_open_for_strong_buy_candidate(self) -> None:
         strategist = self._make_strategist()
         portfolio_state = PortfolioState(cash=100.0)

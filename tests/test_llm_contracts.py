@@ -65,6 +65,38 @@ class LLMContractsTests(unittest.TestCase):
         )
         self.assertEqual(parsed["final_decision"]["reason"], "hold_unspecified")
 
+    def test_trade_reviewer_accepts_watch_action(self) -> None:
+        parsed = normalize_trade_reviewer_output(
+            {
+                "final_decision": {
+                    "symbol": "BTC/USD",
+                    "action": "WATCH",
+                    "side": None,
+                    "size": 0,
+                    "reason": "trend_unconfirmed",
+                }
+            },
+            symbol="BTC/USD",
+        )
+        self.assertEqual(parsed["final_decision"]["action"], "WATCH")
+        self.assertEqual(parsed["final_decision"]["reason"], "trend_unconfirmed")
+
+    def test_trade_reviewer_normalizes_exit_alias_to_close(self) -> None:
+        parsed = normalize_trade_reviewer_output(
+            {
+                "final_decision": {
+                    "symbol": "BTC/USD",
+                    "action": "EXIT",
+                    "side": None,
+                    "size": 0,
+                    "reason": "structure_failed",
+                }
+            },
+            symbol="BTC/USD",
+        )
+        self.assertEqual(parsed["final_decision"]["action"], "CLOSE")
+        self.assertIn("action", parsed["final_decision"]["contract"]["meta"]["normalized_fields"])
+
     def test_candidate_review_normalizes_invalid_fields(self) -> None:
         parsed = normalize_candidate_review(
             {
