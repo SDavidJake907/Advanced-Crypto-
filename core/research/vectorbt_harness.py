@@ -97,6 +97,13 @@ def build_policy_feature_frame(symbol: str, frame_1h: pd.DataFrame) -> pd.DataFr
     frame["bearish_divergence"] = bearish
     frame["divergence_strength"] = strengths
     frame["divergence_age_bars"] = ages
+    frame["ranging_market"] = (
+        frame["momentum_5"].abs().fillna(0.0).le(0.0025)
+        & frame["momentum_14"].abs().fillna(0.0).le(0.006)
+        & frame["atr_pct"].fillna(0.0).le(2.5)
+    )
+    frame["symbol_group"] = _classify_symbol_group(symbol)
+    frame["regime_bucket"] = frame.apply(_classify_regime_bucket, axis=1)
     return frame
 
 
@@ -192,12 +199,81 @@ class BatchSweepResult:
 class WalkForwardResult:
     summary: pd.DataFrame
     windows: pd.DataFrame
+    regime_summary: pd.DataFrame
     feature_frame: pd.DataFrame
+
+
+@dataclass
+class BatchWalkForwardResult:
+    per_symbol_summary: pd.DataFrame
+    aggregate_summary: pd.DataFrame
+    regime_summary: pd.DataFrame
+    windows: pd.DataFrame
 
 
 def _format_variant_component(prefix: str, value: float) -> str:
     token = str(float(value)).replace(".", "p")
     return f"{prefix}_{token}"
+
+
+_MAJOR_SYMBOLS = {
+    "BTC/USD",
+    "ETH/USD",
+    "SOL/USD",
+    "XRP/USD",
+    "ADA/USD",
+    "LINK/USD",
+    "AVAX/USD",
+    "LTC/USD",
+    "DOT/USD",
+    "TRX/USD",
+    "ALGO/USD",
+    "XLM/USD",
+    "HBAR/USD",
+    "TAO/USD",
+}
+_MEME_SYMBOLS = {
+    "DOGE/USD",
+    "SHIB/USD",
+    "PEPE/USD",
+    "WIF/USD",
+    "BONK/USD",
+    "FARTCOIN/USD",
+    "TRUMP/USD",
+    "SPX/USD",
+    "PENGU/USD",
+}
+
+
+def _classify_symbol_group(symbol: str) -> str:
+    normalized = str(symbol or "").upper()
+    if normalized in _MEME_SYMBOLS:
+        return "meme"
+    if normalized in _MAJOR_SYMBOLS:
+        return "major"
+    return "core_alt"
+
+
+def _classify_regime_bucket(row: pd.Series) -> str:
+    if bool(row.get("ranging_market", False)):
+        return "ranging"
+    trend_1h = int(row.get("trend_1h", 0) or 0)
+    momentum_14 = float(row.get("momentum_14", 0.0) or 0.0)
+    momentum_5 = float(row.get("momentum_5", 0.0) or 0.0)
+    if trend_1h > 0 and momentum_14 > 0.0:
+        return "trend"
+    if trend_1h < 0 or (momentum_14 < 0.0 and momentum_5 <= 0.0):
+        return "red"
+    return "transition"
+
+
+def _dominant_label(series: pd.Series, default: str = "unknown") -> str:
+    if series.empty:
+        return default
+    counts = series.astype(str).value_counts()
+    if counts.empty:
+        return default
+    return str(counts.index[0])
 
 
 def _build_entry_mask(
@@ -516,10 +592,14 @@ def run_walk_forward_validation(
         rows.append(
             {
                 "symbol": symbol,
+                "symbol_group": _classify_symbol_group(symbol),
+                "lane_filter": str((lane_filter or "ALL")).upper(),
                 "train_start": str(train_slice["timestamp"].iloc[0]),
                 "train_end": str(train_slice["timestamp"].iloc[-1]),
                 "test_start": str(test_slice["timestamp"].iloc[0]),
                 "test_end": str(test_slice["timestamp"].iloc[-1]),
+                "test_regime_bucket": _dominant_label(test_slice["regime_bucket"], default="unknown"),
+                "test_lane_mode": _dominant_label(test_slice["lane"], default="unknown"),
                 "selected_threshold": best_threshold,
                 "train_total_return_pct": round(best_train_metrics.get("total_return_pct", 0.0), 4),
                 "train_win_rate_pct": round(best_train_metrics.get("win_rate_pct", 0.0), 4),
@@ -534,10 +614,28 @@ def run_walk_forward_validation(
         start += int(step)
 
     windows = pd.DataFrame(rows)
+    regime_summary = pd.DataFrame()
+    if not windows.empty:
+        regime_summary = (
+            windows.groupby("test_regime_bucket", as_index=False)
+            .agg(
+                windows=("symbol", "count"),
+                avg_test_total_return_pct=("test_total_return_pct", "mean"),
+                median_test_total_return_pct=("test_total_return_pct", "median"),
+                avg_test_win_rate_pct=("test_win_rate_pct", "mean"),
+                avg_test_total_trades=("test_total_trades", "mean"),
+                avg_test_max_drawdown_pct=("test_max_drawdown_pct", "mean"),
+                avg_test_sharpe_ratio=("test_sharpe_ratio", "mean"),
+            )
+            .sort_values("avg_test_total_return_pct", ascending=False)
+            .reset_index(drop=True)
+        )
     summary = pd.DataFrame(
         [
             {
                 "symbol": symbol,
+                "symbol_group": _classify_symbol_group(symbol),
+                "lane_filter": str((lane_filter or "ALL")).upper(),
                 "windows": int(len(windows)),
                 "avg_test_total_return_pct": float(windows["test_total_return_pct"].mean()) if not windows.empty else 0.0,
                 "median_test_total_return_pct": float(windows["test_total_return_pct"].median()) if not windows.empty else 0.0,
@@ -556,4 +654,103 @@ def run_walk_forward_validation(
         target = Path(windows_csv_path)
         target.parent.mkdir(parents=True, exist_ok=True)
         windows.to_csv(target, index=False)
-    return WalkForwardResult(summary=summary, windows=windows, feature_frame=features)
+    return WalkForwardResult(summary=summary, windows=windows, regime_summary=regime_summary, feature_frame=features)
+
+
+def run_batch_walk_forward_validation(
+    symbols: list[str],
+    *,
+    history_dir: str | Path = "logs/history",
+    timeframe: str = "1h",
+    entry_score_thresholds: list[float] | None = None,
+    lane_filter: str | None = None,
+    require_bullish_divergence: bool = False,
+    min_net_edge_pct: float | None = None,
+    bullish_divergence_score_bonus: float = 0.0,
+    bullish_divergence_promotion_window: float = 0.0,
+    hold_bars: int = 24,
+    fee_pct: float = 0.40,
+    slippage_pct: float = 0.10,
+    train_bars: int = 96,
+    test_bars: int = 24,
+    step_bars: int | None = None,
+    per_symbol_csv_path: str | Path | None = None,
+    aggregate_csv_path: str | Path | None = None,
+    regime_csv_path: str | Path | None = None,
+    windows_csv_path: str | Path | None = None,
+) -> BatchWalkForwardResult:
+    per_symbol_frames: list[pd.DataFrame] = []
+    regime_frames: list[pd.DataFrame] = []
+    windows_frames: list[pd.DataFrame] = []
+
+    for symbol in symbols:
+        result = run_walk_forward_validation(
+            symbol,
+            history_dir=history_dir,
+            timeframe=timeframe,
+            entry_score_thresholds=entry_score_thresholds,
+            lane_filter=lane_filter,
+            require_bullish_divergence=require_bullish_divergence,
+            min_net_edge_pct=min_net_edge_pct,
+            bullish_divergence_score_bonus=bullish_divergence_score_bonus,
+            bullish_divergence_promotion_window=bullish_divergence_promotion_window,
+            hold_bars=hold_bars,
+            fee_pct=fee_pct,
+            slippage_pct=slippage_pct,
+            train_bars=train_bars,
+            test_bars=test_bars,
+            step_bars=step_bars,
+        )
+        per_symbol_frames.append(result.summary.copy())
+        if not result.regime_summary.empty:
+            regime = result.regime_summary.copy()
+            regime.insert(0, "symbol", symbol)
+            regime.insert(1, "symbol_group", _classify_symbol_group(symbol))
+            regime_frames.append(regime)
+        if not result.windows.empty:
+            windows_frames.append(result.windows.copy())
+
+    per_symbol_summary = pd.concat(per_symbol_frames, ignore_index=True) if per_symbol_frames else pd.DataFrame()
+    regime_summary = pd.concat(regime_frames, ignore_index=True) if regime_frames else pd.DataFrame()
+    windows = pd.concat(windows_frames, ignore_index=True) if windows_frames else pd.DataFrame()
+
+    aggregate_summary = pd.DataFrame()
+    if not per_symbol_summary.empty:
+        aggregate_summary = (
+            per_symbol_summary.groupby(["symbol_group", "lane_filter"], as_index=False)
+            .agg(
+                symbols=("symbol", "count"),
+                avg_test_total_return_pct=("avg_test_total_return_pct", "mean"),
+                median_test_total_return_pct=("median_test_total_return_pct", "median"),
+                avg_test_win_rate_pct=("avg_test_win_rate_pct", "mean"),
+                avg_test_total_trades=("avg_test_total_trades", "mean"),
+                avg_test_max_drawdown_pct=("avg_test_max_drawdown_pct", "mean"),
+                avg_test_sharpe_ratio=("avg_test_sharpe_ratio", "mean"),
+            )
+            .sort_values("avg_test_total_return_pct", ascending=False)
+            .reset_index(drop=True)
+        )
+
+    if per_symbol_csv_path is not None:
+        target = Path(per_symbol_csv_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        per_symbol_summary.to_csv(target, index=False)
+    if aggregate_csv_path is not None:
+        target = Path(aggregate_csv_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        aggregate_summary.to_csv(target, index=False)
+    if regime_csv_path is not None:
+        target = Path(regime_csv_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        regime_summary.to_csv(target, index=False)
+    if windows_csv_path is not None:
+        target = Path(windows_csv_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        windows.to_csv(target, index=False)
+
+    return BatchWalkForwardResult(
+        per_symbol_summary=per_symbol_summary,
+        aggregate_summary=aggregate_summary,
+        regime_summary=regime_summary,
+        windows=windows,
+    )

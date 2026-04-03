@@ -16,6 +16,7 @@ from core.llm.prompts import NVIDIA_OPTIMIZER_SYSTEM_PROMPT
 from core.memory.daily_review import build_daily_review_report_from_disk, write_daily_review_report
 from core.memory.kelly_sizer import run_kelly_update
 from core.memory.kraken_history import build_history_review_block
+from core.models.xgb_entry import XGBEntryModel
 from core.memory.trade_memory import TradeMemoryStore
 from core.runtime.log_rotation import rotate_jsonl_if_needed
 from core.state.system_record import record_optimizer_review
@@ -25,6 +26,7 @@ load_dotenv()
 
 ROOT = Path(__file__).resolve().parents[2]
 REVIEW_LOG = ROOT / "logs" / "nvidia_optimizer_reviews.jsonl"
+FEATURE_IMPORTANCE_LOG = ROOT / "logs" / "feature_importance_latest.json"
 
 
 def _bool_env(name: str, default: bool) -> bool:
@@ -103,9 +105,21 @@ def _run_kelly() -> None:
         print(f"[kelly_sizer] Error: {exc}")
 
 
+def _write_feature_importance_report() -> None:
+    model = XGBEntryModel()
+    model.load_or_init(str(ROOT / "models" / "xgb_entry.pkl"))
+    report = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        **model.build_feature_importance_report(),
+    }
+    FEATURE_IMPORTANCE_LOG.parent.mkdir(parents=True, exist_ok=True)
+    FEATURE_IMPORTANCE_LOG.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+
 def _run_once() -> None:
     _run_kelly()
     write_daily_review_report(build_daily_review_report_from_disk(root=ROOT))
+    _write_feature_importance_report()
     payload = _build_payload()
     raw = nvidia_nemotron_chat(
         payload,

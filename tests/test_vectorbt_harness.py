@@ -8,6 +8,7 @@ from core.research.vectorbt_harness import (
     _build_entry_mask,
     build_policy_feature_frame,
     discover_history_symbols,
+    run_batch_walk_forward_validation,
     load_history_frame,
     run_batch_threshold_sweep,
     run_threshold_sweep,
@@ -211,9 +212,34 @@ class VectorBTHarnessTests(unittest.TestCase):
 
             self.assertEqual(len(result.summary), 1)
             self.assertGreater(len(result.windows), 0)
+            self.assertIn("test_regime_bucket", result.windows.columns)
+            self.assertIn("symbol_group", result.summary.columns)
+            self.assertIn("lane_filter", result.summary.columns)
+            self.assertIn("test_regime_bucket", result.regime_summary.columns)
             self.assertIn("selected_threshold", result.windows.columns)
             self.assertTrue(summary_csv.exists())
             self.assertTrue(windows_csv.exists())
+
+    def test_run_batch_walk_forward_validation_groups_by_symbol_group(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            _write_history_csv(root / "candles_BTCUSD_1h.csv", rows=160)
+            _write_history_csv(root / "candles_ETHUSD_1h.csv", rows=160)
+
+            result = run_batch_walk_forward_validation(
+                ["BTC/USD", "ETH/USD"],
+                history_dir=root,
+                entry_score_thresholds=[55.0],
+                train_bars=72,
+                test_bars=24,
+                hold_bars=12,
+                min_net_edge_pct=-2.0,
+            )
+
+            self.assertEqual(len(result.per_symbol_summary), 2)
+            self.assertIn("symbol_group", result.aggregate_summary.columns)
+            self.assertIn("lane_filter", result.aggregate_summary.columns)
+            self.assertGreater(len(result.windows), 0)
 
 
 if __name__ == "__main__":
