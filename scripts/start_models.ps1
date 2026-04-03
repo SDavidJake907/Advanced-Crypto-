@@ -64,6 +64,24 @@ function Get-UrlPort {
     }
 }
 
+function Get-LocalModelAliases {
+    param(
+        [string]$ModelName
+    )
+    $aliases = New-Object System.Collections.Generic.List[string]
+    foreach ($candidate in @(
+        $ModelName,
+        ($ModelName -replace "-", ""),
+        ($ModelName -replace "(?<=[a-z0-9])(?=[A-Z])", "-").ToLower(),
+        ($ModelName -replace "(?<=[a-z])(?=\d)", "-").ToLower()
+    )) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and -not $aliases.Contains($candidate)) {
+            $aliases.Add($candidate)
+        }
+    }
+    return @($aliases)
+}
+
 if (-not (Test-Path $phiScript)) {
     Write-Error "Phi-3 server script not found at $phiScript"
     exit 1
@@ -178,7 +196,18 @@ if ($advisoryModelProvider -eq "local_nemo" -or $nemotronStrategistProvider -eq 
         [void](Wait-HttpReady -Url $modelsUrl -TimeoutSec 60)
 
         $loadedText = (& $lmsExe ps 2>&1 | Out-String)
-        if ($loadedText -notmatch [regex]::Escape($nemotronModel)) {
+        $strategistAliases = @(
+            Get-LocalModelAliases -ModelName $nemotronModel
+            Get-LocalModelAliases -ModelName $localLlmLoadKey
+        ) | Select-Object -Unique
+        $strategistLoaded = $false
+        foreach ($alias in $strategistAliases) {
+            if ($loadedText -match [regex]::Escape($alias)) {
+                $strategistLoaded = $true
+                break
+            }
+        }
+        if (-not $strategistLoaded) {
             Write-Host "Loading local strategist model in LM Studio..."
             & $lmsExe load $localLlmLoadKey --identifier $nemotronModel --gpu max -y | Out-Null
             $loadedText = (& $lmsExe ps 2>&1 | Out-String)

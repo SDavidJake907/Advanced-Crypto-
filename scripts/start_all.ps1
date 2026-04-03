@@ -11,8 +11,14 @@ Write-Host "Stopping existing KrakenSK app processes..."
 $myPid = $PID
 # Kill by window title
 cmd /c "taskkill /F /FI `"WINDOWTITLE eq KrakenSK*`" /T" 2>$null | Out-Null
-# Kill ALL python processes referencing the KrakenSK root
-Get-WmiObject Win32_Process -Filter "Name LIKE 'python%'" | Where-Object { $_.CommandLine -like "*KrakenSK*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+# Kill trader/python processes for this repo and old Phi-3 launches
+Get-WmiObject Win32_Process -Filter "Name LIKE 'python%'" |
+    Where-Object {
+        $_.CommandLine -like "*KrakenSK*" -or
+        $_.CommandLine -like "*apps.trader.main*" -or
+        $_.CommandLine -like "*scripts\phi3_server.py*"
+    } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 # Kill ALL powershell watchdog windows referencing KrakenSK (except this script's own session)
 Get-WmiObject Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.ProcessId -ne $myPid -and $_.CommandLine -like "*KrakenSK*" -and $_.CommandLine -like "*NoExit*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 5
@@ -65,6 +71,24 @@ function Get-UrlPort {
     }
 }
 
+function Get-LocalModelAliases {
+    param(
+        [string]$ModelName
+    )
+    $aliases = New-Object System.Collections.Generic.List[string]
+    foreach ($candidate in @(
+        $ModelName,
+        ($ModelName -replace "-", ""),
+        ($ModelName -replace "(?<=[a-z0-9])(?=[A-Z])", "-").ToLower(),
+        ($ModelName -replace "(?<=[a-z])(?=\d)", "-").ToLower()
+    )) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and -not $aliases.Contains($candidate)) {
+            $aliases.Add($candidate)
+        }
+    }
+    return @($aliases)
+}
+
 function Test-NemotronBackend {
     param(
         [string]$Provider,
@@ -97,8 +121,9 @@ function Test-NemotronBackend {
     }
 
     $modelEntry = $null
+    $modelAliases = Get-LocalModelAliases -ModelName $Model
     if ($modelsResp.data) {
-        $modelEntry = $modelsResp.data | Where-Object { $_.id -eq $Model } | Select-Object -First 1
+        $modelEntry = $modelsResp.data | Where-Object { $modelAliases -contains $_.id } | Select-Object -First 1
     }
     if (-not $modelEntry) {
         $available = @()
@@ -245,7 +270,8 @@ if ($startModelsOnStart -and ($needsPhi3 -or $needsLocalOllama)) {
     & powershell -ExecutionPolicy Bypass -File (Join-Path $root "scripts\start_models.ps1")
 }
 
-$nemotronStatus = Test-NemotronBackend -Provider $nemotronStrategistProvider -BaseUrl $nemotronBaseUrl -Model $nemotronModel
+$nemotronProbeBaseUrl = if ($nemotronStrategistProvider -eq "local" -and $localLlmBackend -eq "lmstudio") { $advisoryLocalBaseUrl } else { $nemotronBaseUrl }
+$nemotronStatus = Test-NemotronBackend -Provider $nemotronStrategistProvider -BaseUrl $nemotronProbeBaseUrl -Model $nemotronModel
 if (-not $nemotronStatus.Ready) {
     Write-Warning "$($nemotronStatus.Message) Start Phi-3/Nemotron separately via .\scripts\start_models.ps1 or your external host."
 } else {
