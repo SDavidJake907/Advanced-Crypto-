@@ -727,6 +727,14 @@ class NemotronStrategist:
             volume_confirmation = str(market_state_review.get("volume_confirmation", "neutral") or "neutral")
             pullback_quality = str(market_state_review.get("pullback_quality", "unclear") or "unclear")
             late_move_risk = str(market_state_review.get("late_move_risk", "moderate") or "moderate")
+            pattern_explanation = market_state_review.get("pattern_explanation", {}) if isinstance(market_state_review.get("pattern_explanation", {}), dict) else {}
+            structure_pattern = str(pattern_explanation.get("structure_pattern", "none") or "none")
+            structure_validity = str(pattern_explanation.get("structure_validity", "unclear") or "unclear")
+            structure_confidence = float(pattern_explanation.get("structure_confidence", 0.0) or 0.0)
+            recommended_interpretation = pattern_explanation.get("recommended_nemo_interpretation", {}) if isinstance(pattern_explanation.get("recommended_nemo_interpretation", {}), dict) else {}
+            pattern_prefer_action = str(recommended_interpretation.get("prefer_action", "HOLD") or "HOLD")
+            structure_bonus = int(recommended_interpretation.get("structure_bonus", 0) or 0)
+            skepticism_penalty = int(recommended_interpretation.get("skepticism_penalty", 0) or 0)
             lane_candidate = str(lane_supervision.get("lane_candidate", "") or "")
             lane_conflict = bool(lane_supervision.get("lane_conflict", False))
             universe_lane = str(lane_supervision.get("universe_lane", "") or "")
@@ -741,6 +749,8 @@ class NemotronStrategist:
                 f"|phi3:{phi3}|mkt:{market_state}|bias:{lane_bias}|mkt_cf:{market_confidence:>3.2f}"
                 f"|brk_state:{breakout_state}|trend_stage:{trend_stage}|vol_cf:{volume_confirmation}"
                 f"|pbq:{pullback_quality}|late:{late_move_risk}"
+                f"|sp:{structure_pattern}|sval:{structure_validity}|scf:{structure_confidence:>3.2f}"
+                f"|nemo_act:{pattern_prefer_action}|sbonus:{structure_bonus}|skep:{skepticism_penalty}"
                 f"|lane_sup:{lane_candidate or '-'}|lane_conflict:{'Y' if lane_conflict else 'N'}|univ_lane:{universe_lane or '-'}"
                 f"|pat:{pattern_name}|pver:{pattern_validity}|pqs:{pattern_quality:>3.2f}|ext:{extension_risk:>3.2f}"
             )

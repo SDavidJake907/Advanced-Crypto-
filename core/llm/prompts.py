@@ -394,7 +394,7 @@ Quality over quantity.
 You decide which finalists deserve entry. Code still owns exact sizing, hard legality, stops, exits, and execution.
 
 Candidate columns:
-  symbol | lane | score | rec | risk | m5 | m14 | rsi | vol | vs | macd_h | adx | rot | sq | tq | rq | trend | chop | ema | brk | pb | hl | net_edge | cost_pen | phi3 | mkt | bias | mkt_cf | brk_state | trend_stage | vol_cf | pbq | late | pat | pver | pqs
+  symbol | lane | score | rec | risk | m5 | m14 | rsi | vol | vs | macd_h | adx | rot | sq | tq | rq | trend | chop | ema | brk | pb | hl | net_edge | cost_pen | phi3 | mkt | bias | mkt_cf | brk_state | trend_stage | vol_cf | pbq | late | sp | sval | scf | nemo_act | sbonus | skep | pat | pver | pqs
 
 Interpret the Phi chart-state fields strictly:
 - brk_state: fresh_breakout, retest_holding, breakout_attempt, inside_range, unclear
@@ -402,14 +402,21 @@ Interpret the Phi chart-state fields strictly:
 - vol_cf: supportive, neutral, weak
 - pbq: clean_retest, loose_retest, higher_low_support, none, unclear
 - late: contained, moderate, extended
+- sp: structure pattern from Phi chart verification
+- sval: valid, developing, warning, unclear
+- scf: structure confidence 0-1
+- nemo_act: OPEN, WATCH, HOLD from Phi interpretation layer
+- sbonus / skep: structure bonus and skepticism penalty from Phi
 - if mkt=trending and bias=favor_trend with trend_stage in [early, emerging, confirmed], do not flatten it into a generic HOLD without a specific reason
 - if brk_state=fresh_breakout or retest_holding and vol_cf=supportive and late!=extended, treat that as strong structure evidence
+- if sval=valid and scf>=0.70 and nemo_act=OPEN, treat Phi structure as positive evidence, not optional narration
 - if trend_stage=stalling or late=extended, prefer HOLD unless score and structure are exceptional
 
 Rules:
 - OPEN only if rec=BUY or STRONG_BUY, risk!=HIGH, phi3=allow, and m5 > 0
 - OPEN if score >= 72 and ema=Y and (brk=Y or pb=Y) and m5 > 0
 - OPEN if mkt=trending and bias=favor_trend and trend_stage in [early, emerging, confirmed] and brk_state in [fresh_breakout, retest_holding] and vol_cf=supportive
+- OPEN if sval=valid and scf>=0.70 and nemo_act=OPEN and skep<=1 and risk!=HIGH
 - OPEN reduced size if rec=WATCH, risk=LOW or MEDIUM, vol >= 1.2x, and m5 > 0
 - if pver=invalid prefer HOLD unless the rest of the evidence is overwhelming
 - if pver=valid and pqs is strong, treat it as a positive structure confirmation
