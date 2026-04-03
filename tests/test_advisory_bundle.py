@@ -38,6 +38,7 @@ class AdvisoryBundleTests(unittest.TestCase):
         self.assertEqual(bundle.market_state_review["volume_confirmation"], "neutral")
         self.assertEqual(bundle.market_state_review["pattern_explanation"]["structure_pattern"], "breakout_attempt")
         self.assertEqual(bundle.market_state_review["pattern_explanation"]["recommended_nemo_interpretation"]["prefer_action"], "WATCH")
+        self.assertEqual(bundle.market_state_review["candle_evidence"]["primary_candle"], "none")
 
 
 if __name__ == "__main__":

@@ -361,6 +361,7 @@ def normalize_market_state_review(parsed: dict[str, Any]) -> dict[str, Any]:
         late_move_risk = "moderate"
         normalized_fields.append("late_move_risk")
     pattern_explanation = parsed.get("pattern_explanation", {}) if isinstance(parsed.get("pattern_explanation", {}), dict) else {}
+    candle_evidence = parsed.get("candle_evidence", {}) if isinstance(parsed.get("candle_evidence", {}), dict) else {}
     return {
         "market_state": market_state,
         "confidence": _clamp_float(parsed.get("confidence"), default=0.5),
@@ -372,6 +373,7 @@ def normalize_market_state_review(parsed: dict[str, Any]) -> dict[str, Any]:
         "pullback_quality": pullback_quality,
         "late_move_risk": late_move_risk,
         "pattern_explanation": pattern_explanation,
+        "candle_evidence": candle_evidence,
         "contract": build_envelope(
             role=ROLE_MARKET_REVIEWER,
             confidence=parsed.get("confidence", 0.5),

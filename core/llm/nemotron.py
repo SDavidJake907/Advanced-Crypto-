@@ -728,6 +728,7 @@ class NemotronStrategist:
             pullback_quality = str(market_state_review.get("pullback_quality", "unclear") or "unclear")
             late_move_risk = str(market_state_review.get("late_move_risk", "moderate") or "moderate")
             pattern_explanation = market_state_review.get("pattern_explanation", {}) if isinstance(market_state_review.get("pattern_explanation", {}), dict) else {}
+            candle_evidence = market_state_review.get("candle_evidence", {}) if isinstance(market_state_review.get("candle_evidence", {}), dict) else {}
             structure_pattern = str(pattern_explanation.get("structure_pattern", "none") or "none")
             structure_validity = str(pattern_explanation.get("structure_validity", "unclear") or "unclear")
             structure_confidence = float(pattern_explanation.get("structure_confidence", 0.0) or 0.0)
@@ -735,6 +736,10 @@ class NemotronStrategist:
             pattern_prefer_action = str(recommended_interpretation.get("prefer_action", "HOLD") or "HOLD")
             structure_bonus = int(recommended_interpretation.get("structure_bonus", 0) or 0)
             skepticism_penalty = int(recommended_interpretation.get("skepticism_penalty", 0) or 0)
+            primary_candle = str(candle_evidence.get("primary_candle", "none") or "none")
+            candle_bias = str(candle_evidence.get("candle_bias", "neutral") or "neutral")
+            candle_strength = float(candle_evidence.get("candle_strength", 0.0) or 0.0)
+            candle_confirmation_score = float(candle_evidence.get("confirmation_score", 0.0) or 0.0)
             lane_candidate = str(lane_supervision.get("lane_candidate", "") or "")
             lane_conflict = bool(lane_supervision.get("lane_conflict", False))
             universe_lane = str(lane_supervision.get("universe_lane", "") or "")
@@ -751,6 +756,7 @@ class NemotronStrategist:
                 f"|pbq:{pullback_quality}|late:{late_move_risk}"
                 f"|sp:{structure_pattern}|sval:{structure_validity}|scf:{structure_confidence:>3.2f}"
                 f"|nemo_act:{pattern_prefer_action}|sbonus:{structure_bonus}|skep:{skepticism_penalty}"
+                f"|candle:{primary_candle}|cbias:{candle_bias}|cstr:{candle_strength:>3.2f}|ccf:{candle_confirmation_score:>3.2f}"
                 f"|lane_sup:{lane_candidate or '-'}|lane_conflict:{'Y' if lane_conflict else 'N'}|univ_lane:{universe_lane or '-'}"
                 f"|pat:{pattern_name}|pver:{pattern_validity}|pqs:{pattern_quality:>3.2f}|ext:{extension_risk:>3.2f}"
             )

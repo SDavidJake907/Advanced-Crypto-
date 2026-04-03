@@ -46,6 +46,7 @@ class MoverAdvisoryTests(unittest.TestCase):
         self.assertEqual(review.late_move_risk, "moderate")
         self.assertEqual(review.pattern_explanation["structure_pattern"], "breakout_attempt")
         self.assertEqual(review.pattern_explanation["structure_validity"], "developing")
+        self.assertEqual(review.candle_evidence["primary_candle"], "none")
 
     def test_market_state_trending_has_strict_chart_handoff_fields(self) -> None:
         review = _heuristic_market_state_review(
@@ -74,6 +75,8 @@ class MoverAdvisoryTests(unittest.TestCase):
         self.assertEqual(review.pattern_explanation["structure_pattern"], "range_breakout")
         self.assertEqual(review.pattern_explanation["structure_validity"], "valid")
         self.assertEqual(review.pattern_explanation["recommended_nemo_interpretation"]["prefer_action"], "OPEN")
+        self.assertEqual(review.candle_evidence["primary_candle"], "bullish_engulfing")
+        self.assertEqual(review.candle_evidence["candle_bias"], "bullish")
 
     def test_posture_ranging_promoted_mover_is_not_defensive(self) -> None:
         review = _heuristic_posture_review(

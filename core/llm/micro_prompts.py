@@ -95,6 +95,7 @@ class Phi3MarketStateReview:
     pullback_quality: str = "unclear"
     late_move_risk: str = "moderate"
     pattern_explanation: dict[str, Any] | None = None
+    candle_evidence: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -108,6 +109,7 @@ class Phi3MarketStateReview:
             "pullback_quality": self.pullback_quality,
             "late_move_risk": self.late_move_risk,
             "pattern_explanation": self.pattern_explanation or {},
+            "candle_evidence": self.candle_evidence or {},
         }
 
 
@@ -315,6 +317,74 @@ def _heuristic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateR
         late_move_risk = "contained"
     else:
         late_move_risk = "moderate"
+    primary_candle = "none"
+    candle_bias = "neutral"
+    location_context = "mid_range"
+    if pullback_hold:
+        location_context = "at_support"
+    elif range_breakout:
+        location_context = "at_breakout_level"
+    elif trend_confirmed:
+        location_context = "aligned_with_trend"
+    bullish_engulfing = momentum_5 > 0.0 and macd_hist > 0.0 and ema_stack_bullish and volume_ratio >= 1.1
+    bearish_engulfing = momentum_5 < 0.0 and macd_hist < 0.0 and not ema_stack_bullish
+    hammer_like = pullback_hold and momentum_5 > 0.0 and macd_hist >= 0.0
+    shooting_star_like = late_move_risk == "extended" and macd_hist < 0.0
+    inside_bar_like = abs(momentum_5) <= 0.002 and volume_ratio <= 1.05
+    outside_bar_like = volume_surge >= 0.35 and abs(momentum_5) > 0.008
+    doji_like = abs(momentum_5) <= 0.001 and abs(macd_hist) <= 0.00005
+    if bullish_engulfing:
+        primary_candle = "bullish_engulfing"
+        candle_bias = "bullish"
+    elif hammer_like:
+        primary_candle = "hammer"
+        candle_bias = "bullish"
+    elif shooting_star_like:
+        primary_candle = "shooting_star"
+        candle_bias = "bearish"
+    elif bearish_engulfing:
+        primary_candle = "bearish_engulfing"
+        candle_bias = "bearish"
+    elif outside_bar_like:
+        primary_candle = "outside_bar"
+        candle_bias = "bullish" if momentum_5 > 0.0 else "bearish"
+    elif inside_bar_like:
+        primary_candle = "inside_bar"
+        candle_bias = "neutral"
+    elif doji_like:
+        primary_candle = "doji"
+        candle_bias = "neutral"
+    candle_strength = round(min(max(
+        0.3
+        + (0.18 if candle_bias == "bullish" and momentum_5 > 0.0 else 0.0)
+        + (0.18 if candle_bias == "bearish" and momentum_5 < 0.0 else 0.0)
+        + (0.12 if macd_hist >= 0.0 and candle_bias != "bearish" else 0.0)
+        + (0.10 if volume_confirmation == "supportive" else -0.05 if volume_confirmation == "weak" else 0.0),
+        0.0,
+    ), 0.95), 2)
+    confirmation_score = round(min(max(
+        (
+            candle_strength
+            + (0.12 if location_context in {"at_support", "at_breakout_level", "aligned_with_trend"} else 0.0)
+            + (0.12 if volume_confirmation == "supportive" else 0.0)
+            + (0.10 if trend_confirmed else 0.0)
+        ),
+        0.0,
+    ), 0.95), 2)
+    candle_warnings: list[str] = []
+    if primary_candle in {"inside_bar", "doji"}:
+        candle_warnings.append("Primary candle is more indecisive than directional.")
+    if volume_confirmation == "weak":
+        candle_warnings.append("Candle confirmation lacks volume support.")
+    if late_move_risk == "extended" and candle_bias == "bullish":
+        candle_warnings.append("Bullish candle appears late in the move.")
+    candle_summary = (
+        "Bullish candle confirmation supports the structure."
+        if candle_bias == "bullish" and confirmation_score >= 0.65
+        else "Bearish candle warning weakens the structure."
+        if candle_bias == "bearish" and confirmation_score >= 0.55
+        else "Candle evidence is present but not decisive."
+    )
     structure_pattern = "none"
     structure_bias = "neutral"
     structure_validity = "unclear"
@@ -437,29 +507,39 @@ def _heuristic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateR
         },
         "summary": summary,
     }
+    candle_evidence = {
+        "primary_candle": primary_candle,
+        "candle_bias": candle_bias,
+        "candle_strength": candle_strength,
+        "location_context": location_context,
+        "volume_confirmation": volume_confirmation == "supportive",
+        "confirmation_score": confirmation_score,
+        "warning_flags": candle_warnings,
+        "summary": candle_summary,
+    }
     if ranging_market:
         if entry_score >= 55.0 and mover_present:
             if ema_stack_bullish and macd_hist >= 0.0 and momentum_5 > 0.0:
-                return Phi3MarketStateReview("ranging", 0.62, "favor_selective", "range_breakout_attempt_with_ema_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
+                return Phi3MarketStateReview("ranging", 0.62, "favor_selective", "range_breakout_attempt_with_ema_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
             if volume_surge >= 0.35 or volume_ratio >= 1.2:
-                return Phi3MarketStateReview("ranging", 0.6, "favor_selective", "range_breakout_attempt_with_volume_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
+                return Phi3MarketStateReview("ranging", 0.6, "favor_selective", "range_breakout_attempt_with_volume_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
             if rotation_score > 0.0 or symbol_trending:
-                return Phi3MarketStateReview("ranging", 0.58, "favor_selective", "selective_range_mover_with_relative_strength", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
-            return Phi3MarketStateReview("ranging", 0.56, "favor_selective", "range_state_but_mover_present", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
+                return Phi3MarketStateReview("ranging", 0.58, "favor_selective", "selective_range_mover_with_relative_strength", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
+            return Phi3MarketStateReview("ranging", 0.56, "favor_selective", "range_state_but_mover_present", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
         if not ema_stack_bullish and macd_hist < 0.0:
-            return Phi3MarketStateReview("ranging", 0.68, "favor_selective", "range_state_without_trend_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
-        return Phi3MarketStateReview("ranging", 0.65, "favor_selective", "range_signals_detected", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
+            return Phi3MarketStateReview("ranging", 0.68, "favor_selective", "range_state_without_trend_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
+        return Phi3MarketStateReview("ranging", 0.65, "favor_selective", "range_signals_detected", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
     if trend_confirmed and (momentum_5 > 0.0 or rotation_score > 0.0):
         if ema_stack_bullish and macd_hist >= 0.0:
-            return Phi3MarketStateReview("trending", 0.78, "favor_trend", "trend_confirmation_with_ema_and_macd", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
+            return Phi3MarketStateReview("trending", 0.78, "favor_trend", "trend_confirmation_with_ema_and_macd", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
         if volume_surge >= 0.35 or volume_ratio >= 1.2:
-            return Phi3MarketStateReview("trending", 0.75, "favor_trend", "trend_confirmation_with_volume_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
-        return Phi3MarketStateReview("trending", 0.72, "favor_trend", "trend_confirmation_present", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
+            return Phi3MarketStateReview("trending", 0.75, "favor_trend", "trend_confirmation_with_volume_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
+        return Phi3MarketStateReview("trending", 0.72, "favor_trend", "trend_confirmation_present", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
     if ema_stack_bullish and macd_hist >= 0.0 and momentum_5 > 0.0:
-        return Phi3MarketStateReview("transition", 0.58, "favor_selective", "breakout_attempt_not_yet_confirmed", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
+        return Phi3MarketStateReview("transition", 0.58, "favor_selective", "breakout_attempt_not_yet_confirmed", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
     if macd_hist < 0.0 and momentum_5 < 0.0:
-        return Phi3MarketStateReview("transition", 0.62, "reduce_trend_entries", "momentum_fading_into_transition", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
-    return Phi3MarketStateReview("transition", 0.6, "favor_selective", "mixed_market_structure", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation)
+        return Phi3MarketStateReview("transition", 0.62, "reduce_trend_entries", "momentum_fading_into_transition", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
+    return Phi3MarketStateReview("transition", 0.6, "favor_selective", "mixed_market_structure", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk, pattern_explanation, candle_evidence)
 
 
 def deterministic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateReview:
@@ -490,6 +570,7 @@ def phi3_review_market_state(
             pullback_quality=str(parsed.get("pullback_quality", "unclear") or "unclear"),
             late_move_risk=str(parsed.get("late_move_risk", "moderate") or "moderate"),
             pattern_explanation=parsed.get("pattern_explanation", {}) if isinstance(parsed.get("pattern_explanation", {}), dict) else {},
+            candle_evidence=parsed.get("candle_evidence", {}) if isinstance(parsed.get("candle_evidence", {}), dict) else {},
         )
     except Exception:
         return _heuristic_market_state_review(features)
