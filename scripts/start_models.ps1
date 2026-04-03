@@ -250,19 +250,22 @@ if ($advisoryModelProvider -eq "local_nemo" -or $nemotronStrategistProvider -eq 
             $wslHostLiteral = Get-WslCommandLiteral $vllmWslHost
             $wslExtraArgs = $vllmWslExtraArgs
             $wslCommand = "export HOME='$wslHomeLiteral'; cd '$wslHomeLiteral'; mkdir -p '$wslHomeLiteral/logs'; source '$wslVenvLiteral/bin/activate'; python -m vllm.entrypoints.openai.api_server --model '$wslModelLiteral' --trust-remote-code --mamba_ssm_cache_dtype float32 --host '$wslHostLiteral' --port $vllmWslPort $wslExtraArgs"
+            $wslCommandLiteral = $wslCommand.Replace("'", "''")
             if ($watchdogEnabled) {
                 Start-Process powershell -ArgumentList "-NoExit", "-Command", "
                     `$host.UI.RawUI.WindowTitle='AI-Models - vllm_wsl';
+                    `$wslCmd = '$wslCommandLiteral';
                     while (`$true) {
                         Write-Host '[watchdog] Starting vllm_wsl...';
-                        & wsl -d '$vllmWslDistro' -- bash -lc ""$wslCommand"";
+                        & wsl -d '$vllmWslDistro' -- bash -lc `$wslCmd;
                         Write-Host '[watchdog] vllm_wsl exited. Restarting in 10s...';
                         Start-Sleep -Seconds 10
                     }"
             } else {
                 Start-Process powershell -ArgumentList "-NoExit", "-Command", "
                     `$host.UI.RawUI.WindowTitle='AI-Models - vllm_wsl';
-                    & wsl -d '$vllmWslDistro' -- bash -lc ""$wslCommand"";
+                    `$wslCmd = '$wslCommandLiteral';
+                    & wsl -d '$vllmWslDistro' -- bash -lc `$wslCmd;
                 "
             }
         }
