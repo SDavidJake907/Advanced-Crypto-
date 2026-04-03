@@ -54,6 +54,7 @@ Owns:
 - pattern verification
 - candle-context review
 - market-state and posture review from structured packets
+- structured chart-evidence translation for Nemo, not free-form trade narration
 
 ### Nemotron
 
@@ -406,6 +407,10 @@ Current runtime note:
 - local strategist receives a compact canonical candidate packet instead of the full wide packet
 - `lesson_summary` is preferred over long lesson dumps
 - `behavior_score` can still be provided, but local payloads should stay compact
+- `Phi-3` should translate chart data into machine-readable evidence, not vague prose
+- current Phi handoff includes:
+  - `pattern_explanation`: structure pattern, validity, confidence, quality/context, warnings, and recommended Nemo interpretation
+  - `candle_evidence`: primary candle, bias, strength, location context, confirmation score, and warning flags
 - `Phi-3` (NPU): market-state scan, posture review, watchlist flagging — boosts entry_score for flagged symbols
 - `Phi-3` pattern verifier: chart-structure and candle-context verification only; it helps Nemo judge finalists, but it does not make the final trade decision
 - `Nemotron` / OpenAI: batch comparative strategist using full candidate table (score, lane, RSI, MACD, ADX, VWIO, net_edge, cost_pen, Phi-3 signal)
@@ -413,6 +418,32 @@ Current runtime note:
 - Nemo receives `learned_lessons` (per-symbol outcome history) and `behavior_score` (self-calibration data) each cycle
 - no LLM is allowed to override hard risk
 - runtime adjustment advice is staged for replay/shadow/human review
+
+### Phi To Nemo Handoff
+
+Phi should explain the chart to Nemo as structured evidence, not as a story.
+
+Current evidence layers passed from Phi into the strategist path:
+- `pattern_explanation`
+  - `structure_pattern`
+  - `structure_bias`
+  - `structure_validity`
+  - `structure_confidence`
+  - quality/context/warning fields
+  - `recommended_nemo_interpretation`
+- `candle_evidence`
+  - `primary_candle`
+  - `candle_bias`
+  - `candle_strength`
+  - `location_context`
+  - `confirmation_score`
+  - `warning_flags`
+
+Design rule:
+- deterministic code computes the market facts
+- Phi translates those facts into compact structure and candle evidence
+- Nemo uses that evidence for finalist judgment
+- risk and execution still own vetoes
 
 ## Entry Scoring
 

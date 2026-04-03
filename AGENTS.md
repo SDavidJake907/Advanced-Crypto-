@@ -70,6 +70,13 @@ This repo is a modular crypto trading system with deterministic scoring, AI-assi
 - Use short lesson summaries instead of long text dumps when possible.
 - Prefer `lesson_summary` over long `learned_lessons` blocks.
 - Preserve shared field names across advisory and Nemo payloads unless explicitly refactoring all consumers.
+- Phi should translate chart data into structured evidence for Nemo:
+  - pattern
+  - quality
+  - context
+  - warnings
+  - compact recommended interpretation
+- Do not let Phi respond with vague chart prose like "looks bullish" when a structured evidence field can be emitted instead.
 
 ## Implementation rules
 - Make the smallest safe change set.
