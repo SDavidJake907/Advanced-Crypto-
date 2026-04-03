@@ -82,13 +82,6 @@ function Get-LocalModelAliases {
     return @($aliases)
 }
 
-function Get-WslCommandLiteral {
-    param(
-        [string]$Value
-    )
-    return $Value
-}
-
 if (-not (Test-Path $phiScript)) {
     Write-Error "Phi-3 server script not found at $phiScript"
     exit 1
@@ -117,14 +110,6 @@ $localLlmLoadKey = Get-EnvValue "LOCAL_LLM_LOAD_KEY" $nemotronModel
 $ollamaModelsRoot = Get-EnvValue "OLLAMA_MODELS" "C:\Users\kitti"
 $localLlmBaseUrl = if (-not [string]::IsNullOrWhiteSpace($advisoryLocalBaseUrl)) { $advisoryLocalBaseUrl } else { $nemotronBaseUrl }
 $localLlmPort = Get-UrlPort -Url $localLlmBaseUrl -Default 1234
-$vllmWslDistro = Get-EnvValue "VLLM_WSL_DISTRO" "Ubuntu"
-$vllmWslHome = Get-EnvValue "VLLM_WSL_HOME" "/home/$env:USERNAME"
-$vllmWslVenv = Get-EnvValue "VLLM_WSL_VENV" "$vllmWslHome/.venvs/vllm"
-$vllmWslModel = Get-EnvValue "VLLM_WSL_MODEL" "nvidia/NVIDIA-Nemotron-Nano-9B-v2"
-$vllmWslPort = Get-EnvValue "VLLM_WSL_PORT" "8000"
-$vllmWslHost = Get-EnvValue "VLLM_WSL_HOST" "0.0.0.0"
-$vllmWslExtraArgs = Get-EnvValue "VLLM_WSL_EXTRA_ARGS" ""
-$vllmWslReadyUrl = "http://127.0.0.1:$vllmWslPort/v1/models"
 
 Write-Host "Starting persistent AI services only..."
 
@@ -239,52 +224,6 @@ if ($advisoryModelProvider -eq "local_nemo" -or $nemotronStrategistProvider -eq 
             & $lmsExe load $advisoryLocalModel --identifier $advisoryLocalModel --gpu max -y | Out-Null
         }
         Write-Host "LM Studio local model host ready."
-    } elseif ($localLlmBackend -eq "vllm_wsl") {
-        $vllmReady = Wait-HttpReady -Url $vllmWslReadyUrl -TimeoutSec 3
-        if ($vllmReady) {
-            Write-Host "WSL vLLM server already running at http://127.0.0.1:$vllmWslPort - skipping start."
-        } else {
-            $wslHomeLiteral = Get-WslCommandLiteral $vllmWslHome
-            $wslVenvLiteral = Get-WslCommandLiteral $vllmWslVenv
-            $wslModelLiteral = Get-WslCommandLiteral $vllmWslModel
-            $wslHostLiteral = Get-WslCommandLiteral $vllmWslHost
-            $wslExtraArgs = $vllmWslExtraArgs
-            $wslCommand = "export HOME='$wslHomeLiteral'; cd '$wslHomeLiteral'; mkdir -p '$wslHomeLiteral/logs'; source '$wslVenvLiteral/bin/activate'; python -m vllm.entrypoints.openai.api_server --model '$wslModelLiteral' --trust-remote-code --mamba_ssm_cache_dtype float32 --host '$wslHostLiteral' --port $vllmWslPort $wslExtraArgs"
-            $wslCommandLiteral = $wslCommand.Replace("'", "''")
-            if ($watchdogEnabled) {
-                Start-Process powershell -ArgumentList "-NoExit", "-Command", "
-                    `$host.UI.RawUI.WindowTitle='AI-Models - vllm_wsl';
-                    `$wslCmd = '$wslCommandLiteral';
-                    while (`$true) {
-                        Write-Host '[watchdog] Starting vllm_wsl...';
-                        & wsl -d '$vllmWslDistro' -- bash -lc `$wslCmd;
-                        Write-Host '[watchdog] vllm_wsl exited. Restarting in 10s...';
-                        Start-Sleep -Seconds 10
-                    }"
-            } else {
-                Start-Process powershell -ArgumentList "-NoExit", "-Command", "
-                    `$host.UI.RawUI.WindowTitle='AI-Models - vllm_wsl';
-                    `$wslCmd = '$wslCommandLiteral';
-                    & wsl -d '$vllmWslDistro' -- bash -lc `$wslCmd;
-                "
-            }
-        }
-        Write-Host "Waiting for WSL vLLM on port $vllmWslPort (official NVIDIA Nemotron can take several minutes to load)..."
-        $vllmUp = Wait-HttpReady -Url $vllmWslReadyUrl -TimeoutSec 900
-        if ($vllmUp) {
-            $vllmModels = Get-HttpJson -Url $vllmWslReadyUrl -TimeoutSec 10
-            $available = @()
-            if ($vllmModels -and $vllmModels.data) {
-                $available = @($vllmModels.data | ForEach-Object { $_.id })
-            }
-            if ($available.Count -gt 0) {
-                Write-Host "WSL vLLM ready. Available model(s): $($available -join ', ')"
-            } else {
-                Write-Warning "WSL vLLM responded but did not list any models."
-            }
-        } else {
-            Write-Warning "WSL vLLM did not become ready within 15 minutes - check the vllm_wsl window."
-        }
     } else {
         if (-not (Test-Path $ollamaExe)) {
             Write-Error "Ollama executable not found at $ollamaExe"
@@ -346,8 +285,6 @@ if ($needsPhi3) {
 if ($advisoryModelProvider -eq "local_nemo" -or $nemotronStrategistProvider -eq "local") {
     if ($localLlmBackend -eq "lmstudio") {
         Write-Host " - lmstudio (local Gemma/strategy host)"
-    } elseif ($localLlmBackend -eq "vllm_wsl") {
-        Write-Host " - vllm_wsl (official NVIDIA Nemotron via Ubuntu/WSL)"
     } else {
         Write-Host " - ollama (local model host)"
     }

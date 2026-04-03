@@ -134,41 +134,34 @@ function Test-NemotronBackend {
         return [pscustomobject]$result
     }
 
-    if ($localLlmBackend -eq "ollama") {
-        try {
-            $showResp = Invoke-RestMethod -Uri "$($BaseUrl.TrimEnd('/'))/api/show" -Method Post -ContentType "application/json" -Body (@{ model = $Model } | ConvertTo-Json -Compress) -TimeoutSec 15
-            $capabilities = @()
-            if ($showResp.capabilities) {
-                $capabilities = @($showResp.capabilities)
-            }
-            if ($capabilities -contains "completion" -and -not ($capabilities -contains "chat")) {
-                $result.ChatMode = "completion-fallback"
-                $result.Ready = $true
-                $result.Message = "Local Nemotron model is completion-only; runtime will use completion fallback."
-                return [pscustomobject]$result
-            }
-            if ($capabilities -contains "chat") {
-                $result.ChatMode = "chat"
-                $result.Ready = $true
-                $result.Message = "Local Nemotron model supports chat completions."
-                return [pscustomobject]$result
-            }
-            $result.ChatMode = "unknown"
+    try {
+        $showResp = Invoke-RestMethod -Uri "$($BaseUrl.TrimEnd('/'))/api/show" -Method Post -ContentType "application/json" -Body (@{ model = $Model } | ConvertTo-Json -Compress) -TimeoutSec 15
+        $capabilities = @()
+        if ($showResp.capabilities) {
+            $capabilities = @($showResp.capabilities)
+        }
+        if ($capabilities -contains "completion" -and -not ($capabilities -contains "chat")) {
+            $result.ChatMode = "completion-fallback"
             $result.Ready = $true
-            $result.Message = "Local Nemotron model detected; capabilities not explicitly reported."
-            return [pscustomobject]$result
-        } catch {
-            $result.Ready = $true
-            $result.ChatMode = "unknown"
-            $result.Message = "Local Nemotron model detected; capability probe unavailable."
+            $result.Message = "Local Nemotron model is completion-only; runtime will use completion fallback."
             return [pscustomobject]$result
         }
+        if ($capabilities -contains "chat") {
+            $result.ChatMode = "chat"
+            $result.Ready = $true
+            $result.Message = "Local Nemotron model supports chat completions."
+            return [pscustomobject]$result
+        }
+        $result.ChatMode = "unknown"
+        $result.Ready = $true
+        $result.Message = "Local Nemotron model detected; capabilities not explicitly reported."
+        return [pscustomobject]$result
+    } catch {
+        $result.Ready = $true
+        $result.ChatMode = "unknown"
+        $result.Message = "Local Nemotron model detected; capability probe unavailable."
+        return [pscustomobject]$result
     }
-
-    $result.Ready = $true
-    $result.ChatMode = "chat"
-    $result.Message = "OpenAI-compatible local strategist model detected."
-    return [pscustomobject]$result
 }
 
 if (-not (Test-Path $python)) {

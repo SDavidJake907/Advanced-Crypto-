@@ -230,12 +230,11 @@ Persistent AI services are started separately with [`scripts/start_models.ps1`](
 - a local model host when `NEMOTRON_PROVIDER=local`:
   - `ollama` when `LOCAL_LLM_BACKEND=ollama`
   - `LM Studio` when `LOCAL_LLM_BACKEND=lmstudio`
-  - Ubuntu/WSL `vLLM` when `LOCAL_LLM_BACKEND=vllm_wsl`
 - optional Phi-3 services only when `ADVISORY_MODEL_PROVIDER=phi3`
 
 **Important:** Run `start_models.ps1` first and wait for "Phi-3 ready" before running `start_all.ps1`. Phi-3 takes 2-3 minutes to load on NPU — `start_all.ps1` only waits 15 seconds.
 
-Current note: the default local strategist profile uses `NVIDIA-Nemotron-Nano-9B-v2` through Ollama with `ADVISORY_MODEL_PROVIDER=local_nemo`, `NEMOTRON_PROVIDER=local`, `NEMOTRON_STRATEGIST_PROVIDER=local`, and `LOCAL_LLM_BACKEND=ollama`. An optional official local profile can run the same model from Ubuntu/WSL through `vLLM` by setting `LOCAL_LLM_BACKEND=vllm_wsl`, `NEMOTRON_BASE_URL=http://127.0.0.1:8000/v1`, and the `VLLM_WSL_*` variables in `.env`. Phi-3 can be started alongside either local strategist path when `START_PHI3_ON_START=true`.
+Current note: the default local strategist profile uses `NVIDIA-Nemotron-Nano-9B-v2` through Ollama with `ADVISORY_MODEL_PROVIDER=local_nemo`, `NEMOTRON_PROVIDER=local`, `NEMOTRON_STRATEGIST_PROVIDER=local`, and `LOCAL_LLM_BACKEND=ollama`. Phi-3 can be started alongside that local strategist path when `START_PHI3_ON_START=true`.
 
 Current reference docs:
 - [LLM operating model](docs/llm_operating_model.md)
@@ -553,9 +552,8 @@ Common runtime controls in `.env`:
 - `NEMOTRON_PROVIDER=local|nvidia|openai`
 - `NEMOTRON_STRATEGIST_PROVIDER=local|cloud|nvidia|openai`
 - `NEMOTRON_BATCH_MODE=true|false`
-- `LOCAL_LLM_BACKEND=ollama|lmstudio|vllm_wsl`
+- `LOCAL_LLM_BACKEND=ollama|lmstudio`
 - `LOCAL_LLM_LOAD_KEY=` local model key to auto-load at startup for LM Studio / Ollama-style local hosts
-- `VLLM_WSL_DISTRO`, `VLLM_WSL_HOME`, `VLLM_WSL_VENV`, `VLLM_WSL_MODEL`, `VLLM_WSL_PORT`, `VLLM_WSL_HOST`, `VLLM_WSL_EXTRA_ARGS` for the optional Ubuntu/WSL official Nemotron path
 - `ADVISORY_LOCAL_BASE_URL=http://127.0.0.1:1234`
 - `ADVISORY_LOCAL_MODEL=gemma4-e4b-it`
 - `NEMOTRON_BASE_URL=http://127.0.0.1:1234`
