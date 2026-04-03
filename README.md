@@ -1,16 +1,130 @@
-# KrakenSK
+# KrakenSK / Advanced-Crypto
+
+KrakenSK is a live crypto trading system built around a deterministic execution core, structured AI-assisted review, hard risk controls, and replay/shadow validation before live change. The current shipped live adapter is Kraken-first, but the architecture is intended to support API-key exchange integrations more generally.
 
 Operating objective: maximize high-quality wins while protecting capital. The target is not "always win" because no live market system can guarantee that; the target is disciplined execution with a validated path toward winning a high share of selected trades, aiming for 80%+ only when supported by replay, shadow, and live evidence. The system should also learn the way a strong human operator does: review outcomes, keep what works, cut what fails, and tighten behavior over time without moving deterministic truth into prompts.
 
-KrakenSK is a live crypto trading system built around a deterministic trading core. The current shipped live adapter is Kraken-first, but the architecture is intended to support API-key exchange integrations more generally:
-- symbol-local feature computation (GPU-accelerated via custom CUDA kernels)
-- lane-aware scanning and promotion
-- lane-aware execution
-- state-based position management
-- hard runtime health and risk gates
-- replay and shadow validation before live change
+LLMs are present, but constrained. The intended direction is not "AI decides everything." The intended direction is a measurable leader-rotation engine with deterministic code owning arithmetic, legality, sizing, and hard vetoes, while local models provide structured review and final candidate judgment.
 
-LLMs are still present, but they are constrained. The intended direction is not "AI decides everything." The intended direction is a measurable leader-rotation engine with AI used for review, diagnosis, and structured advisory.
+## What This Project Is
+
+- Live crypto trading system with a deterministic core
+- Kraken-first exchange adapter with room for broader exchange integrations
+- AI-assisted review layer, not an AI-only trading bot
+- Operator UI for live monitoring and control-room visibility
+- Replay, review, and shadow tooling before live runtime changes
+
+## Why This Exists
+
+This repository exists to run a real trading stack without moving the core business logic into prompts. Features, scores, risk limits, exposure rules, and execution constraints are meant to stay inspectable in code. Models help with comparative review, chart-context interpretation, and structured trade judgment, but they do not own the economic truth.
+
+## System Flow
+
+1. Market data collection
+2. Symbol-local feature extraction
+3. Deterministic scoring and lane selection
+4. Phi-3 pattern / market-state review
+5. Gemma 4 finalist judgment
+6. Hard risk, portfolio, and cost gating
+7. Execution and fill tracking
+8. Exit management, trade memory, and review feedback
+
+```text
+Market Data -> Feature Engine -> Deterministic Scoring -> Phi-3 Verification
+           -> Final Candidate Payload -> Gemma 4 Judgment
+           -> Risk / Portfolio Gates -> Execution -> Exit Logic
+           -> Trade Memory / Replay / Shadow Review
+```
+
+## Model Roles
+
+### Deterministic Core
+
+Owns:
+- market/account normalization
+- feature extraction
+- scoring
+- hard risk gating
+- execution
+- exit management
+
+### Phi-3
+
+Owns:
+- pattern verification
+- candle-context review
+- market-state and posture review from structured packets
+
+### Gemma 4
+
+Owns:
+- final structured `OPEN / HOLD / FLAT` judgment on finalists
+- comparative ranking on the candidate set it is given
+- reasoned decision output for the live strategy layer
+
+### Runtime Enforcement
+
+Owns:
+- legality checks
+- exposure limits
+- fee/spread/slippage floors
+- portfolio replacement rules
+- hard vetoes over any model output
+
+## Repository Layout
+
+- `apps/` - app entrypoints and operator-facing services
+- `configs/` - runtime configuration and cached exchange metadata
+- `core/` - features, policy, risk, execution, memory, and model adapters
+- `cpp/` - CUDA and accelerated feature components
+- `docs/` - architecture, operating model, trading rules, and research notes
+- `scripts/` - startup, restart, status, and utility scripts
+- `tests/` - regression and behavior coverage
+- `logs/` - runtime traces, decisions, alerts, and synced state
+- `.env.example` - environment variable template
+- `universe.json` - tradable universe definition
+
+## Quick Start
+
+### 1. Clone
+
+```powershell
+git clone https://github.com/SDavidJake907/Advanced-Crypto-.git
+cd Advanced-Crypto-
+```
+
+### 2. Create Local Environment
+
+- Copy `.env.example` to `.env`
+- Fill in exchange credentials, model-provider settings, and runtime ports
+- Adjust [`configs/runtime_overrides.json`](configs/runtime_overrides.json) for your own risk and universe settings
+
+### 3. Install Python Dependencies
+
+```powershell
+pip install -e .
+```
+
+### 4. Start Model Services
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start_models.ps1
+```
+
+### 5. Start The Stack
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1
+```
+
+## Project Status
+
+Current state:
+- active development
+- live-trading capable with operator control
+- architecture and docs public
+- not presented as finished or automatically capital-ready
+- intended to be validated through replay, shadow, and measured live behavior
 
 ## Build Attribution
 
@@ -34,31 +148,6 @@ You are responsible for:
 - complying with the license and terms of any third-party model, API, or binary you use
 - supplying your own credentials where required
 - reviewing provider usage limits, commercial terms, and attribution requirements before deployment
-
-## What This Repository Contains
-
-This repository includes:
-- a live exchange trading loop with a current Kraken-first adapter
-- a universe manager that selects and ranks tradable symbols
-- deterministic feature extraction, scoring, and risk gating
-- optional local LLM services for advisory and finalist review
-- a web-based operator UI for runtime monitoring
-- replay, shadow validation, and review tooling
-- a large supporting doc set for architecture, tuning, runtime flow, and operating rules
-
-If you are reading this on GitHub, start with this README, then use the full docs index in [docs/DOCS_INDEX.md](docs/DOCS_INDEX.md).
-
-## UI Screenshots
-
-Operator UI examples from the current stack:
-
-![Operator control room](docs/screenshots/operator-control-room.png)
-
-![Operator overview](docs/screenshots/operator-overview.png)
-
-![Known entry ledger](docs/screenshots/operator-ledger.png)
-
-![Portfolio view](docs/screenshots/operator-portfolio.png)
 
 ## System Requirements
 
@@ -158,18 +247,29 @@ Current reference docs:
 - [North Star runtime baseline](docs/northstar_runtime_baseline.md)
 - [Full docs index](docs/DOCS_INDEX.md)
 
-### Docs Map
+## Documentation Map
 
-- [README.md](README.md): front door - what the project is, how it runs, and where to look next
-- [Full docs index](docs/DOCS_INDEX.md): complete documentation directory with all major docs grouped by purpose
+- [README.md](README.md): front door for the repository
+- [Full docs index](docs/DOCS_INDEX.md): full grouped document map
 - [Trading playbook](docs/trading_playbook.md): how the system should trade in practice
-- [Runtime cycle](docs/runtime_cycle.md): what the live system actually does on startup and during each decision cycle
-- [Symbol classification](docs/symbol_classification.md): which tracked symbols are majors, core alts, or meme/research-disabled names
-- [Exchange fee and policy references](docs/exchange_fee_policy_refs.md): official provider links for fee assumptions, subscription limits, and when not to change live cost settings
-- [Entry/exit research](docs/entry_exit_research.md): where entry and exit behavior actually live in code and config
-- [LLM operating model](docs/llm_operating_model.md): what Nemo/advisory are allowed to do and what code still owns
-- [North Star runtime baseline](docs/northstar_runtime_baseline.md): target runtime shape and recommended operating profile
-- [Funding readiness checklist](docs/funding_readiness_checklist.md): pass/fail checklist for whether the system is ready for more capital
+- [Runtime cycle](docs/runtime_cycle.md): startup and live decision-loop behavior
+- [LLM operating model](docs/llm_operating_model.md): what Phi-3, Gemma, and deterministic code each own
+- [Entry/exit research](docs/entry_exit_research.md): where trade behavior actually lives
+- [Symbol classification](docs/symbol_classification.md): what each tracked symbol is and how it is treated
+- [Exchange fee and policy references](docs/exchange_fee_policy_refs.md): fee-policy guardrails for live assumptions
+- [Funding readiness checklist](docs/funding_readiness_checklist.md): whether the stack is ready for more capital
+
+## UI Screenshots
+
+Operator UI examples from the current stack:
+
+![Operator control room](docs/screenshots/operator-control-room.png)
+
+![Operator overview](docs/screenshots/operator-overview.png)
+
+![Known entry ledger](docs/screenshots/operator-ledger.png)
+
+![Portfolio view](docs/screenshots/operator-portfolio.png)
 
 ## Adjust To Your Own Settings
 
