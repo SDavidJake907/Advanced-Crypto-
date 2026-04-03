@@ -30,10 +30,13 @@ def _role_decision(role: str, contract: dict[str, Any], source: dict[str, Any]) 
         return "defer"
     if role == "market_reviewer":
         market_state = str(source.get("market_state", "transition") or "transition").lower()
+        lane_bias = str(source.get("lane_bias", "favor_selective") or "favor_selective").lower()
         if market_state == "trending":
             return "approve"
         if market_state == "ranging":
-            return "reject"
+            if lane_bias == "reduce_trend_entries":
+                return "reject"
+            return "defer"
         return "defer"
     return "defer"
 
