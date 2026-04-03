@@ -222,8 +222,6 @@ The normal app stack started by [`scripts/start_all.ps1`](scripts/start_all.ps1)
 - `universe_manager`
 - `review_scheduler`
 - `trader`
-- optional `visual_phil`
-- optional `visual_feed`
 - optional `operator_ui`
 
 Persistent AI services are started separately with [`scripts/start_models.ps1`](scripts/start_models.ps1):

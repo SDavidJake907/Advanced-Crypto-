@@ -417,22 +417,12 @@ def status() -> dict[str, Any]:
     decision_debug = _read_jsonl_tail(ROOT / "logs" / "decision_debug.jsonl", 12)
     alerts = _read_jsonl_tail(ROOT / "logs" / "alerts.jsonl", 20)
     nemo_recommendations = _read_jsonl_tail(ROOT / "logs" / "nemo_recommendations.jsonl", 20)
-    visual_feed = _read_jsonl_tail(ROOT / "logs" / "visual_phi3_feed.jsonl", 5)
     universe = _load_universe()
     universe_summary = _summarize_universe_meta(universe)
     collector_depth = _summarize_collector_depth(collector)
     runtime_profile = _summarize_runtime_profile()
 
     latest_decision = decision_debug[-1] if decision_debug else {}
-    latest_visual = next(
-        (
-            item
-            for item in reversed(visual_feed)
-            if item.get("event") == "visual_review" and item.get("review_ok")
-        ),
-        {},
-    )
-
     portfolio_state = (
         account_sync.get("portfolio_state", {})
         if isinstance(account_sync.get("portfolio_state", {}), dict)
@@ -470,7 +460,6 @@ def status() -> dict[str, Any]:
         "decision_summary": _summarize_decisions(decision_debug),
         "lane_metrics": _summarize_lane_metrics(decision_debug),
         "recent_decisions": decision_debug[-5:],
-        "latest_visual_review": latest_visual,
         "optimizer_reviews": optimizer_reviews,
         "nemo_recommendations": nemo_recommendations[-10:],
         "nemo_recommendation_summary": _summarize_nemo_recommendations(nemo_recommendations),

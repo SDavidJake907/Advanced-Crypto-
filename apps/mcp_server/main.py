@@ -142,14 +142,6 @@ def _collector_status() -> dict[str, Any]:
     return {"status": "ok", "path": str(path.relative_to(ROOT)), "telemetry": payload}
 
 
-def _visual_feed_status(limit: int = 20) -> dict[str, Any]:
-    path = ROOT / "logs" / "visual_phi3_feed.jsonl"
-    if not path.exists():
-        return {"status": "missing", "path": str(path.relative_to(ROOT))}
-    items = _read_jsonl_tail(path, limit)
-    return {"status": "ok", "path": str(path.relative_to(ROOT)), "items": items}
-
-
 @mcp.tool()
 def healthcheck() -> dict[str, Any]:
     llm = _mcp_llm_config()
@@ -349,7 +341,6 @@ def get_trading_status(limit: int = 20) -> dict[str, Any]:
         "lane_supervision_summary": _lane_supervision_summary(),
         "outcome_review_summary": _outcome_review_summary(10),
         "collector_status": _collector_status(),
-        "visual_feed_status": _visual_feed_status(10),
         "lane_counts": lane_counts,
         "recent_nemotron_reasons": nemotron_reasons,
         "recent_actions": recent_actions,
@@ -412,12 +403,6 @@ def get_setup_reliability_summary(
 @mcp.tool()
 def get_collector_status() -> dict[str, Any]:
     return _collector_status()
-
-
-@mcp.tool()
-def get_visual_feed_status(limit: int = 20) -> dict[str, Any]:
-    limit = max(1, min(limit, 100))
-    return _visual_feed_status(limit)
 
 
 @mcp.tool()

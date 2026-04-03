@@ -170,8 +170,6 @@ if (-not (Test-Path $python)) {
 }
 
 $replayEnabled = (Get-EnvValue "START_REPLAY_ON_START" "false").ToLower() -eq "true"
-$visualPhilEnabled = (Get-EnvValue "START_VISUAL_PHIL_ON_START" "false").ToLower() -eq "true"
-$visualPhilFeedEnabled = (Get-EnvValue "START_VISUAL_PHIL_FEED_ON_START" "true").ToLower() -eq "true"
 $operatorUiEnabled = (Get-EnvValue "START_OPERATOR_UI_ON_START" "false").ToLower() -eq "true"
 $mcpServerEnabled = (Get-EnvValue "START_MCP_SERVER_ON_START" "true").ToLower() -eq "true"
 $mcpPublicEnabled = (Get-EnvValue "MCP_PUBLIC_ENABLED" "false").ToLower() -eq "true"
@@ -181,16 +179,6 @@ $replayWarmupBars = Get-EnvValue "REPLAY_WARMUP_BARS" "60"
 $replayMaxSteps = Get-EnvValue "REPLAY_MAX_STEPS" "300"
 $replaySummaryPath = Get-EnvValue "REPLAY_SUMMARY_PATH" "logs/replay_summary.json"
 $replayTracePath = Get-EnvValue "REPLAY_TRACE_PATH" "logs/replay_traces.jsonl"
-$visualPhilPort = Get-EnvValue "VISUAL_PHI3_PORT" "8085"
-$visualPhilDevice = Get-EnvValue "VISUAL_PHI3_DEVICE" "NPU"
-$visualPhilModelDir = Get-EnvValue "VISUAL_PHI3_MODEL_DIR" ""
-$visualPhilReviewUrl = Get-EnvValue "VISUAL_PHI3_REVIEW_URL" "http://127.0.0.1:8085/review_image"
-$visualPhilIntervalSec = Get-EnvValue "VISUAL_PHI3_INTERVAL_SEC" "30"
-$visualOllamaModel = Get-EnvValue "VISUAL_OLLAMA_MODEL" ""
-$visualOllamaUrl = Get-EnvValue "VISUAL_OLLAMA_URL" "http://127.0.0.1:11434"
-$visualPhilWindowTitle = Get-EnvValue "VISUAL_PHI3_WINDOW_TITLE" "Kraken Desktop"
-$visualPhilProcessName = Get-EnvValue "VISUAL_PHI3_PROCESS_NAME" "KrakenDesktop.exe"
-$visualPhilProcessPid = Get-EnvValue "VISUAL_PHI3_PROCESS_PID" "0"
 $operatorUiHost = Get-EnvValue "OPERATOR_UI_HOST" "127.0.0.1"
 $operatorUiPort = Get-EnvValue "OPERATOR_UI_PORT" "8780"
 $mcpHost = Get-EnvValue "MCP_HOST" "0.0.0.0"
@@ -409,54 +397,6 @@ if ($replayEnabled) {
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle='KrakenSK - replay'; cd `"$root`"; $replayCommand"
 }
 
-# 5) Optional visual Phil server
-if ($visualPhilEnabled -and $advisoryModelProvider -ne "phi3") {
-    Write-Host "Skipping visual Phi-3 server because advisory backend is $advisoryModelProvider."
-} elseif ($visualPhilEnabled) {
-    if (-not (Test-Path $phiPython)) {
-        Write-Error "Phi-3 Python executable not found at $phiPython"
-        exit 1
-    }
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle='KrakenSK - visual_phil'; cd `"$root`"; `$env:VISUAL_PHI3_PORT='$visualPhilPort'; `$env:VISUAL_PHI3_DEVICE='$visualPhilDevice'; `$env:VISUAL_PHI3_MODEL_DIR='$visualPhilModelDir'; & `"$phiPython`" -m apps.visual_phi3.main"
-    [void](Wait-HttpReady -Url "http://127.0.0.1:${visualPhilPort}/health" -TimeoutSec 90)
-}
-
-if ($visualPhilFeedEnabled -and $advisoryModelProvider -ne "phi3") {
-    Write-Host "Skipping visual Phi-3 feed because advisory backend is $advisoryModelProvider."
-} elseif ($visualPhilFeedEnabled) {
-    if ($watchdogEnabled) {
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
-            `$host.UI.RawUI.WindowTitle='KrakenSK - visual_feed';
-            cd '$root';
-            while (`$true) {
-                Write-Host '[watchdog] Starting visual_feed...';
-                `$env:VISUAL_PHI3_REVIEW_URL='$visualPhilReviewUrl';
-                `$env:VISUAL_PHI3_INTERVAL_SEC='$visualPhilIntervalSec';
-                `$env:VISUAL_PHI3_WINDOW_TITLE='$visualPhilWindowTitle';
-                `$env:VISUAL_PHI3_PROCESS_NAME='$visualPhilProcessName';
-                `$env:VISUAL_PHI3_PROCESS_PID='$visualPhilProcessPid';
-                `$env:VISUAL_OLLAMA_MODEL='$visualOllamaModel';
-                `$env:VISUAL_OLLAMA_URL='$visualOllamaUrl';
-                & '$python' -m apps.visual_feed.main;
-                Write-Host '[watchdog] visual_feed exited. Restarting in 10s...';
-                Start-Sleep -Seconds 10
-            }"
-    } else {
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
-            `$host.UI.RawUI.WindowTitle='KrakenSK - visual_feed';
-            cd '$root';
-            `$env:VISUAL_PHI3_REVIEW_URL='$visualPhilReviewUrl';
-            `$env:VISUAL_PHI3_INTERVAL_SEC='$visualPhilIntervalSec';
-            `$env:VISUAL_PHI3_WINDOW_TITLE='$visualPhilWindowTitle';
-            `$env:VISUAL_PHI3_PROCESS_NAME='$visualPhilProcessName';
-            `$env:VISUAL_PHI3_PROCESS_PID='$visualPhilProcessPid';
-            `$env:VISUAL_OLLAMA_MODEL='$visualOllamaModel';
-            `$env:VISUAL_OLLAMA_URL='$visualOllamaUrl';
-            & '$python' -m apps.visual_feed.main;
-        "
-    }
-}
-
 if ($operatorUiEnabled) {
     if ($watchdogEnabled) {
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "
@@ -592,12 +532,6 @@ Write-Host " - advisory_min_entry_score ($advisoryMinEntryScore)"
 Write-Host " - advisory_min_volume_ratio ($advisoryMinVolumeRatio)"
 if ($replayEnabled) {
     Write-Host " - replay"
-}
-if ($visualPhilEnabled) {
-    Write-Host " - visual_phil (:${visualPhilPort})"
-}
-if ($visualPhilFeedEnabled) {
-    Write-Host " - visual_feed"
 }
 if ($operatorUiEnabled) {
     Write-Host " - operator_ui (http://${operatorUiHost}:${operatorUiPort})"

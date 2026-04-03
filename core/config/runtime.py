@@ -176,7 +176,6 @@ _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "MEME_NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 0.95},
     "LEADER_URGENCY_OVERRIDE_THRESHOLD": {"type": float, "default": 0.35},
     "NEMOTRON_VERDICT_CACHE_TTL_SEC": {"type": float, "default": 90.0},
-    "ADVISORY_ENABLE_VISUAL_CONTEXT": {"type": bool, "default": False},
     "ADVISORY_MIN_ENTRY_SCORE": {"type": float, "default": 45.0},
     "MARKET_TREND_BEAR_SCORE_PENALTY": {"type": float, "default": 8.0},
     "MARKET_TREND_BULL_SCORE_BOOST": {"type": float, "default": 4.0},

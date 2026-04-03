@@ -112,7 +112,6 @@ class AlertingTests(unittest.TestCase):
         (logs_dir / "open_orders.json").write_text(json.dumps({}), encoding="utf-8")
         (logs_dir / "nvidia_optimizer_reviews.jsonl").write_text("", encoding="utf-8")
         (logs_dir / "decision_debug.jsonl").write_text("", encoding="utf-8")
-        (logs_dir / "visual_phi3_feed.jsonl").write_text("", encoding="utf-8")
         (logs_dir / "alerts.jsonl").write_text(
             json.dumps(
                 {

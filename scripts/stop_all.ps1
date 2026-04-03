@@ -6,8 +6,6 @@ $targets = @(
     "KrakenSK - phi3_npu",
     "KrakenSK - review_scheduler",
     "KrakenSK - replay",
-    "KrakenSK - visual_phil",
-    "KrakenSK - visual_feed",
     "KrakenSK - operator_ui",
     "KrakenSK - ollama"
 )
