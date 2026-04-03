@@ -600,6 +600,9 @@ Common runtime controls in `.env`:
 - `LOCAL_LLM_BACKEND=ollama|lmstudio`
 - `LOCAL_STRATEGIST_MODEL=` one-key local strategist switch for Ollama / LM Studio profiles
 - `LOCAL_LLM_LOAD_KEY=` local model key to auto-load at startup for LM Studio / Ollama-style local hosts
+- `NEMOTRON_TEMPERATURE=0.1`
+- `NEMOTRON_LOCAL_TEMPERATURE=0.0`
+- `NEMOTRON_CLOUD_TEMPERATURE=0.1`
 - `ADVISORY_LOCAL_BASE_URL=http://127.0.0.1:1234`
 - `ADVISORY_LOCAL_MODEL=gemma4-e4b-it`
 - `NEMOTRON_BASE_URL=http://127.0.0.1:1234`

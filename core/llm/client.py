@@ -18,6 +18,28 @@ NEMOTRON_DEBUG_VERBOSE = os.getenv("NEMOTRON_DEBUG_VERBOSE", "false").lower() ==
 _LOCAL_NEMOTRON_LOCK = Path("logs/nemotron_local.lock")
 
 
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return float(default)
+    try:
+        return float(raw)
+    except ValueError:
+        return float(default)
+
+
+def _nemotron_temperature() -> float:
+    return _env_float("NEMOTRON_TEMPERATURE", 0.1)
+
+
+def _local_nemotron_temperature() -> float:
+    return _env_float("NEMOTRON_LOCAL_TEMPERATURE", 0.0)
+
+
+def _cloud_nemotron_temperature() -> float:
+    return _env_float("NEMOTRON_CLOUD_TEMPERATURE", _nemotron_temperature())
+
+
 def _append_nemotron_debug(event: dict[str, Any]) -> None:
     NEMOTRON_DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
     rotate_jsonl_if_needed(NEMOTRON_DEBUG_LOG)
@@ -566,7 +588,7 @@ def nvidia_nemotron_chat(
         model=model or _nemotron_cloud_model(),
         system=system,
         user_payload=user_payload,
-        temperature=0.1,
+        temperature=_cloud_nemotron_temperature(),
         max_tokens=max_tokens,
         headers=_nemotron_cloud_headers(),
         timeout_s=60.0,
@@ -815,7 +837,7 @@ def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int 
                             model=model,
                             system=system,
                             user_payload=user_payload,
-                            temperature=0.0,
+                            temperature=_local_nemotron_temperature(),
                             max_tokens=token_budget,
                             headers=headers,
                             timeout_s=timeout_s,
@@ -837,7 +859,7 @@ def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int 
                             model=model,
                             system=system,
                             user_payload=user_payload,
-                            temperature=0.0,
+                            temperature=_local_nemotron_temperature(),
                             max_tokens=token_budget,
                             headers=headers,
                             timeout_s=timeout_s,
@@ -860,7 +882,7 @@ def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int 
                                 model=model,
                                 system=system,
                                 user_payload=user_payload,
-                                temperature=0.0,
+                                temperature=_local_nemotron_temperature(),
                                 max_tokens=token_budget,
                                 headers=headers,
                                 timeout_s=timeout_s,
@@ -874,7 +896,7 @@ def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int 
                                 model=model,
                                 system=system,
                                 user_payload=user_payload,
-                                temperature=0.0,
+                                temperature=_local_nemotron_temperature(),
                                 max_tokens=token_budget,
                                 headers=headers,
                                 timeout_s=timeout_s,
@@ -896,7 +918,7 @@ def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int 
                         model=model,
                         system=system,
                         user_payload=user_payload,
-                        temperature=0.1,
+                        temperature=_cloud_nemotron_temperature(),
                         max_tokens=token_budget,
                         headers=headers,
                         timeout_s=timeout_s,
