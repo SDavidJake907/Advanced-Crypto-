@@ -46,6 +46,10 @@ class MoverAdvisoryTests(unittest.TestCase):
         self.assertEqual(review.late_move_risk, "moderate")
         self.assertEqual(review.pattern_explanation["structure_pattern"], "breakout_attempt")
         self.assertEqual(review.pattern_explanation["structure_validity"], "developing")
+        self.assertEqual(review.pattern_explanation["structure_phase"], "attempting_breakout")
+        self.assertEqual(review.pattern_explanation["moving_average_context"]["ema_stack_state"], "mixed_stack")
+        self.assertEqual(review.pattern_explanation["momentum_context"]["momentum_state"], "positive")
+        self.assertEqual(review.pattern_explanation["context"]["breakout_level_state"], "pressing")
         self.assertEqual(review.candle_evidence["primary_candle"], "none")
 
     def test_market_state_trending_has_strict_chart_handoff_fields(self) -> None:
@@ -74,6 +78,10 @@ class MoverAdvisoryTests(unittest.TestCase):
         self.assertEqual(review.late_move_risk, "contained")
         self.assertEqual(review.pattern_explanation["structure_pattern"], "range_breakout")
         self.assertEqual(review.pattern_explanation["structure_validity"], "valid")
+        self.assertEqual(review.pattern_explanation["structure_phase"], "confirmed_breakout")
+        self.assertEqual(review.pattern_explanation["moving_average_context"]["ema_stack_state"], "bullish_stack")
+        self.assertEqual(review.pattern_explanation["momentum_context"]["macd_state"], "bullish_expansion")
+        self.assertEqual(review.pattern_explanation["context"]["breakout_level_state"], "cleared")
         self.assertEqual(review.pattern_explanation["recommended_nemo_interpretation"]["prefer_action"], "OPEN")
         self.assertEqual(review.candle_evidence["primary_candle"], "bullish_engulfing")
         self.assertEqual(review.candle_evidence["candle_bias"], "bullish")

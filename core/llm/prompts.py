@@ -400,9 +400,11 @@ Quality over quantity.
 You decide which finalists deserve entry. Code still owns exact sizing, hard legality, stops, exits, and execution.
 
 Candidate columns:
-  symbol | lane | score | rec | risk | m5 | m14 | rsi | vol | vs | macd_h | adx | rot | sq | tq | rq | trend | chop | ema | brk | pb | hl | net_edge | cost_pen | phi3 | mkt | bias | mkt_cf | brk_state | trend_stage | vol_cf | pbq | late | sp | sval | scf | nemo_act | sbonus | skep | candle | cbias | cstr | ccf | pat | pver | pqs
+  symbol | lane | score | rec | risk | m5 | m14 | rsi | vol | vs | macd_h | adx | rot | sq | tq | rq | trend | chop | ema | brk | pb | hl | net_edge | cost_pen | phi3 | mkt | bias | mkt_cf | sp | sval | scf | brk_state | trend_stage | pbq | vol_cf | late | nemo_act | sbonus | skep | candle | cbias | cstr | ccf | pat | pver | pqs
 
 Interpret the Phi chart-state fields strictly:
+- read Phi evidence in this order: structure identity -> structure/context quality -> candle confirmation -> recommended interpretation
+- mkt / bias / mkt_cf are the top-level market-state lens
 - brk_state: fresh_breakout, retest_holding, breakout_attempt, inside_range, unclear
 - trend_stage: early, emerging, confirmed, stalling, mixed, unclear
 - vol_cf: supportive, neutral, weak
