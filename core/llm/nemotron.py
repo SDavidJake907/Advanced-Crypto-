@@ -265,6 +265,7 @@ class NemotronStrategist:
     def _phi_chart_support_level(self, *, features: dict[str, Any], market_state_review: dict[str, Any]) -> str:
         market_state = str(market_state_review.get("market_state", "transition") or "transition")
         lane_bias = str(market_state_review.get("lane_bias", "favor_selective") or "favor_selective")
+        market_reason = str(market_state_review.get("reason", "") or "")
         trend_stage = str(market_state_review.get("trend_stage", "unclear") or "unclear")
         breakout_state = str(market_state_review.get("breakout_state", "unclear") or "unclear")
         volume_confirmation = str(market_state_review.get("volume_confirmation", "neutral") or "neutral")
@@ -283,6 +284,17 @@ class NemotronStrategist:
             and trend_confirmed
             and recommendation in {"BUY", "STRONG_BUY"}
             and score >= 65.0
+        ):
+            return "strong"
+        if (
+            market_state == "ranging"
+            and lane_bias == "favor_selective"
+            and market_reason == "range_breakout_attempt_with_ema_support"
+            and breakout_state in {"fresh_breakout", "retest_holding", "breakout_attempt", "unclear"}
+            and volume_confirmation in {"supportive", "neutral"}
+            and late_move_risk != "extended"
+            and recommendation in {"BUY", "STRONG_BUY"}
+            and score >= 68.0
         ):
             return "strong"
         if (

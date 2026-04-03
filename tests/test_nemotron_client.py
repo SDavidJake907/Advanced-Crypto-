@@ -580,6 +580,40 @@ class NemotronBatchParsingTests(unittest.TestCase):
         candidate["features"] = features
         return candidate
 
+    def _selective_range_breakout_candidate(self, symbol: str = "NEAR/USD") -> dict[str, object]:
+        candidate = self._candidate(symbol)
+        features = dict(candidate["features"])
+        features.update(
+            {
+                "entry_score": 70.3,
+                "entry_recommendation": "STRONG_BUY",
+                "reversal_risk": "LOW",
+                "volume_ratio": 1.2,
+                "trade_quality": 99.6,
+                "structure_quality": 63.1,
+                "continuation_quality": 62.2,
+                "short_tf_ready_15m": True,
+                "tp_after_cost_valid": True,
+                "net_edge_pct": 0.12,
+                "trend_1h": 1,
+                "trend_confirmed": False,
+                "indicators_ready": True,
+            }
+        )
+        candidate["features"] = features
+        candidate["market_state_review"] = {
+            "market_state": "ranging",
+            "confidence": 0.62,
+            "lane_bias": "favor_selective",
+            "reason": "range_breakout_attempt_with_ema_support",
+            "breakout_state": "breakout_attempt",
+            "trend_stage": "emerging",
+            "volume_confirmation": "neutral",
+            "pullback_quality": "higher_low_support",
+            "late_move_risk": "moderate",
+        }
+        return candidate
+
     def test_batch_decide_parses_tool_result_wrapped_decisions(self) -> None:
         strategist = self._make_strategist()
         portfolio_state = PortfolioState(cash=100.0)
@@ -762,6 +796,47 @@ class NemotronBatchParsingTests(unittest.TestCase):
 
         self.assertEqual(results["BTC/USD"].execution["nemotron"]["reason"], "continuation")
         self.assertEqual(results["BTC/USD"].execution["nemotron"]["debug"]["phi_chart_support"], "strong")
+        self.assertEqual(executions[0]["signal"], "LONG")
+
+    def test_batch_decide_overrides_hold_unspecified_for_strong_selective_range_breakout(self) -> None:
+        strategist = self._make_strategist()
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+        executions: list[dict[str, object]] = []
+
+        raw = (
+            '{"reasoning":"selective range breakout candidate","decisions":'
+            '[{"symbol":"NEAR/USD","action":"HOLD","reason":"hold_unspecified"}]}'
+        )
+
+        def fake_execution_place_order(executor, signal, symbol, features, portfolio_state, size_factor):  # type: ignore[no-untyped-def]
+            executions.append(
+                {
+                    "signal": signal,
+                    "symbol": symbol,
+                    "size_factor": size_factor,
+                }
+            )
+            return {"status": "filled"}
+
+        with patch("core.llm.nemotron.nemotron_chat", return_value=raw):
+            with patch("core.llm.nemotron.nemotron_provider_name", return_value="nvidia"):
+                with patch("core.llm.nemotron.strategy_decision", return_value="LONG"):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=[]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            with patch("core.llm.nemotron.execution_place_order", side_effect=fake_execution_place_order):
+                                results = strategist.batch_decide(
+                                    candidates=[self._selective_range_breakout_candidate()],
+                                    portfolio_state=portfolio_state,
+                                    positions_state=positions_state,
+                                    symbols=["NEAR/USD"],
+                                )
+
+        self.assertEqual(results["NEAR/USD"].execution["nemotron"]["reason"], "continuation")
+        self.assertEqual(results["NEAR/USD"].execution["nemotron"]["debug"]["phi_chart_support"], "strong")
         self.assertEqual(executions[0]["signal"], "LONG")
 
     def test_single_parse_failure_uses_deterministic_open_for_strong_buy_candidate(self) -> None:
