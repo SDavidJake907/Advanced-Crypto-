@@ -262,6 +262,40 @@ class NemotronStrategist:
             "size_factor_hint": 1.0,
         }
 
+    def _phi_chart_support_level(self, *, features: dict[str, Any], market_state_review: dict[str, Any]) -> str:
+        market_state = str(market_state_review.get("market_state", "transition") or "transition")
+        lane_bias = str(market_state_review.get("lane_bias", "favor_selective") or "favor_selective")
+        trend_stage = str(market_state_review.get("trend_stage", "unclear") or "unclear")
+        breakout_state = str(market_state_review.get("breakout_state", "unclear") or "unclear")
+        volume_confirmation = str(market_state_review.get("volume_confirmation", "neutral") or "neutral")
+        late_move_risk = str(market_state_review.get("late_move_risk", "moderate") or "moderate")
+        pullback_quality = str(market_state_review.get("pullback_quality", "unclear") or "unclear")
+        score = float(features.get("entry_score", 0.0) or 0.0)
+        trend_confirmed = bool(features.get("trend_confirmed", False))
+        recommendation = str(features.get("entry_recommendation", "WATCH") or "WATCH").upper()
+        if (
+            market_state == "trending"
+            and lane_bias == "favor_trend"
+            and trend_stage in {"early", "emerging", "confirmed"}
+            and breakout_state in {"fresh_breakout", "retest_holding"}
+            and volume_confirmation == "supportive"
+            and late_move_risk != "extended"
+            and trend_confirmed
+            and recommendation in {"BUY", "STRONG_BUY"}
+            and score >= 65.0
+        ):
+            return "strong"
+        if (
+            market_state in {"trending", "transition"}
+            and trend_stage in {"early", "emerging", "confirmed"}
+            and breakout_state in {"fresh_breakout", "retest_holding", "breakout_attempt"}
+            and volume_confirmation in {"supportive", "neutral"}
+            and late_move_risk != "extended"
+            and (pullback_quality in {"clean_retest", "higher_low_support"} or recommendation in {"BUY", "STRONG_BUY"})
+        ):
+            return "medium"
+        return "weak"
+
     def _decision_fingerprint(
         self,
         *,
@@ -867,6 +901,23 @@ class NemotronStrategist:
                 side = "SHORT"
             reason = str(d.get("reason", "batch_hold"))
             size_raw = d.get("size", 0)
+            phi_chart_support = self._phi_chart_support_level(
+                features=features,
+                market_state_review=market_state_review,
+            )
+
+            if (
+                action == "HOLD"
+                and reason in {"m5_zero", "hold_unspecified"}
+                and phi_chart_support == "strong"
+                and str(reflex.get("reflex", "allow")) == "allow"
+                and str(features.get("entry_recommendation", "WATCH") or "WATCH").upper() in {"BUY", "STRONG_BUY"}
+                and str(features.get("reversal_risk", "MEDIUM") or "MEDIUM").upper() != "HIGH"
+            ):
+                action = "OPEN"
+                side = "LONG"
+                reason = "continuation"
+                size_raw = round(max_trade * 0.6, 2)
 
             # Enforce slot limit across batch
             if action == "OPEN" and slots_used >= open_slots:
@@ -889,7 +940,12 @@ class NemotronStrategist:
             integrated_reflex = {
                 "action": action,
                 "reason": reason,
-                "debug": {"batch": True, "batch_reasoning": reasoning[:120]},
+                "debug": {
+                    "batch": True,
+                    "batch_reasoning": reasoning[:120],
+                    "phi_chart_support": phi_chart_support,
+                    "primary_blocker": reason if action == "HOLD" else "",
+                },
                 "override_signal": side if action == "OPEN" and side in {"LONG", "SHORT"} else "FLAT",
                 "size_factor_hint": 1.0,
                 "reflex": reflex.get("reflex", "allow"),

@@ -541,6 +541,11 @@ class NemotronBatchParsingTests(unittest.TestCase):
                 "confidence": 0.72,
                 "lane_bias": "favor_trend",
                 "reason": "trend_confirmation_present",
+                "breakout_state": "fresh_breakout",
+                "trend_stage": "confirmed",
+                "volume_confirmation": "supportive",
+                "pullback_quality": "higher_low_support",
+                "late_move_risk": "contained",
             },
             "lane_supervision": {
                 "universe_lane": "L2",
@@ -717,6 +722,47 @@ class NemotronBatchParsingTests(unittest.TestCase):
             strategy_calls[0]["lane_supervision"]["lane_candidate"],
             "breakout",
         )
+
+    def test_batch_decide_overrides_m5_zero_when_phi_chart_support_is_strong(self) -> None:
+        strategist = self._make_strategist()
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+        executions: list[dict[str, object]] = []
+
+        raw = (
+            '{"reasoning":"near trend intact","decisions":'
+            '[{"symbol":"BTC/USD","action":"HOLD","reason":"m5_zero"}]}'
+        )
+
+        def fake_execution_place_order(executor, signal, symbol, features, portfolio_state, size_factor):  # type: ignore[no-untyped-def]
+            executions.append(
+                {
+                    "signal": signal,
+                    "symbol": symbol,
+                    "size_factor": size_factor,
+                }
+            )
+            return {"status": "filled"}
+
+        with patch("core.llm.nemotron.nemotron_chat", return_value=raw):
+            with patch("core.llm.nemotron.nemotron_provider_name", return_value="nvidia"):
+                with patch("core.llm.nemotron.strategy_decision", return_value="LONG"):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=[]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            with patch("core.llm.nemotron.execution_place_order", side_effect=fake_execution_place_order):
+                                results = strategist.batch_decide(
+                                    candidates=[self._strong_buy_candidate()],
+                                    portfolio_state=portfolio_state,
+                                    positions_state=positions_state,
+                                    symbols=["BTC/USD"],
+                                )
+
+        self.assertEqual(results["BTC/USD"].execution["nemotron"]["reason"], "continuation")
+        self.assertEqual(results["BTC/USD"].execution["nemotron"]["debug"]["phi_chart_support"], "strong")
+        self.assertEqual(executions[0]["signal"], "LONG")
 
     def test_single_parse_failure_uses_deterministic_open_for_strong_buy_candidate(self) -> None:
         strategist = self._make_strategist()
