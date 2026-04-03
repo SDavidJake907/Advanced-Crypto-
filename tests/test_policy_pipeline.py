@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from core.policy.nemotron_gate import _passes_market_state_entry_gate, passes_deterministic_candidate_gate
 from core.policy.candidate_score import score_candidate
@@ -322,6 +323,34 @@ class PolicyPipelineTests(unittest.TestCase):
         )
         self.assertFalse(passed)
         self.assertEqual(reason, "market_state_transition_weak_block")
+
+    def test_deterministic_gate_no_longer_blocks_only_on_non_positive_net_edge(self) -> None:
+        with patch(
+            "core.config.runtime.load_runtime_overrides",
+            return_value={"STABILIZATION_STRICT_ENTRY_ENABLED": False},
+        ):
+            passed, reason = passes_deterministic_candidate_gate(
+                symbol="TEST/USD",
+                positions_state=PositionState(),
+                universe_context={},
+                features={
+                    "symbol": "TEST/USD",
+                    "lane": "L3",
+                    "indicators_ready": True,
+                    "entry_score": 70.0,
+                    "volume_ratio": 1.2,
+                    "net_edge_pct": 0.0,
+                    "trend_1h": 1,
+                    "trend_confirmed": True,
+                    "momentum_5": 0.01,
+                    "momentum_14": 0.01,
+                    "ranging_market": False,
+                    "promotion_tier": "promote",
+                    "promotion_reason": "strong_buy_low_risk",
+                },
+            )
+        self.assertTrue(passed)
+        self.assertEqual(reason, "passed")
 
 
 if __name__ == "__main__":

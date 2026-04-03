@@ -330,10 +330,6 @@ def passes_deterministic_candidate_gate(
         return False, f"entry_score_below_gate({_entry_score:.1f}<{_min_score:.1f})"
     if _volume_ratio < _min_vol:
         return False, f"volume_ratio_below_gate({_volume_ratio:.2f}<{_min_vol:.2f})"
-    _net_edge_pct = _effective_net_edge_pct(features)
-    if _net_edge_pct <= 0.0:
-        return False, f"net_edge_non_positive({_net_edge_pct:.2f})"
-
     market_state_ok, market_state_reason = _passes_market_state_entry_gate(features)
     if not market_state_ok:
         return False, market_state_reason
