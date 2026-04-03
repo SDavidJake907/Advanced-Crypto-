@@ -688,6 +688,11 @@ class NemotronStrategist:
             market_state = str(market_state_review.get("market_state", "transition") or "transition")
             lane_bias = str(market_state_review.get("lane_bias", "favor_selective") or "favor_selective")
             market_confidence = float(market_state_review.get("confidence", 0.0) or 0.0)
+            breakout_state = str(market_state_review.get("breakout_state", "unclear") or "unclear")
+            trend_stage = str(market_state_review.get("trend_stage", "unclear") or "unclear")
+            volume_confirmation = str(market_state_review.get("volume_confirmation", "neutral") or "neutral")
+            pullback_quality = str(market_state_review.get("pullback_quality", "unclear") or "unclear")
+            late_move_risk = str(market_state_review.get("late_move_risk", "moderate") or "moderate")
             lane_candidate = str(lane_supervision.get("lane_candidate", "") or "")
             lane_conflict = bool(lane_supervision.get("lane_conflict", False))
             universe_lane = str(lane_supervision.get("universe_lane", "") or "")
@@ -700,6 +705,8 @@ class NemotronStrategist:
                 f"|ema:{'Y' if ema9 else 'N'}|brk:{'Y' if brk else 'N'}|pb:{'Y' if pb else 'N'}|hl:{hl}"
                 f"|net_edge:{net_edge:>+5.2f}%|cost_pen:{cost_penalty:>+4.0f}pts"
                 f"|phi3:{phi3}|mkt:{market_state}|bias:{lane_bias}|mkt_cf:{market_confidence:>3.2f}"
+                f"|brk_state:{breakout_state}|trend_stage:{trend_stage}|vol_cf:{volume_confirmation}"
+                f"|pbq:{pullback_quality}|late:{late_move_risk}"
                 f"|lane_sup:{lane_candidate or '-'}|lane_conflict:{'Y' if lane_conflict else 'N'}|univ_lane:{universe_lane or '-'}"
                 f"|pat:{pattern_name}|pver:{pattern_validity}|pqs:{pattern_quality:>3.2f}|ext:{extension_risk:>3.2f}"
             )

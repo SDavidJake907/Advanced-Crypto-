@@ -89,6 +89,11 @@ class Phi3MarketStateReview:
     confidence: float
     lane_bias: str
     reason: str
+    breakout_state: str = "unclear"
+    trend_stage: str = "unclear"
+    volume_confirmation: str = "neutral"
+    pullback_quality: str = "unclear"
+    late_move_risk: str = "moderate"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -96,6 +101,11 @@ class Phi3MarketStateReview:
             "confidence": self.confidence,
             "lane_bias": self.lane_bias,
             "reason": self.reason,
+            "breakout_state": self.breakout_state,
+            "trend_stage": self.trend_stage,
+            "volume_confirmation": self.volume_confirmation,
+            "pullback_quality": self.pullback_quality,
+            "late_move_risk": self.late_move_risk,
         }
 
 
@@ -244,6 +254,7 @@ def _heuristic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateR
     ranging_market = bool(features.get("ranging_market", False))
     trend_confirmed = bool(features.get("trend_confirmed", False))
     momentum_5 = float(features.get("momentum_5", 0.0) or 0.0)
+    momentum_14 = float(features.get("momentum_14", 0.0) or 0.0)
     rotation_score = float(features.get("rotation_score", 0.0) or 0.0)
     entry_score = float(features.get("entry_score", 0.0) or 0.0)
     volume_surge = float(features.get("volume_surge", 0.0) or 0.0)
@@ -251,8 +262,50 @@ def _heuristic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateR
     macd_hist = float(features.get("macd_hist", 0.0) or 0.0)
     ema9_above_ema20 = bool(features.get("ema9_above_ema20", False))
     ema9_above_ema26 = bool(features.get("ema9_above_ema26", False))
+    range_breakout = bool(features.get("range_breakout_1h", False))
+    pullback_hold = bool(features.get("pullback_hold", False))
+    higher_low_count = int(features.get("higher_low_count", 0) or 0)
     symbol_trending = bool(features.get("sentiment_symbol_trending", False))
     ema_stack_bullish = ema9_above_ema20 and ema9_above_ema26
+    if range_breakout and volume_ratio >= 1.2 and momentum_5 > 0.0:
+        breakout_state = "fresh_breakout"
+    elif pullback_hold and ema_stack_bullish:
+        breakout_state = "retest_holding"
+    elif range_breakout or momentum_5 > 0.0:
+        breakout_state = "breakout_attempt"
+    else:
+        breakout_state = "inside_range"
+    if trend_confirmed and ema_stack_bullish and macd_hist >= 0.0:
+        if higher_low_count >= 3 and momentum_14 > 0.0:
+            trend_stage = "confirmed"
+        else:
+            trend_stage = "emerging"
+    elif ema_stack_bullish and momentum_5 > 0.0:
+        trend_stage = "early"
+    elif macd_hist < 0.0 and momentum_5 < 0.0:
+        trend_stage = "stalling"
+    else:
+        trend_stage = "mixed"
+    if volume_ratio >= 1.25 or volume_surge >= 0.35:
+        volume_confirmation = "supportive"
+    elif volume_ratio <= 0.7:
+        volume_confirmation = "weak"
+    else:
+        volume_confirmation = "neutral"
+    if pullback_hold and ema_stack_bullish:
+        pullback_quality = "clean_retest"
+    elif pullback_hold:
+        pullback_quality = "loose_retest"
+    elif higher_low_count >= 2 and ema_stack_bullish:
+        pullback_quality = "higher_low_support"
+    else:
+        pullback_quality = "none"
+    if entry_score >= 80.0 and momentum_5 > 0.015 and volume_surge >= 0.35:
+        late_move_risk = "extended"
+    elif trend_confirmed and higher_low_count >= 2:
+        late_move_risk = "contained"
+    else:
+        late_move_risk = "moderate"
     mover_present = (
         momentum_5 > 0.0
         or rotation_score > 0.0
@@ -263,26 +316,26 @@ def _heuristic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateR
     if ranging_market:
         if entry_score >= 55.0 and mover_present:
             if ema_stack_bullish and macd_hist >= 0.0 and momentum_5 > 0.0:
-                return Phi3MarketStateReview("ranging", 0.62, "favor_selective", "range_breakout_attempt_with_ema_support")
+                return Phi3MarketStateReview("ranging", 0.62, "favor_selective", "range_breakout_attempt_with_ema_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
             if volume_surge >= 0.35 or volume_ratio >= 1.2:
-                return Phi3MarketStateReview("ranging", 0.6, "favor_selective", "range_breakout_attempt_with_volume_support")
+                return Phi3MarketStateReview("ranging", 0.6, "favor_selective", "range_breakout_attempt_with_volume_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
             if rotation_score > 0.0 or symbol_trending:
-                return Phi3MarketStateReview("ranging", 0.58, "favor_selective", "selective_range_mover_with_relative_strength")
-            return Phi3MarketStateReview("ranging", 0.56, "favor_selective", "range_state_but_mover_present")
+                return Phi3MarketStateReview("ranging", 0.58, "favor_selective", "selective_range_mover_with_relative_strength", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
+            return Phi3MarketStateReview("ranging", 0.56, "favor_selective", "range_state_but_mover_present", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
         if not ema_stack_bullish and macd_hist < 0.0:
-            return Phi3MarketStateReview("ranging", 0.68, "favor_selective", "range_state_without_trend_support")
-        return Phi3MarketStateReview("ranging", 0.65, "favor_selective", "range_signals_detected")
+            return Phi3MarketStateReview("ranging", 0.68, "favor_selective", "range_state_without_trend_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
+        return Phi3MarketStateReview("ranging", 0.65, "favor_selective", "range_signals_detected", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
     if trend_confirmed and (momentum_5 > 0.0 or rotation_score > 0.0):
         if ema_stack_bullish and macd_hist >= 0.0:
-            return Phi3MarketStateReview("trending", 0.78, "favor_trend", "trend_confirmation_with_ema_and_macd")
+            return Phi3MarketStateReview("trending", 0.78, "favor_trend", "trend_confirmation_with_ema_and_macd", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
         if volume_surge >= 0.35 or volume_ratio >= 1.2:
-            return Phi3MarketStateReview("trending", 0.75, "favor_trend", "trend_confirmation_with_volume_support")
-        return Phi3MarketStateReview("trending", 0.72, "favor_trend", "trend_confirmation_present")
+            return Phi3MarketStateReview("trending", 0.75, "favor_trend", "trend_confirmation_with_volume_support", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
+        return Phi3MarketStateReview("trending", 0.72, "favor_trend", "trend_confirmation_present", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
     if ema_stack_bullish and macd_hist >= 0.0 and momentum_5 > 0.0:
-        return Phi3MarketStateReview("transition", 0.58, "favor_selective", "breakout_attempt_not_yet_confirmed")
+        return Phi3MarketStateReview("transition", 0.58, "favor_selective", "breakout_attempt_not_yet_confirmed", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
     if macd_hist < 0.0 and momentum_5 < 0.0:
-        return Phi3MarketStateReview("transition", 0.62, "reduce_trend_entries", "momentum_fading_into_transition")
-    return Phi3MarketStateReview("transition", 0.6, "favor_selective", "mixed_market_structure")
+        return Phi3MarketStateReview("transition", 0.62, "reduce_trend_entries", "momentum_fading_into_transition", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
+    return Phi3MarketStateReview("transition", 0.6, "favor_selective", "mixed_market_structure", breakout_state, trend_stage, volume_confirmation, pullback_quality, late_move_risk)
 
 
 def deterministic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateReview:
@@ -307,6 +360,11 @@ def phi3_review_market_state(
             confidence=_clamp_confidence(parsed.get("confidence"), 0.5),
             lane_bias=_safe_lane_bias(parsed.get("lane_bias")),
             reason=str(parsed.get("reason", "market_state_review")),
+            breakout_state=str(parsed.get("breakout_state", "unclear") or "unclear"),
+            trend_stage=str(parsed.get("trend_stage", "unclear") or "unclear"),
+            volume_confirmation=str(parsed.get("volume_confirmation", "neutral") or "neutral"),
+            pullback_quality=str(parsed.get("pullback_quality", "unclear") or "unclear"),
+            late_move_risk=str(parsed.get("late_move_risk", "moderate") or "moderate"),
         )
     except Exception:
         return _heuristic_market_state_review(features)

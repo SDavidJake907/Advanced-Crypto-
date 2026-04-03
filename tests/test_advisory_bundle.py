@@ -33,6 +33,9 @@ class AdvisoryBundleTests(unittest.TestCase):
         self.assertEqual(bundle.market_state_review["market_state"], "ranging")
         self.assertEqual(bundle.market_state_review["lane_bias"], "favor_selective")
         self.assertEqual(bundle.market_state_review["reason"], "selective_range_mover_with_relative_strength")
+        self.assertEqual(bundle.market_state_review["breakout_state"], "breakout_attempt")
+        self.assertEqual(bundle.market_state_review["trend_stage"], "mixed")
+        self.assertEqual(bundle.market_state_review["volume_confirmation"], "neutral")
 
 
 if __name__ == "__main__":

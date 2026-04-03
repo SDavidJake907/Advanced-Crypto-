@@ -41,6 +41,34 @@ class MoverAdvisoryTests(unittest.TestCase):
         self.assertEqual(review.market_state, "ranging")
         self.assertEqual(review.lane_bias, "favor_selective")
         self.assertEqual(review.reason, "selective_range_mover_with_relative_strength")
+        self.assertEqual(review.breakout_state, "breakout_attempt")
+        self.assertEqual(review.trend_stage, "mixed")
+        self.assertEqual(review.late_move_risk, "moderate")
+
+    def test_market_state_trending_has_strict_chart_handoff_fields(self) -> None:
+        review = _heuristic_market_state_review(
+            {
+                "ranging_market": False,
+                "trend_confirmed": True,
+                "entry_score": 74.0,
+                "momentum_5": 0.012,
+                "momentum_14": 0.02,
+                "rotation_score": 0.1,
+                "volume_ratio": 1.35,
+                "volume_surge": 0.4,
+                "macd_hist": 0.002,
+                "ema9_above_ema20": True,
+                "ema9_above_ema26": True,
+                "range_breakout_1h": True,
+                "pullback_hold": False,
+                "higher_low_count": 3,
+            }
+        )
+        self.assertEqual(review.market_state, "trending")
+        self.assertEqual(review.breakout_state, "fresh_breakout")
+        self.assertEqual(review.trend_stage, "confirmed")
+        self.assertEqual(review.volume_confirmation, "supportive")
+        self.assertEqual(review.late_move_risk, "contained")
 
     def test_posture_ranging_promoted_mover_is_not_defensive(self) -> None:
         review = _heuristic_posture_review(

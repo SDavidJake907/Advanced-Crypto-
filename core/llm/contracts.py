@@ -340,11 +340,36 @@ def normalize_market_state_review(parsed: dict[str, Any]) -> dict[str, Any]:
     if not reasons:
         reasons = [str(parsed.get("reason", "market_state_review")).strip() or "market_state_review"]
         normalized_fields.append("reasons")
+    breakout_state = str(parsed.get("breakout_state", "unclear")).strip().lower()
+    if breakout_state not in {"fresh_breakout", "retest_holding", "breakout_attempt", "inside_range", "unclear"}:
+        breakout_state = "unclear"
+        normalized_fields.append("breakout_state")
+    trend_stage = str(parsed.get("trend_stage", "unclear")).strip().lower()
+    if trend_stage not in {"early", "emerging", "confirmed", "stalling", "mixed", "unclear"}:
+        trend_stage = "unclear"
+        normalized_fields.append("trend_stage")
+    volume_confirmation = str(parsed.get("volume_confirmation", "neutral")).strip().lower()
+    if volume_confirmation not in {"supportive", "neutral", "weak"}:
+        volume_confirmation = "neutral"
+        normalized_fields.append("volume_confirmation")
+    pullback_quality = str(parsed.get("pullback_quality", "unclear")).strip().lower()
+    if pullback_quality not in {"clean_retest", "loose_retest", "higher_low_support", "none", "unclear"}:
+        pullback_quality = "unclear"
+        normalized_fields.append("pullback_quality")
+    late_move_risk = str(parsed.get("late_move_risk", "moderate")).strip().lower()
+    if late_move_risk not in {"contained", "moderate", "extended"}:
+        late_move_risk = "moderate"
+        normalized_fields.append("late_move_risk")
     return {
         "market_state": market_state,
         "confidence": _clamp_float(parsed.get("confidence"), default=0.5),
         "lane_bias": lane_bias,
         "reason": reasons[0],
+        "breakout_state": breakout_state,
+        "trend_stage": trend_stage,
+        "volume_confirmation": volume_confirmation,
+        "pullback_quality": pullback_quality,
+        "late_move_risk": late_move_risk,
         "contract": build_envelope(
             role=ROLE_MARKET_REVIEWER,
             confidence=parsed.get("confidence", 0.5),
