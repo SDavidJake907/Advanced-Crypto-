@@ -26,6 +26,9 @@ These are core market anchors and generally the first names to compare against b
 | `DOT/USD` | major | liquid large-cap alt | `L2` or `L3` |
 | `TRX/USD` | major | liquid large-cap alt | `L2` or `L3` |
 | `ALGO/USD` | major | liquid legacy infrastructure major alt | `L2` or `L3` |
+| `XLM/USD` | major | liquid payments / legacy major alt | `L2` or `L3` |
+| `HBAR/USD` | major | liquid infrastructure / enterprise narrative alt | `L2` or `L3` |
+| `TAO/USD` | major | liquid high-value infrastructure / AI major alt | `L2` or `L3` |
 
 ## Core Alts
 
@@ -46,6 +49,9 @@ These are non-meme tradable alts that can still be strong leaders, but are not t
 | `UNI/USD` | core alt | large-cap DeFi exchange token | `L3` |
 | `FET/USD` | core alt | AI narrative alt | `L2` or `L3` |
 | `TIA/USD` | core alt | infrastructure / data availability alt | `L3` |
+| `APT/USD` | core alt | liquid platform / rotation alt | `L2` or `L3` |
+| `FIL/USD` | core alt | storage / infrastructure rotation alt | `L2` or `L3` |
+| `ZEC/USD` | core alt | legacy privacy / momentum alt | `L3` |
 
 ## Meme / Research Disabled
 
