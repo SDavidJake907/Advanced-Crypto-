@@ -19,7 +19,8 @@ function Get-EnvValue {
 
 $localLlmBackend = (Get-EnvValue "LOCAL_LLM_BACKEND" "ollama").ToLower()
 $localLlmBaseUrl = Get-EnvValue "ADVISORY_LOCAL_BASE_URL" (Get-EnvValue "NEMOTRON_BASE_URL" "http://127.0.0.1:11434")
-$localLlmModel = Get-EnvValue "ADVISORY_LOCAL_MODEL" (Get-EnvValue "NEMOTRON_MODEL" "")
+$localStrategistModel = Get-EnvValue "LOCAL_STRATEGIST_MODEL" ""
+$localLlmModel = Get-EnvValue "ADVISORY_LOCAL_MODEL" (Get-EnvValue "NEMOTRON_MODEL" $localStrategistModel)
 
 Write-Host "`n=== SERVICES ===" -ForegroundColor Cyan
 

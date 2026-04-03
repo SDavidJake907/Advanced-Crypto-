@@ -99,14 +99,15 @@ $nemotronProvider = Get-EnvValue "NEMOTRON_PROVIDER" "nvidia"
 $nemotronStrategistProvider = Get-EnvValue "NEMOTRON_STRATEGIST_PROVIDER" ""
 $nemotronBaseUrl = Get-EnvValue "NEMOTRON_BASE_URL" "http://127.0.0.1:11434"
 $advisoryLocalBaseUrl = Get-EnvValue "ADVISORY_LOCAL_BASE_URL" $nemotronBaseUrl
-$advisoryLocalModel = Get-EnvValue "ADVISORY_LOCAL_MODEL" ""
+$localStrategistModel = Get-EnvValue "LOCAL_STRATEGIST_MODEL" ""
+$advisoryLocalModel = Get-EnvValue "ADVISORY_LOCAL_MODEL" $localStrategistModel
 $localLlmBackend = (Get-EnvValue "LOCAL_LLM_BACKEND" "ollama").ToLower()
 $nvidiaApiKey = Get-EnvValue "NVIDIA_API_KEY" ""
 if ([string]::IsNullOrWhiteSpace($nemotronStrategistProvider)) {
     $nemotronStrategistProvider = $nemotronProvider
 }
-$nemotronModel = Get-EnvValue "NEMOTRON_MODEL" "nemotron-9b"
-$localLlmLoadKey = Get-EnvValue "LOCAL_LLM_LOAD_KEY" $nemotronModel
+$nemotronModel = Get-EnvValue "NEMOTRON_MODEL" $(if (-not [string]::IsNullOrWhiteSpace($localStrategistModel)) { $localStrategistModel } else { "nemotron-9b" })
+$localLlmLoadKey = Get-EnvValue "LOCAL_LLM_LOAD_KEY" $(if (-not [string]::IsNullOrWhiteSpace($localStrategistModel)) { $localStrategistModel } else { $nemotronModel })
 $ollamaModelsRoot = Get-EnvValue "OLLAMA_MODELS" "C:\Users\kitti"
 $localLlmBaseUrl = if (-not [string]::IsNullOrWhiteSpace($advisoryLocalBaseUrl)) { $advisoryLocalBaseUrl } else { $nemotronBaseUrl }
 $localLlmPort = Get-UrlPort -Url $localLlmBaseUrl -Default 1234

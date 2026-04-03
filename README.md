@@ -232,7 +232,7 @@ Persistent AI services are started separately with [`scripts/start_models.ps1`](
 
 **Important:** Run `start_models.ps1` first and wait for "Phi-3 ready" before running `start_all.ps1`. Phi-3 takes 2-3 minutes to load on NPU — `start_all.ps1` only waits 15 seconds.
 
-Current note: the default local strategist profile uses `NVIDIA-Nemotron-Nano-9B-v2` through Ollama with `ADVISORY_MODEL_PROVIDER=local_nemo`, `NEMOTRON_PROVIDER=local`, `NEMOTRON_STRATEGIST_PROVIDER=local`, and `LOCAL_LLM_BACKEND=ollama`. Phi-3 can be started alongside that local strategist path when `START_PHI3_ON_START=true`.
+Current note: the default local strategist profile uses `NVIDIA-Nemotron-Nano-9B-v2` through Ollama with `ADVISORY_MODEL_PROVIDER=local_nemo`, `NEMOTRON_PROVIDER=local`, `NEMOTRON_STRATEGIST_PROVIDER=local`, and `LOCAL_LLM_BACKEND=ollama`. `LOCAL_STRATEGIST_MODEL` can be used as the single local switch between Ollama strategist models such as `mirage335/NVIDIA-Nemotron-Nano-9B-v2-virtuoso:latest` and `gemma4:e4b`. Phi-3 can be started alongside that local strategist path when `START_PHI3_ON_START=true`.
 
 Current reference docs:
 - [LLM operating model](docs/llm_operating_model.md)
@@ -551,6 +551,7 @@ Common runtime controls in `.env`:
 - `NEMOTRON_STRATEGIST_PROVIDER=local|cloud|nvidia|openai`
 - `NEMOTRON_BATCH_MODE=true|false`
 - `LOCAL_LLM_BACKEND=ollama|lmstudio`
+- `LOCAL_STRATEGIST_MODEL=` one-key local strategist switch for Ollama / LM Studio profiles
 - `LOCAL_LLM_LOAD_KEY=` local model key to auto-load at startup for LM Studio / Ollama-style local hosts
 - `ADVISORY_LOCAL_BASE_URL=http://127.0.0.1:1234`
 - `ADVISORY_LOCAL_MODEL=gemma4-e4b-it`

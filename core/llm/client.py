@@ -341,7 +341,7 @@ def nemotron_provider_model() -> str:
         return _nemotron_cloud_model()
     if provider == "openai":
         return _openai_model()
-    return os.getenv("NEMOTRON_MODEL", "nemotron-9b").strip()
+    return os.getenv("NEMOTRON_MODEL", os.getenv("LOCAL_STRATEGIST_MODEL", "nemotron-9b")).strip()
 
 
 def nemotron_provider_api_url() -> str:
@@ -359,7 +359,10 @@ def advisory_provider_name() -> str:
 
 def advisory_provider_model() -> str:
     if _advisory_provider() == "local_nemo":
-        return os.getenv("ADVISORY_LOCAL_MODEL", os.getenv("NEMOTRON_MODEL", "nemotron-9b")).strip()
+        return os.getenv(
+            "ADVISORY_LOCAL_MODEL",
+            os.getenv("NEMOTRON_MODEL", os.getenv("LOCAL_STRATEGIST_MODEL", "nemotron-9b")),
+        ).strip()
     return os.getenv("PHI3_MODEL", "phi3").strip()
 
 

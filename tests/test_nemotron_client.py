@@ -11,8 +11,10 @@ from core.execution.cpp_exec import CppExecutor
 from core.llm.nemotron import NemotronDecision, NemotronStrategist
 from core.llm.client import (
     advisory_chat,
+    advisory_provider_model,
     advisory_provider_name,
     nemotron_chat,
+    nemotron_provider_model,
     nemotron_provider_name,
     parse_json_response,
     run_nemotron_tool_loop,
@@ -213,6 +215,19 @@ class NemotronClientTests(unittest.TestCase):
             strategist_provider = nemotron_provider_name()
 
         self.assertEqual(strategist_provider, "local")
+
+    def test_local_strategist_model_fallback_applies_to_local_provider_models(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "NEMOTRON_PROVIDER": "local",
+                "ADVISORY_MODEL_PROVIDER": "local_nemo",
+                "LOCAL_STRATEGIST_MODEL": "gemma4:e4b",
+            },
+            clear=False,
+        ):
+            self.assertEqual(nemotron_provider_model(), "gemma4:e4b")
+            self.assertEqual(advisory_provider_model(), "gemma4:e4b")
 
     def test_tool_loop_rewrites_current_symbol_placeholder(self) -> None:
         responses = iter(
