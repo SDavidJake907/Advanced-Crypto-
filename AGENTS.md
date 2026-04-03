@@ -78,6 +78,35 @@ This repo is a modular crypto trading system with deterministic scoring, AI-assi
 - Preserve backward compatibility where practical.
 - Add or update tests for scoring, persistence, exit logic, and payload schema changes.
 
+## Change discipline
+- Prefer one variable change at a time for live-trading behavior.
+- Do not loosen multiple independent gates at once unless the task explicitly requires it.
+- Separate diagnosis changes from behavior changes where practical.
+- When a model path is involved, prefer improving observability before changing core trade behavior.
+- Keep runtime tweaks reversible and easy to explain from logs.
+
+## Evidence rules
+- Use recent live logs before changing gates, fees, sizing, or exits.
+- Distinguish clearly between:
+  - candidate discovery failure
+  - model judgment failure
+  - execution/cost rejection
+  - portfolio/correlation rejection
+- Do not call something a strategist failure if the execution or portfolio layer is the real blocker.
+- Prefer concrete blocker labels over vague summaries.
+
+## Prompt hygiene
+- Prompts should request specific reasons, not vague catch-all labels.
+- If a HOLD reason can be made more specific, prefer specificity over generic wording.
+- Do not let prompt examples normalize lazy outputs that weaken diagnosis.
+- Keep reason taxonomies short, stable, and log-friendly.
+
+## Runtime safety
+- Treat live fee assumptions, spread assumptions, and cost floors as production risk settings.
+- When changing live cost assumptions, prefer conservative buffers over literal best-case values.
+- Do not widen position count, sizing, and entry aggression in the same change unless explicitly required.
+- Respect the distinction between local runtime overrides and committed repo defaults.
+
 ## Validation expectations
 For any non-trivial task:
 1. identify relevant files
@@ -201,12 +230,11 @@ Since the system is mostly complete, use Codex for:
 
 Not for:
 - giant redesigns
-- vague “make it better” changes
+- vague "make it better" changes
 - moving business logic into prompts
 
 ## Recommended workflow
 Do these next:
-- Add the `AGENTS.md`
 - Keep a small text file of favorite Codex prompts
 - For every change, force:
   - plan
