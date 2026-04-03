@@ -323,6 +323,37 @@ class NemotronStrategist:
             return "medium"
         return "weak"
 
+    def _phi_requires_explicit_override(self, *, features: dict[str, Any], market_state_review: dict[str, Any]) -> bool:
+        pattern_explanation = market_state_review.get("pattern_explanation", {}) if isinstance(market_state_review.get("pattern_explanation", {}), dict) else {}
+        candle_evidence = market_state_review.get("candle_evidence", {}) if isinstance(market_state_review.get("candle_evidence", {}), dict) else {}
+        recommended = pattern_explanation.get("recommended_nemo_interpretation", {}) if isinstance(pattern_explanation.get("recommended_nemo_interpretation", {}), dict) else {}
+
+        recommendation = str(features.get("entry_recommendation", "WATCH") or "WATCH").upper()
+        reversal_risk = str(features.get("reversal_risk", "MEDIUM") or "MEDIUM").upper()
+        structure_validity = str(pattern_explanation.get("structure_validity", "unclear") or "unclear")
+        structure_confidence = float(pattern_explanation.get("structure_confidence", 0.0) or 0.0)
+        prefer_action = str(recommended.get("prefer_action", "HOLD") or "HOLD").upper()
+        skepticism_penalty = int(recommended.get("skepticism_penalty", 0) or 0)
+        candle_confirmation = float(candle_evidence.get("confirmation_score", 0.0) or 0.0)
+        candle_bias = str(candle_evidence.get("candle_bias", "neutral") or "neutral")
+        late_move_risk = str(market_state_review.get("late_move_risk", "moderate") or "moderate")
+        breakout_state = str(market_state_review.get("breakout_state", "unclear") or "unclear")
+        score = float(features.get("entry_score", 0.0) or 0.0)
+
+        return (
+            recommendation in {"BUY", "STRONG_BUY"}
+            and reversal_risk != "HIGH"
+            and prefer_action == "OPEN"
+            and structure_validity == "valid"
+            and structure_confidence >= 0.6
+            and candle_confirmation >= 0.65
+            and candle_bias != "bearish"
+            and skepticism_penalty <= 1
+            and late_move_risk != "extended"
+            and breakout_state in {"fresh_breakout", "retest_holding", "breakout_attempt"}
+            and score >= 58.0
+        )
+
     def _decision_fingerprint(
         self,
         *,
@@ -949,18 +980,22 @@ class NemotronStrategist:
                 features=features,
                 market_state_review=market_state_review,
             )
+            phi_requires_explicit_override = self._phi_requires_explicit_override(
+                features=features,
+                market_state_review=market_state_review,
+            )
 
             if (
                 action == "HOLD"
-                and reason in {"m5_zero", "hold_unspecified"}
-                and phi_chart_support == "strong"
+                and reason in {"m5_zero", "hold_unspecified", "not_ranked_by_batch", "batch_hold"}
+                and (phi_chart_support == "strong" or phi_requires_explicit_override)
                 and str(reflex.get("reflex", "allow")) == "allow"
                 and str(features.get("entry_recommendation", "WATCH") or "WATCH").upper() in {"BUY", "STRONG_BUY"}
                 and str(features.get("reversal_risk", "MEDIUM") or "MEDIUM").upper() != "HIGH"
             ):
                 action = "OPEN"
                 side = "LONG"
-                reason = "continuation"
+                reason = "phi_structure_confirmed"
                 size_raw = round(max_trade * 0.6, 2)
 
             # Enforce slot limit across batch
@@ -988,6 +1023,7 @@ class NemotronStrategist:
                     "batch": True,
                     "batch_reasoning": reasoning[:120],
                     "phi_chart_support": phi_chart_support,
+                    "phi_requires_explicit_override": phi_requires_explicit_override,
                     "primary_blocker": reason if action == "HOLD" else "",
                 },
                 "override_signal": side if action == "OPEN" and side in {"LONG", "SHORT"} else "FLAT",

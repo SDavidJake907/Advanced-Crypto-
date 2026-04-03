@@ -423,6 +423,8 @@ Interpret the Phi chart-state fields strictly:
 - if brk_state=fresh_breakout or retest_holding and vol_cf=supportive and late!=extended, treat that as strong structure evidence
 - if sval=valid and scf>=0.70 and nemo_act=OPEN, treat Phi structure as positive evidence, not optional narration
 - if candle is bullish with ccf>=0.65 at the same time Phi structure is valid, treat candle evidence as confirmation rather than noise
+- if Phi gives nemo_act=OPEN with sval=valid and supportive candle confirmation, you may reject it only with a specific blocker such as net_edge_too_low, volume_too_light, reversal_risk_high, trend_unconfirmed, portfolio_full, or late_move_risk
+- do not answer HOLD with hold_unspecified or not_ranked_by_batch when Phi structure is strong and actionable
 - if trend_stage=stalling or late=extended, prefer HOLD unless score and structure are exceptional
 
 Rules:
@@ -438,6 +440,7 @@ Rules:
 - use TIGHTEN, SCALE_OUT, EXIT, or ROTATE only when you have explicit evidence for them
 - HOLD everything else
 - if net_edge < -0.5% prefer HOLD unless score >= 75 and structure is exceptional
+- if Phi gives nemo_act=OPEN with sval=valid and supportive candle confirmation, you may reject it only with a specific blocker such as net_edge_too_low, volume_too_light, reversal_risk_high, trend_unconfirmed, portfolio_full, or late_move_risk
 - if open_slots is exhausted, do not force more entries
 - size is only a bounded hint; use smaller hints for weaker or WATCH setups
 - prefer fewer clean opens over many marginal opens

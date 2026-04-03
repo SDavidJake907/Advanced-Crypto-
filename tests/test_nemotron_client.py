@@ -614,6 +614,57 @@ class NemotronBatchParsingTests(unittest.TestCase):
         }
         return candidate
 
+    def _phi_actionable_retest_candidate(self, symbol: str = "ONDO/USD") -> dict[str, object]:
+        candidate = self._candidate(symbol)
+        features = dict(candidate["features"])
+        features.update(
+            {
+                "entry_score": 60.63,
+                "entry_recommendation": "BUY",
+                "reversal_risk": "MEDIUM",
+                "volume_ratio": 1.05,
+                "trade_quality": 99.8,
+                "structure_quality": 62.3,
+                "continuation_quality": 63.4,
+                "short_tf_ready_15m": True,
+                "tp_after_cost_valid": True,
+                "net_edge_pct": 0.08,
+                "trend_1h": 1,
+                "trend_confirmed": True,
+                "indicators_ready": True,
+            }
+        )
+        candidate["features"] = features
+        candidate["market_state_review"] = {
+            "market_state": "ranging",
+            "confidence": 0.62,
+            "lane_bias": "favor_selective",
+            "reason": "range_breakout_attempt_with_ema_support",
+            "breakout_state": "retest_holding",
+            "trend_stage": "confirmed",
+            "volume_confirmation": "neutral",
+            "pullback_quality": "clean_retest",
+            "late_move_risk": "contained",
+            "pattern_explanation": {
+                "structure_pattern": "trend_retest",
+                "structure_bias": "bullish",
+                "structure_validity": "valid",
+                "structure_confidence": 0.68,
+                "recommended_nemo_interpretation": {
+                    "structure_bonus": 4,
+                    "skepticism_penalty": 0,
+                    "prefer_action": "OPEN",
+                },
+            },
+            "candle_evidence": {
+                "primary_candle": "hammer",
+                "candle_bias": "bullish",
+                "candle_strength": 0.6,
+                "confirmation_score": 0.82,
+            },
+        }
+        return candidate
+
     def test_batch_decide_parses_tool_result_wrapped_decisions(self) -> None:
         strategist = self._make_strategist()
         portfolio_state = PortfolioState(cash=100.0)
@@ -794,7 +845,7 @@ class NemotronBatchParsingTests(unittest.TestCase):
                                     symbols=["BTC/USD"],
                                 )
 
-        self.assertEqual(results["BTC/USD"].execution["nemotron"]["reason"], "continuation")
+        self.assertEqual(results["BTC/USD"].execution["nemotron"]["reason"], "phi_structure_confirmed")
         self.assertEqual(results["BTC/USD"].execution["nemotron"]["debug"]["phi_chart_support"], "strong")
         self.assertEqual(executions[0]["signal"], "LONG")
 
@@ -835,8 +886,43 @@ class NemotronBatchParsingTests(unittest.TestCase):
                                     symbols=["NEAR/USD"],
                                 )
 
-        self.assertEqual(results["NEAR/USD"].execution["nemotron"]["reason"], "continuation")
+        self.assertEqual(results["NEAR/USD"].execution["nemotron"]["reason"], "phi_structure_confirmed")
         self.assertEqual(results["NEAR/USD"].execution["nemotron"]["debug"]["phi_chart_support"], "strong")
+        self.assertEqual(executions[0]["signal"], "LONG")
+
+    def test_batch_decide_overrides_not_ranked_when_phi_requires_explicit_override(self) -> None:
+        strategist = self._make_strategist()
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+        executions: list[dict[str, object]] = []
+
+        raw = (
+            '{"reasoning":"actionable retest candidate","decisions":'
+            '[{"symbol":"ONDO/USD","action":"HOLD","reason":"not_ranked_by_batch"}]}'
+        )
+
+        def fake_execution_place_order(executor, signal, symbol, features, portfolio_state, size_factor):  # type: ignore[no-untyped-def]
+            executions.append({"signal": signal, "symbol": symbol, "size_factor": size_factor})
+            return {"status": "filled"}
+
+        with patch("core.llm.nemotron.nemotron_chat", return_value=raw):
+            with patch("core.llm.nemotron.nemotron_provider_name", return_value="nvidia"):
+                with patch("core.llm.nemotron.strategy_decision", return_value="LONG"):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=[]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            with patch("core.llm.nemotron.execution_place_order", side_effect=fake_execution_place_order):
+                                results = strategist.batch_decide(
+                                    candidates=[self._phi_actionable_retest_candidate()],
+                                    portfolio_state=portfolio_state,
+                                    positions_state=positions_state,
+                                    symbols=["ONDO/USD"],
+                                )
+
+        self.assertEqual(results["ONDO/USD"].execution["nemotron"]["reason"], "phi_structure_confirmed")
+        self.assertTrue(results["ONDO/USD"].execution["nemotron"]["debug"]["phi_requires_explicit_override"])
         self.assertEqual(executions[0]["signal"], "LONG")
 
     def test_validate_final_decision_preserves_advisory_actions_safely(self) -> None:
