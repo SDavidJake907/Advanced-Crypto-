@@ -138,12 +138,14 @@ The normal app stack started by [`scripts/start_all.ps1`](scripts/start_all.ps1)
 - optional `operator_ui`
 
 Persistent AI services are started separately with [`scripts/start_models.ps1`](scripts/start_models.ps1):
-- `ollama` when `NEMOTRON_PROVIDER=local`
+- a local model host when `NEMOTRON_PROVIDER=local`:
+  - `ollama` when `LOCAL_LLM_BACKEND=ollama`
+  - `LM Studio` when `LOCAL_LLM_BACKEND=lmstudio`
 - optional Phi-3 services only when `ADVISORY_MODEL_PROVIDER=phi3`
 
 **Important:** Run `start_models.ps1` first and wait for "Phi-3 ready" before running `start_all.ps1`. Phi-3 takes 2-3 minutes to load on NPU — `start_all.ps1` only waits 15 seconds.
 
-Current note: the recommended runtime is `ADVISORY_MODEL_PROVIDER=local_nemo`, `NEMOTRON_PROVIDER=local`, `NEMOTRON_STRATEGIST_PROVIDER=local`, and `NEMOTRON_BATCH_MODE=false`. In that setup, Phi-3 readiness is not required.
+Current note: the active local strategist profile uses `Gemma 4 E4B` through LM Studio with `ADVISORY_MODEL_PROVIDER=local_nemo`, `NEMOTRON_PROVIDER=local`, `NEMOTRON_STRATEGIST_PROVIDER=local`, `LOCAL_LLM_BACKEND=lmstudio`, and `NEMOTRON_BATCH_MODE=false`. In that setup, Phi-3 readiness is not required.
 
 Current reference docs:
 - [LLM operating model](docs/llm_operating_model.md)
@@ -450,8 +452,12 @@ Common runtime controls in `.env`:
 - `NEMOTRON_PROVIDER=local|nvidia|openai`
 - `NEMOTRON_STRATEGIST_PROVIDER=local|cloud|nvidia|openai`
 - `NEMOTRON_BATCH_MODE=true|false`
-- `NEMOTRON_BASE_URL=http://127.0.0.1:11434`
-- `NEMOTRON_MODEL=mirage335/NVIDIA-Nemotron-Nano-9B-v2-virtuoso:latest`
+- `LOCAL_LLM_BACKEND=ollama|lmstudio`
+- `LOCAL_LLM_LOAD_KEY=` local LM Studio model key to auto-load at startup
+- `ADVISORY_LOCAL_BASE_URL=http://127.0.0.1:1234`
+- `ADVISORY_LOCAL_MODEL=gemma4-e4b-it`
+- `NEMOTRON_BASE_URL=http://127.0.0.1:1234`
+- `NEMOTRON_MODEL=gemma4-e4b-it`
 - `MCP_PUBLIC_ENABLED=true|false`
 - `MCP_PUBLIC_HOSTNAME=` named Cloudflare hostname, optional
 - `MCP_TUNNEL_NAME=` named Cloudflare tunnel, optional

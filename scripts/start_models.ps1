@@ -3,6 +3,7 @@ $phiProject = "C:\Users\kitti\Projects\kraken-hybrad9"
 $phiScript = Join-Path $root "scripts\\phi3_server.py"
 $phiPython = Join-Path $phiProject "npu-env-real\Scripts\python.exe"
 $ollamaExe = "C:\Users\kitti\AppData\Local\Programs\Ollama\ollama.exe"
+$lmsExe = Join-Path $env:USERPROFILE ".lmstudio\bin\lms.exe"
 $envFile = Join-Path $root ".env"
 
 function Get-EnvValue {
@@ -51,6 +52,18 @@ function Get-HttpJson {
     }
 }
 
+function Get-UrlPort {
+    param(
+        [string]$Url,
+        [int]$Default = 1234
+    )
+    try {
+        return ([Uri]$Url).Port
+    } catch {
+        return $Default
+    }
+}
+
 if (-not (Test-Path $phiScript)) {
     Write-Error "Phi-3 server script not found at $phiScript"
     exit 1
@@ -66,12 +79,19 @@ $advisoryModelProvider = (Get-EnvValue "ADVISORY_MODEL_PROVIDER" "local_nemo").T
 $startPhi3OnStart = (Get-EnvValue "START_PHI3_ON_START" "false").ToLower() -eq "true"
 $nemotronProvider = Get-EnvValue "NEMOTRON_PROVIDER" "nvidia"
 $nemotronStrategistProvider = Get-EnvValue "NEMOTRON_STRATEGIST_PROVIDER" ""
+$nemotronBaseUrl = Get-EnvValue "NEMOTRON_BASE_URL" "http://127.0.0.1:11434"
+$advisoryLocalBaseUrl = Get-EnvValue "ADVISORY_LOCAL_BASE_URL" $nemotronBaseUrl
+$advisoryLocalModel = Get-EnvValue "ADVISORY_LOCAL_MODEL" ""
+$localLlmBackend = (Get-EnvValue "LOCAL_LLM_BACKEND" "ollama").ToLower()
 $nvidiaApiKey = Get-EnvValue "NVIDIA_API_KEY" ""
 if ([string]::IsNullOrWhiteSpace($nemotronStrategistProvider)) {
     $nemotronStrategistProvider = $nemotronProvider
 }
 $nemotronModel = Get-EnvValue "NEMOTRON_MODEL" "nemotron-9b"
+$localLlmLoadKey = Get-EnvValue "LOCAL_LLM_LOAD_KEY" $nemotronModel
 $ollamaModelsRoot = Get-EnvValue "OLLAMA_MODELS" "C:\Users\kitti"
+$localLlmBaseUrl = if (-not [string]::IsNullOrWhiteSpace($advisoryLocalBaseUrl)) { $advisoryLocalBaseUrl } else { $nemotronBaseUrl }
+$localLlmPort = Get-UrlPort -Url $localLlmBaseUrl -Default 1234
 
 Write-Host "Starting persistent AI services only..."
 
@@ -142,54 +162,89 @@ if ($needsPhi3) {
 }
 
 if ($advisoryModelProvider -eq "local_nemo" -or $nemotronStrategistProvider -eq "local") {
-    if (-not (Test-Path $ollamaExe)) {
-        Write-Error "Ollama executable not found at $ollamaExe"
-        exit 1
-    }
-    $ollamaAlready = $null
-    try { $ollamaAlready = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -Method Get -TimeoutSec 3 -ErrorAction SilentlyContinue } catch {}
-    if ($ollamaAlready) {
-        Write-Host "Ollama already running on port 11434 - skipping start."
-    } elseif ($watchdogEnabled) {
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
-            `$host.UI.RawUI.WindowTitle='AI-Models - ollama';
-            while (`$true) {
-                Write-Host '[watchdog] Starting ollama...';
+    if ($localLlmBackend -eq "lmstudio") {
+        if (-not (Test-Path $lmsExe)) {
+            Write-Error "LM Studio CLI not found at $lmsExe"
+            exit 1
+        }
+        $modelsUrl = if ($localLlmBaseUrl.TrimEnd('/').EndsWith('/v1')) { "$($localLlmBaseUrl.TrimEnd('/'))/models" } else { "$($localLlmBaseUrl.TrimEnd('/'))/v1/models" }
+        $lmStudioReady = Wait-HttpReady -Url $modelsUrl -TimeoutSec 3
+        if ($lmStudioReady) {
+            Write-Host "LM Studio server already running at $localLlmBaseUrl - skipping start."
+        } else {
+            Write-Host "Starting LM Studio server on port $localLlmPort..."
+            & $lmsExe server start --port $localLlmPort | Out-Null
+        }
+        [void](Wait-HttpReady -Url $modelsUrl -TimeoutSec 60)
+
+        $loadedText = (& $lmsExe ps 2>&1 | Out-String)
+        if ($loadedText -notmatch [regex]::Escape($nemotronModel)) {
+            Write-Host "Loading local strategist model in LM Studio..."
+            & $lmsExe load $localLlmLoadKey --identifier $nemotronModel --gpu max -y | Out-Null
+            $loadedText = (& $lmsExe ps 2>&1 | Out-String)
+        } else {
+            Write-Host "LM Studio model $nemotronModel already loaded."
+        }
+        if (
+            $advisoryModelProvider -eq "local_nemo" -and
+            -not [string]::IsNullOrWhiteSpace($advisoryLocalModel) -and
+            $advisoryLocalModel -ne $nemotronModel -and
+            $loadedText -notmatch [regex]::Escape($advisoryLocalModel)
+        ) {
+            Write-Host "Loading advisory local model in LM Studio..."
+            & $lmsExe load $advisoryLocalModel --identifier $advisoryLocalModel --gpu max -y | Out-Null
+        }
+        Write-Host "LM Studio local model host ready."
+    } else {
+        if (-not (Test-Path $ollamaExe)) {
+            Write-Error "Ollama executable not found at $ollamaExe"
+            exit 1
+        }
+        $ollamaAlready = $null
+        try { $ollamaAlready = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -Method Get -TimeoutSec 3 -ErrorAction SilentlyContinue } catch {}
+        if ($ollamaAlready) {
+            Write-Host "Ollama already running on port 11434 - skipping start."
+        } elseif ($watchdogEnabled) {
+            Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+                `$host.UI.RawUI.WindowTitle='AI-Models - ollama';
+                while (`$true) {
+                    Write-Host '[watchdog] Starting ollama...';
+                    `$env:OLLAMA_KEEP_ALIVE='-1';
+                    `$env:OLLAMA_MODELS='$ollamaModelsRoot';
+                    & '$ollamaExe' serve;
+                    Write-Host '[watchdog] ollama exited. Restarting in 10s...';
+                    Start-Sleep -Seconds 10
+                }"
+        } else {
+            Start-Process powershell -ArgumentList "-NoExit", "-Command", "
+                `$host.UI.RawUI.WindowTitle='AI-Models - ollama';
                 `$env:OLLAMA_KEEP_ALIVE='-1';
                 `$env:OLLAMA_MODELS='$ollamaModelsRoot';
                 & '$ollamaExe' serve;
-                Write-Host '[watchdog] ollama exited. Restarting in 10s...';
-                Start-Sleep -Seconds 10
-            }"
-    } else {
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "
-            `$host.UI.RawUI.WindowTitle='AI-Models - ollama';
-            `$env:OLLAMA_KEEP_ALIVE='-1';
-            `$env:OLLAMA_MODELS='$ollamaModelsRoot';
-            & '$ollamaExe' serve;
-        "
-    }
-    [void](Wait-HttpReady -Url "http://127.0.0.1:11434/api/tags" -TimeoutSec 60)
-
-    Write-Host "Warming Nemotron model (3 inference passes - first pass may take 5+ min)..."
-    $warmPrompt = '{"action":"HOLD"}'
-    $warmBody = @{
-        model = $nemotronModel
-        prompt = $warmPrompt
-        stream = $false
-        keep_alive = "1440h"
-        options = @{ num_predict = 30; temperature = 0; num_ctx = 8192 }
-    } | ConvertTo-Json -Compress
-    for ($warmPass = 1; $warmPass -le 3; $warmPass++) {
-        Write-Host "  Nemo warmup pass $warmPass/3..."
-        try {
-            Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/generate" -Method Post -ContentType "application/json" -Body $warmBody -TimeoutSec 360 | Out-Null
-            Write-Host "  Pass $warmPass done."
-        } catch {
-            Write-Warning "  Pass $warmPass failed: $_"
+            "
         }
+        [void](Wait-HttpReady -Url "http://127.0.0.1:11434/api/tags" -TimeoutSec 60)
+
+        Write-Host "Warming local Ollama model (3 inference passes - first pass may take 5+ min)..."
+        $warmPrompt = '{"action":"HOLD"}'
+        $warmBody = @{
+            model = $nemotronModel
+            prompt = $warmPrompt
+            stream = $false
+            keep_alive = "1440h"
+            options = @{ num_predict = 30; temperature = 0; num_ctx = 8192 }
+        } | ConvertTo-Json -Compress
+        for ($warmPass = 1; $warmPass -le 3; $warmPass++) {
+            Write-Host "  Warmup pass $warmPass/3..."
+            try {
+                Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/generate" -Method Post -ContentType "application/json" -Body $warmBody -TimeoutSec 360 | Out-Null
+                Write-Host "  Pass $warmPass done."
+            } catch {
+                Write-Warning "  Pass $warmPass failed: $_"
+            }
+        }
+        Write-Host "Local Ollama model warm."
     }
-    Write-Host "Nemotron model warm."
 }
 
 Write-Host "Started persistent AI services:"
@@ -199,7 +254,11 @@ if ($needsPhi3) {
     Write-Host " - advisory_backend ($advisoryModelProvider)"
 }
 if ($advisoryModelProvider -eq "local_nemo" -or $nemotronStrategistProvider -eq "local") {
-    Write-Host " - ollama (local nemotron host)"
+    if ($localLlmBackend -eq "lmstudio") {
+        Write-Host " - lmstudio (local Gemma/strategy host)"
+    } else {
+        Write-Host " - ollama (local model host)"
+    }
 } else {
     Write-Host " - nemotron_provider ($nemotronStrategistProvider)"
 }

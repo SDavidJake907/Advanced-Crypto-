@@ -3,6 +3,7 @@ $python = Join-Path $root ".venv\Scripts\python.exe"
 $phiProject = "C:\Users\kitti\Projects\kraken-hybrad9"
 $phiPython = Join-Path $phiProject "npu-env-real\Scripts\python.exe"
 $ollamaExe = "C:\Users\kitti\AppData\Local\Programs\Ollama\ollama.exe"
+$lmsExe = Join-Path $env:USERPROFILE ".lmstudio\bin\lms.exe"
 $envFile = Join-Path $root ".env"
 
 # --- Clean up all KrakenSK app processes before starting ---
@@ -50,6 +51,18 @@ function Wait-HttpReady {
         Start-Sleep -Seconds 1
     }
     return $false
+}
+
+function Get-UrlPort {
+    param(
+        [string]$Url,
+        [int]$Default = 1234
+    )
+    try {
+        return ([Uri]$Url).Port
+    } catch {
+        return $Default
+    }
 }
 
 function Test-NemotronBackend {
@@ -165,6 +178,8 @@ $nemotronProvider = Get-EnvValue "NEMOTRON_PROVIDER" "nvidia"
 $nemotronStrategistProvider = Get-EnvValue "NEMOTRON_STRATEGIST_PROVIDER" ""
 $nemotronBaseUrl = Get-EnvValue "NEMOTRON_BASE_URL" "http://127.0.0.1:8081"
 $nemotronModel = Get-EnvValue "NEMOTRON_MODEL" "nemotron-9b"
+$advisoryLocalBaseUrl = Get-EnvValue "ADVISORY_LOCAL_BASE_URL" $nemotronBaseUrl
+$localLlmBackend = (Get-EnvValue "LOCAL_LLM_BACKEND" "ollama").ToLower()
 $startModelsOnStart = (Get-EnvValue "START_MODELS_ON_START" "true").ToLower() -eq "true"
 $nemotronTopCandidateCount = Get-EnvValue "NEMOTRON_TOP_CANDIDATE_COUNT" "15"
 $nemotronAllowBuyLowOutsideTop = Get-EnvValue "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP" "true"
@@ -209,7 +224,7 @@ if ($advisoryModelProvider -ne "phi3") {
 $needsLocalOllama = ($advisoryModelProvider -eq "local_nemo") -or
     ($nemotronProvider -eq "local") -or
     ($nemotronStrategistProvider -eq "local")
-if (-not $needsLocalOllama) {
+if (-not $needsLocalOllama -or $localLlmBackend -ne "ollama") {
     Get-WmiObject Win32_Process -Filter "Name='ollama.exe'" |
         Where-Object {
             $_.ExecutablePath -ieq $ollamaExe -or
