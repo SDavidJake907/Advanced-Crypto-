@@ -63,7 +63,11 @@ from core.features.batch import compute_features_batch, slice_features_for_asset
 from core.features.pattern_engine import detect_top_pattern_from_frame
 from core.llm.client import advisory_provider_name
 from core.llm.phi3_pattern_verifier import verify_pattern_evidence
-from core.llm.micro_prompts import nemotron_review_outcome, phi3_review_exit_posture
+from core.llm.micro_prompts import (
+    deterministic_market_state_review,
+    nemotron_review_outcome,
+    phi3_review_exit_posture,
+)
 from core.llm.client import unload_nemotron_model
 from core.memory.trade_memory import build_outcome_record
 from apps.trader.positions import (
@@ -631,7 +635,12 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         continue
                     if _sym not in _ranked_entry_syms and _sym not in _structure_syms:
                         continue
-                    _bf = slice_features_for_asset(features_batch, _ai)
+                    _lane_supervision = lane_supervision_map.get(_sym)
+                    _universe_lane = (_lane_supervision or {}).get("universe_lane")
+                    _bf = slice_features_for_asset(features_batch, _ai, lane_hint=_universe_lane)
+                    if _lane_supervision:
+                        _bf["universe_lane"] = _universe_lane or _bf.get("lane")
+                        _bf = apply_lane_supervision(_bf, _lane_supervision)
                     if not bool(_bf.get("indicators_ready", True)):
                         continue
                     # Inject live market data (bid/ask/book_valid) into batch features
@@ -688,10 +697,13 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                     _short_tf_ready = bool(_bf.get("short_tf_ready_5m", False) or _bf.get("short_tf_ready_15m", False))
                     _overextended = bool(_bf.get("overextended", False))
                     _range_pos_1h = float(_bf.get("range_pos_1h", 0.5) or 0.5)
+                    _market_state_review = deterministic_market_state_review(_bf).to_dict()
                     _batch_candidates.append({
                         "symbol": _sym,
                         "features": _bf,
                         "reflex": _reflex,
+                        "market_state_review": _market_state_review,
+                        "lane_supervision": dict(_lane_supervision or {}),
                         "phi3_ms": _phi3_ms,
                         "proposed_weight": float(get_proposed_weight(_sym, _bf.get("lane"))),
                         "_rank_score": _rank_score,

@@ -521,6 +521,20 @@ class NemotronBatchParsingTests(unittest.TestCase):
             },
             "proposed_weight": 0.1,
             "reflex": {"reflex": "allow", "micro_state": "stable", "reason": "test"},
+            "market_state_review": {
+                "market_state": "trending",
+                "confidence": 0.72,
+                "lane_bias": "favor_trend",
+                "reason": "trend_confirmation_present",
+            },
+            "lane_supervision": {
+                "universe_lane": "L2",
+                "lane_candidate": "breakout",
+                "lane_conflict": False,
+                "lane_confidence": 0.81,
+                "narrative_tag": "trend_continuation",
+                "reason": "phi3_lane_supervision",
+            },
             "phi3_ms": 0.0,
         }
 
@@ -647,6 +661,47 @@ class NemotronBatchParsingTests(unittest.TestCase):
 
         self.assertEqual(results["BTC/USD"].execution["nemotron"]["reason"], "model_parse_failed_deterministic_open")
         self.assertEqual(results["BTC/USD"].signal, "LONG")
+
+    def test_batch_decide_carries_market_state_and_lane_supervision_into_reflex(self) -> None:
+        strategist = self._make_strategist()
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+        strategy_calls: list[dict[str, object]] = []
+
+        raw = (
+            '{"reasoning":"context_ok","decisions":'
+            '[{"symbol":"BTC/USD","action":"HOLD","reason":"context_hold"}]}'
+        )
+
+        def fake_strategy_decision(strategy, features, reflex_decision):  # type: ignore[no-untyped-def]
+            strategy_calls.append(reflex_decision)
+            return "FLAT"
+
+        with patch("core.llm.nemotron.nemotron_chat", return_value=raw):
+            with patch("core.llm.nemotron.nemotron_provider_name", return_value="nvidia"):
+                with patch("core.llm.nemotron.strategy_decision", side_effect=fake_strategy_decision):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=["no_action"]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            results = strategist.batch_decide(
+                                candidates=[self._candidate()],
+                                portfolio_state=portfolio_state,
+                                positions_state=positions_state,
+                                symbols=["BTC/USD"],
+                            )
+
+        self.assertEqual(results["BTC/USD"].execution["nemotron"]["reason"], "context_hold")
+        self.assertEqual(len(strategy_calls), 1)
+        self.assertEqual(
+            strategy_calls[0]["market_state_review"]["market_state"],
+            "trending",
+        )
+        self.assertEqual(
+            strategy_calls[0]["lane_supervision"]["lane_candidate"],
+            "breakout",
+        )
 
     def test_single_parse_failure_uses_deterministic_open_for_strong_buy_candidate(self) -> None:
         strategist = self._make_strategist()

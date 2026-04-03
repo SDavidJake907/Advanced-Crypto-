@@ -653,6 +653,8 @@ class NemotronStrategist:
             sym = c["symbol"]
             f = c["features"]
             phi3 = str(c.get("reflex", {}).get("reflex", "allow"))
+            market_state_review = c.get("market_state_review", {}) if isinstance(c.get("market_state_review", {}), dict) else {}
+            lane_supervision = c.get("lane_supervision", {}) if isinstance(c.get("lane_supervision", {}), dict) else {}
             pattern_candidate = f.get("pattern_candidate", {}) if isinstance(f.get("pattern_candidate", {}), dict) else {}
             pattern_verification = f.get("pattern_verification", {}) if isinstance(f.get("pattern_verification", {}), dict) else {}
             lane = str(f.get("lane", "L3") or "L3")
@@ -683,6 +685,12 @@ class NemotronStrategist:
             pattern_validity = str(pattern_verification.get("validity", "unclear") or "unclear")
             pattern_quality = float(pattern_verification.get("pattern_quality_score", 0.0) or 0.0)
             extension_risk = float(pattern_verification.get("extension_risk_score", 0.0) or 0.0)
+            market_state = str(market_state_review.get("market_state", "transition") or "transition")
+            lane_bias = str(market_state_review.get("lane_bias", "favor_selective") or "favor_selective")
+            market_confidence = float(market_state_review.get("confidence", 0.0) or 0.0)
+            lane_candidate = str(lane_supervision.get("lane_candidate", "") or "")
+            lane_conflict = bool(lane_supervision.get("lane_conflict", False))
+            universe_lane = str(lane_supervision.get("universe_lane", "") or "")
             rows.append(
                 f"{sym:<14}|{lane:<3}|score:{score:>4.0f}|{rec:<10}|{risk:<6}"
                 f"|m5:{m5:>+5.1f}%|m14:{m14:>+5.1f}%|rsi:{rsi:>4.0f}|vol:{vol:>4.1f}x|vs:{vs:>4.1f}%"
@@ -691,7 +699,9 @@ class NemotronStrategist:
                 f"|trend:{'Y' if trend_ok else 'N'}|chop:{'Y' if ranging else 'N'}"
                 f"|ema:{'Y' if ema9 else 'N'}|brk:{'Y' if brk else 'N'}|pb:{'Y' if pb else 'N'}|hl:{hl}"
                 f"|net_edge:{net_edge:>+5.2f}%|cost_pen:{cost_penalty:>+4.0f}pts"
-                f"|phi3:{phi3}|pat:{pattern_name}|pver:{pattern_validity}|pqs:{pattern_quality:>3.2f}|ext:{extension_risk:>3.2f}"
+                f"|phi3:{phi3}|mkt:{market_state}|bias:{lane_bias}|mkt_cf:{market_confidence:>3.2f}"
+                f"|lane_sup:{lane_candidate or '-'}|lane_conflict:{'Y' if lane_conflict else 'N'}|univ_lane:{universe_lane or '-'}"
+                f"|pat:{pattern_name}|pver:{pattern_validity}|pqs:{pattern_quality:>3.2f}|ext:{extension_risk:>3.2f}"
             )
         table = "\n".join(rows)
 
@@ -831,6 +841,8 @@ class NemotronStrategist:
             features = c["features"]
             proposed_weight = float(c.get("proposed_weight", 0.1))
             reflex = c.get("reflex", {"reflex": "allow", "micro_state": "stable", "reason": "batch"})
+            market_state_review = c.get("market_state_review", {}) if isinstance(c.get("market_state_review", {}), dict) else {}
+            lane_supervision = c.get("lane_supervision", {}) if isinstance(c.get("lane_supervision", {}), dict) else {}
             t_sym = time.perf_counter()
 
             if sym in decision_map:
@@ -875,6 +887,8 @@ class NemotronStrategist:
                 "size_factor_hint": 1.0,
                 "reflex": reflex.get("reflex", "allow"),
                 "micro_state": reflex.get("micro_state", "stable"),
+                "market_state_review": market_state_review,
+                "lane_supervision": lane_supervision,
             }
 
             signal = strategy_decision(self.strategy, features, reflex_decision=integrated_reflex)
