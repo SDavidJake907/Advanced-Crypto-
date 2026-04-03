@@ -384,6 +384,10 @@ def _openai_model() -> str:
     return os.getenv("OPENAI_MODEL", os.getenv("NEMOTRON_MODEL", "gpt-4.1-mini")).strip()
 
 
+def _local_llm_backend() -> str:
+    return str(os.getenv("LOCAL_LLM_BACKEND", "ollama") or "ollama").strip().lower()
+
+
 def _strip_reasoning_blocks(raw: str) -> str:
     text = raw.strip()
     while "<think>" in text:
@@ -576,6 +580,20 @@ def warm_nemotron_model() -> bool:
     provider = _nemotron_provider()
     if provider != "local":
         return True  # Cloud providers manage their own warm state
+    if _local_llm_backend() == "lmstudio":
+        base_url = nemotron_provider_api_url()
+        base = base_url.rstrip("/")
+        if base.endswith("/v1"):
+            models_url = f"{base}/models"
+        else:
+            models_url = f"{base}/v1/models"
+        try:
+            resp = httpx.get(models_url, timeout=15.0)
+            resp.raise_for_status()
+            return True
+        except Exception as exc:
+            print(f"[warm_nemotron] LM Studio readiness check failed: {exc}")
+            return False
     model = os.getenv("NEMOTRON_MODEL", "nemotron-9b")
     ollama_host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
     endpoint = f"{ollama_host}/api/generate"
@@ -608,6 +626,8 @@ def unload_nemotron_model() -> None:
     """
     provider = _nemotron_provider()
     if provider != "local":
+        return
+    if _local_llm_backend() == "lmstudio":
         return
     model = os.getenv("NEMOTRON_MODEL", "nemotron-9b")
     ollama_host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")

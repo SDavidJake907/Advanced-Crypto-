@@ -9,7 +9,16 @@ import httpx
 
 from core.execution.cpp_exec import CppExecutor
 from core.llm.nemotron import NemotronDecision, NemotronStrategist
-from core.llm.client import advisory_chat, advisory_provider_name, nemotron_chat, nemotron_provider_name, parse_json_response, run_nemotron_tool_loop
+from core.llm.client import (
+    advisory_chat,
+    advisory_provider_name,
+    nemotron_chat,
+    nemotron_provider_name,
+    parse_json_response,
+    run_nemotron_tool_loop,
+    unload_nemotron_model,
+    warm_nemotron_model,
+)
 from core.risk.basic_risk import BasicRiskEngine
 from core.risk.portfolio import PortfolioConfig, PositionState
 from core.state.portfolio import PortfolioState
@@ -428,6 +437,45 @@ class NemotronClientTests(unittest.TestCase):
         self.assertEqual(parsed["final_decision"]["symbol"], "TEST/USD")
         self.assertEqual(parsed["final_decision"]["action"], "HOLD")
         self.assertEqual(parsed["final_decision"]["reason"], "ok_generate")
+
+    def test_warm_nemotron_model_uses_lmstudio_readiness_when_configured(self) -> None:
+        request_urls: list[str] = []
+
+        def fake_get(url: str, **kwargs: object) -> httpx.Response:
+            request_urls.append(url)
+            return httpx.Response(200, request=httpx.Request("GET", url), json={"data": [{"id": "gemma4-e4b-it"}]})
+
+        with patch.dict(
+            "os.environ",
+            {
+                "NEMOTRON_PROVIDER": "local",
+                "NEMOTRON_STRATEGIST_PROVIDER": "local",
+                "LOCAL_LLM_BACKEND": "lmstudio",
+                "NEMOTRON_BASE_URL": "http://127.0.0.1:1234",
+                "NEMOTRON_MODEL": "gemma4-e4b-it",
+            },
+            clear=False,
+        ):
+            with patch("core.llm.client.httpx.get", side_effect=fake_get):
+                self.assertTrue(warm_nemotron_model())
+
+        self.assertEqual(request_urls, ["http://127.0.0.1:1234/v1/models"])
+
+    def test_unload_nemotron_model_skips_http_call_for_lmstudio(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "NEMOTRON_PROVIDER": "local",
+                "NEMOTRON_STRATEGIST_PROVIDER": "local",
+                "LOCAL_LLM_BACKEND": "lmstudio",
+                "NEMOTRON_BASE_URL": "http://127.0.0.1:1234",
+                "NEMOTRON_MODEL": "gemma4-e4b-it",
+            },
+            clear=False,
+        ):
+            with patch("core.llm.client.httpx.post") as post_mock:
+                unload_nemotron_model()
+        post_mock.assert_not_called()
 
 
 class NemotronBatchParsingTests(unittest.TestCase):
