@@ -24,14 +24,14 @@ This repository exists to run a real trading stack without moving the core busin
 2. Symbol-local feature extraction
 3. Deterministic scoring and lane selection
 4. Phi-3 pattern / market-state review
-5. Gemma 4 finalist judgment
+5. Nemotron finalist judgment
 6. Hard risk, portfolio, and cost gating
 7. Execution and fill tracking
 8. Exit management, trade memory, and review feedback
 
 ```text
 Market Data -> Feature Engine -> Deterministic Scoring -> Phi-3 Verification
-           -> Final Candidate Payload -> Gemma 4 Judgment
+           -> Final Candidate Payload -> Nemotron Judgment
            -> Risk / Portfolio Gates -> Execution -> Exit Logic
            -> Trade Memory / Replay / Shadow Review
 ```
@@ -55,7 +55,7 @@ Owns:
 - candle-context review
 - market-state and posture review from structured packets
 
-### Gemma 4
+### Nemotron
 
 Owns:
 - final structured `OPEN / HOLD / FLAT` judgment on finalists
@@ -230,11 +230,12 @@ Persistent AI services are started separately with [`scripts/start_models.ps1`](
 - a local model host when `NEMOTRON_PROVIDER=local`:
   - `ollama` when `LOCAL_LLM_BACKEND=ollama`
   - `LM Studio` when `LOCAL_LLM_BACKEND=lmstudio`
+  - Ubuntu/WSL `vLLM` when `LOCAL_LLM_BACKEND=vllm_wsl`
 - optional Phi-3 services only when `ADVISORY_MODEL_PROVIDER=phi3`
 
 **Important:** Run `start_models.ps1` first and wait for "Phi-3 ready" before running `start_all.ps1`. Phi-3 takes 2-3 minutes to load on NPU — `start_all.ps1` only waits 15 seconds.
 
-Current note: the default local strategist profile uses `NVIDIA-Nemotron-Nano-9B-v2` through Ollama with `ADVISORY_MODEL_PROVIDER=local_nemo`, `NEMOTRON_PROVIDER=local`, `NEMOTRON_STRATEGIST_PROVIDER=local`, and `LOCAL_LLM_BACKEND=ollama`. Phi-3 can be started alongside that local strategist path when `START_PHI3_ON_START=true`.
+Current note: the default local strategist profile uses `NVIDIA-Nemotron-Nano-9B-v2` through Ollama with `ADVISORY_MODEL_PROVIDER=local_nemo`, `NEMOTRON_PROVIDER=local`, `NEMOTRON_STRATEGIST_PROVIDER=local`, and `LOCAL_LLM_BACKEND=ollama`. An optional official local profile can run the same model from Ubuntu/WSL through `vLLM` by setting `LOCAL_LLM_BACKEND=vllm_wsl`, `NEMOTRON_BASE_URL=http://127.0.0.1:8000/v1`, and the `VLLM_WSL_*` variables in `.env`. Phi-3 can be started alongside either local strategist path when `START_PHI3_ON_START=true`.
 
 Current reference docs:
 - [LLM operating model](docs/llm_operating_model.md)
@@ -253,7 +254,7 @@ Current reference docs:
 - [Full docs index](docs/DOCS_INDEX.md): full grouped document map
 - [Trading playbook](docs/trading_playbook.md): how the system should trade in practice
 - [Runtime cycle](docs/runtime_cycle.md): startup and live decision-loop behavior
-- [LLM operating model](docs/llm_operating_model.md): what Phi-3, Gemma, and deterministic code each own
+- [LLM operating model](docs/llm_operating_model.md): what Phi-3, Nemotron, and deterministic code each own
 - [Entry/exit research](docs/entry_exit_research.md): where trade behavior actually lives
 - [Symbol classification](docs/symbol_classification.md): what each tracked symbol is and how it is treated
 - [Exchange fee and policy references](docs/exchange_fee_policy_refs.md): fee-policy guardrails for live assumptions
@@ -552,8 +553,9 @@ Common runtime controls in `.env`:
 - `NEMOTRON_PROVIDER=local|nvidia|openai`
 - `NEMOTRON_STRATEGIST_PROVIDER=local|cloud|nvidia|openai`
 - `NEMOTRON_BATCH_MODE=true|false`
-- `LOCAL_LLM_BACKEND=ollama|lmstudio`
-- `LOCAL_LLM_LOAD_KEY=` local LM Studio model key to auto-load at startup
+- `LOCAL_LLM_BACKEND=ollama|lmstudio|vllm_wsl`
+- `LOCAL_LLM_LOAD_KEY=` local model key to auto-load at startup for LM Studio / Ollama-style local hosts
+- `VLLM_WSL_DISTRO`, `VLLM_WSL_HOME`, `VLLM_WSL_VENV`, `VLLM_WSL_MODEL`, `VLLM_WSL_PORT`, `VLLM_WSL_HOST`, `VLLM_WSL_EXTRA_ARGS` for the optional Ubuntu/WSL official Nemotron path
 - `ADVISORY_LOCAL_BASE_URL=http://127.0.0.1:1234`
 - `ADVISORY_LOCAL_MODEL=gemma4-e4b-it`
 - `NEMOTRON_BASE_URL=http://127.0.0.1:1234`
