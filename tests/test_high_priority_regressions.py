@@ -36,6 +36,7 @@ class HighPriorityRegressionTests(unittest.TestCase):
             symbol="TEST/USD",
             features={
                 "entry_recommendation": "WATCH",
+                "promotion_tier": "probe",
                 "reversal_risk": "MEDIUM",
                 "entry_score": 70.0,
                 "rotation_score": 0.2,
@@ -44,7 +45,6 @@ class HighPriorityRegressionTests(unittest.TestCase):
             },
             positions_state=PositionState(),
             universe_context={"current_symbol_is_top_candidate": False},
-            candidate_review={"promotion_decision": "promote", "priority": 0.8},
         )
         self.assertTrue(allowed)
 

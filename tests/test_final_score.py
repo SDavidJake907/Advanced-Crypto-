@@ -32,6 +32,7 @@ class FinalScoreRefactorTests(unittest.TestCase):
         self.assertEqual(result.cost_penalty, 5.0)
         self.assertEqual(result.correlation_penalty, 0.0)
         self.assertEqual(result.net_edge_pct, 0.45)
+        self.assertEqual(result.fear_greed_bonus, 0.0)
 
     def test_score_breakdown_groups_contributions_without_renaming_public_fields(self) -> None:
         result = compute_final_score(
@@ -60,6 +61,7 @@ class FinalScoreRefactorTests(unittest.TestCase):
         self.assertEqual(breakdown["setup_pts"], 58.0)
         self.assertEqual(breakdown["reflex_bonus"], -5.0)
         self.assertEqual(breakdown["divergence_bonus"], -0.8)
+        self.assertEqual(breakdown["fear_greed_bonus"], 0.0)
         self.assertEqual(breakdown["reliability_bonus"], -10.0)
         self.assertEqual(breakdown["basket_fit"], 8.0)
         self.assertEqual(breakdown["spread_penalty"], -14.4)
@@ -67,6 +69,42 @@ class FinalScoreRefactorTests(unittest.TestCase):
         self.assertEqual(breakdown["correlation_penalty"], -5.0)
         self.assertEqual(breakdown["net_edge_pct"], -0.75)
         self.assertEqual(breakdown["notes"], result.breakdown_notes)
+
+    def test_fear_greed_adds_small_bonus_for_confirmed_trend(self) -> None:
+        result = compute_final_score(
+            {
+                "symbol": "BTC/USD",
+                "entry_score": 60.0,
+                "reflex": {"reflex": "allow"},
+                "lane": "L1",
+                "trend_confirmed": True,
+                "ranging_market": False,
+                "sentiment_fng_value": 75,
+                "spread_pct": 0.2,
+                "point_breakdown": {"cost_penalty_pts": 2.0, "net_edge_pct": 0.5},
+            },
+        )
+
+        self.assertAlmostEqual(result.fear_greed_bonus, 1.5)
+        self.assertEqual(result.score_breakdown["fear_greed_bonus"], 1.5)
+
+    def test_fear_greed_penalizes_extreme_fear_when_trend_unconfirmed(self) -> None:
+        result = compute_final_score(
+            {
+                "symbol": "ETH/USD",
+                "entry_score": 60.0,
+                "reflex": {"reflex": "allow"},
+                "lane": "L3",
+                "trend_confirmed": False,
+                "ranging_market": False,
+                "sentiment_fng_value": 10,
+                "spread_pct": 0.2,
+                "point_breakdown": {"cost_penalty_pts": 2.0, "net_edge_pct": 0.5},
+            },
+        )
+
+        self.assertAlmostEqual(result.fear_greed_bonus, -1.2)
+        self.assertEqual(result.score_breakdown["fear_greed_bonus"], -1.2)
 
 
 if __name__ == "__main__":

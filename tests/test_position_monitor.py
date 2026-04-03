@@ -224,7 +224,7 @@ class PositionMonitorTests(unittest.TestCase):
 
     def test_monitor_tracks_mfe_mae_and_structure_state(self) -> None:
         result = monitor_open_position(
-            Position(symbol="SOL/USD", side="LONG", weight=0.1, lane="L2", entry_price=100.0),
+            Position(symbol="SOL/USD", side="LONG", weight=0.1, lane="L2", entry_price=100.0, risk_r=1.0),
             price=104.0,
             atr=1.0,
             hold_minutes=20.0,

@@ -220,16 +220,28 @@ def _select_replacement_candidate(
         return None
     weakest: Position | None = None
     weakest_score = 0.0
+    soft_replaceable: Position | None = None
+    soft_replace_weight = 1.0
     for position in positions.all():
         if position.symbol == incoming_symbol:
             continue
         score = _position_weakness_score(position)
         if score < 4.0:
+            monitor_reason = str(position.monitor_reason or "").lower()
+            exit_reason = str(position.exit_posture_reason or "").lower()
+            if (
+                abs(float(position.weight or 0.0)) <= 0.08
+                and monitor_reason == "default_hold_state"
+                and exit_reason == "default_hold_state"
+            ):
+                if soft_replaceable is None or abs(float(position.weight or 0.0)) < soft_replace_weight:
+                    soft_replaceable = position
+                    soft_replace_weight = abs(float(position.weight or 0.0))
             continue
         if weakest is None or score > weakest_score:
             weakest = position
             weakest_score = score
-    return weakest
+    return weakest if weakest is not None else soft_replaceable
 
 
 def evaluate_trade(

@@ -34,6 +34,7 @@ class FinalTradeScore:
     entry_score: float          # raw setup score from entry_verifier
     reflex_bonus: float         # Phi-3 reflex signal adjustment
     divergence_bonus: float     # RSI divergence adjustment
+    fear_greed_bonus: float     # macro sentiment context adjustment
     reliability_bonus: float    # per-symbol win-rate adjustment
     basket_fit_bonus: float     # low correlation to held positions
     spread_penalty: float       # spread cost penalty
@@ -67,11 +68,12 @@ class _SetupContribution:
     entry_score: float
     reflex_bonus: float
     divergence_bonus: float
+    fear_greed_bonus: float
     notes: tuple[str, ...]
 
     @property
     def total(self) -> float:
-        return self.entry_score + self.reflex_bonus + self.divergence_bonus
+        return self.entry_score + self.reflex_bonus + self.divergence_bonus + self.fear_greed_bonus
 
 
 @dataclass(frozen=True)
@@ -181,6 +183,36 @@ def _divergence_bonus(features: dict[str, Any]) -> tuple[float, str]:
     return -adjustment, f"bear_div(age={age},{-adjustment:.1f})"
 
 
+def _fear_greed_bonus(features: dict[str, Any]) -> tuple[float, str]:
+    raw = features.get("sentiment_fng_value")
+    try:
+        fng = float(raw)
+    except (TypeError, ValueError):
+        return 0.0, ""
+
+    fng = _clamp(fng, 0.0, 100.0)
+    trend_confirmed = bool(features.get("trend_confirmed", False))
+    ranging_market = bool(features.get("ranging_market", False))
+    overextended = bool(features.get("overextended", False))
+
+    if overextended and fng >= 70.0:
+        penalty = _clamp(((fng - 70.0) / 30.0) * 1.5, 0.0, 1.5)
+        return -penalty, f"fng_greed_extended({int(round(fng))},-{penalty:.1f})" if penalty >= 0.5 else ""
+
+    if not trend_confirmed and fng <= 25.0:
+        penalty = _clamp(((25.0 - fng) / 25.0) * 2.0, 0.0, 2.0)
+        return -penalty, f"fng_extreme_fear({int(round(fng))},-{penalty:.1f})" if penalty >= 0.5 else ""
+
+    if trend_confirmed and not ranging_market:
+        bonus = _clamp((fng - 50.0) / 25.0, -1.0, 1.0) * 1.5
+        if abs(bonus) < 0.25:
+            return 0.0, ""
+        sign = "+" if bonus > 0 else ""
+        return bonus, f"fng_trend_context({int(round(fng))},{sign}{bonus:.1f})"
+
+    return 0.0, ""
+
+
 def _basket_fit_bonus(features: dict[str, Any], held_correlation_map: dict[str, float]) -> tuple[float, str]:
     """
     Bonus for symbols that are uncorrelated with what's currently held.
@@ -239,11 +271,13 @@ def _setup_contribution(features: dict[str, Any]) -> _SetupContribution:
     entry_score = float(features.get("entry_score", 0.0) or 0.0)
     reflex_bonus, reflex_note = _reflex_bonus(features)
     divergence_bonus, divergence_note = _divergence_bonus(features)
-    notes = tuple(note for note in (reflex_note, divergence_note) if note)
+    fear_greed_bonus, fear_greed_note = _fear_greed_bonus(features)
+    notes = tuple(note for note in (reflex_note, divergence_note, fear_greed_note) if note)
     return _SetupContribution(
         entry_score=entry_score,
         reflex_bonus=reflex_bonus,
         divergence_bonus=divergence_bonus,
+        fear_greed_bonus=fear_greed_bonus,
         notes=notes,
     )
 
@@ -291,6 +325,7 @@ def _build_score_breakdown(
         "setup_pts": round(setup.entry_score, 1),
         "reflex_bonus": round(setup.reflex_bonus, 1),
         "divergence_bonus": round(setup.divergence_bonus, 1),
+        "fear_greed_bonus": round(setup.fear_greed_bonus, 1),
         "reliability_bonus": round(reliability.value, 1),
         "basket_fit": round(basket.basket_fit_bonus, 1),
         "spread_penalty": -round(cost.spread_penalty, 1),
@@ -354,6 +389,7 @@ def compute_final_score(
         entry_score=setup.entry_score,
         reflex_bonus=setup.reflex_bonus,
         divergence_bonus=setup.divergence_bonus,
+        fear_greed_bonus=setup.fear_greed_bonus,
         reliability_bonus=reliability.value,
         basket_fit_bonus=basket.basket_fit_bonus,
         spread_penalty=cost.spread_penalty,

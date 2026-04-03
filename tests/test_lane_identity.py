@@ -127,7 +127,7 @@ class LaneIdentityTests(unittest.TestCase):
                 "lane": "L3",
                 "volume_ratio": 0.95,
                 "volume_surge": 0.55,
-                "momentum_5": 0.01,
+                "momentum_5": 0.015,
                 "momentum_14": 0.005,
                 "trend_1h": 0,
                 "rsi": 58.0,
@@ -154,8 +154,8 @@ class LaneIdentityTests(unittest.TestCase):
                 "spread_pct": 0.4,
             }
         )
-        self.assertFalse(result.passed)
-        self.assertEqual(result.reason, "lane3_vol_low")
+        self.assertTrue(result.passed)
+        self.assertEqual(result.reason, "lane3_vol_low_warning")
         self.assertEqual(result.severity, "soft")
 
     def test_lane4_entry_verifier_promotes_hot_setup_more_easily(self) -> None:
@@ -197,6 +197,7 @@ class LaneIdentityTests(unittest.TestCase):
             features={
                 "lane": "L4",
                 "entry_recommendation": "WATCH",
+                "promotion_tier": "probe",
                 "reversal_risk": "MEDIUM",
                 "entry_score": 46.0,
                 "rotation_score": 0.05,
@@ -207,7 +208,6 @@ class LaneIdentityTests(unittest.TestCase):
             },
             positions_state=PositionState(),
             universe_context={"current_symbol_is_top_candidate": False},
-            candidate_review={"promotion_decision": "neutral", "priority": 0.45},
         )
         self.assertTrue(allowed)
 
@@ -264,9 +264,10 @@ class LaneIdentityTests(unittest.TestCase):
         self.assertIn(lane3["entry_recommendation"], {"WATCH", "BUY"})
         self.assertGreaterEqual(lane2["entry_score"], lane3["entry_score"])
 
-    def test_lane1_requires_cleaner_watch_promotion_than_lane2(self) -> None:
+    def test_unpromoted_watch_fails_nemotron_gate(self) -> None:
         base_features = {
             "entry_recommendation": "WATCH",
+            "promotion_tier": "skip",
             "reversal_risk": "MEDIUM",
             "entry_score": 58.0,
             "rotation_score": 0.04,
@@ -281,17 +282,15 @@ class LaneIdentityTests(unittest.TestCase):
             features={"lane": "L1", **base_features},
             positions_state=PositionState(),
             universe_context={"current_symbol_is_top_candidate": False},
-            candidate_review={"promotion_decision": "promote", "priority": 0.62},
         )
         allowed_l2 = should_run_nemotron(
             symbol="APT/USD",
             features={"lane": "L2", **base_features},
             positions_state=PositionState(),
             universe_context={"current_symbol_is_top_candidate": False},
-            candidate_review={"promotion_decision": "promote", "priority": 0.62},
         )
         self.assertFalse(allowed_l1)
-        self.assertTrue(allowed_l2)
+        self.assertFalse(allowed_l2)
 
 
 if __name__ == "__main__":

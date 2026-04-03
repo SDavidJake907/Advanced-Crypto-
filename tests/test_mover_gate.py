@@ -7,7 +7,14 @@ from core.risk.portfolio import PositionState
 
 class MoverGateTests(unittest.TestCase):
     def test_ranging_market_allows_strong_mover_buy(self) -> None:
-        with patch("core.config.runtime.load_runtime_overrides", return_value={}):
+        with patch(
+            "core.config.runtime.load_runtime_overrides",
+            return_value={
+                "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
+                "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "STABILIZATION_STRICT_ENTRY_ENABLED": False,
+            },
+        ):
             passed, reason = passes_deterministic_candidate_gate(
                 symbol="XLM/USD",
                 positions_state=PositionState(),
@@ -42,8 +49,15 @@ class MoverGateTests(unittest.TestCase):
         self.assertTrue(passed)
         self.assertEqual(reason, "passed")
 
-    def test_ranging_market_still_blocks_weak_setup(self) -> None:
-        with patch("core.config.runtime.load_runtime_overrides", return_value={}):
+    def test_ranging_market_no_longer_auto_blocks_buy_candidate(self) -> None:
+        with patch(
+            "core.config.runtime.load_runtime_overrides",
+            return_value={
+                "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
+                "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "STABILIZATION_STRICT_ENTRY_ENABLED": False,
+            },
+        ):
             passed, reason = passes_deterministic_candidate_gate(
                 symbol="ICP/USD",
                 positions_state=PositionState(),
@@ -52,7 +66,7 @@ class MoverGateTests(unittest.TestCase):
                     "symbol": "ICP/USD",
                     "lane": "L2",
                     "indicators_ready": True,
-                    "entry_recommendation": "WATCH",
+                    "entry_recommendation": "BUY",
                     "reversal_risk": "MEDIUM",
                     "entry_score": 55.0,
                     "rotation_score": 0.0,
@@ -69,11 +83,18 @@ class MoverGateTests(unittest.TestCase):
                     "regime_7d": "choppy",
                 },
         )
-        self.assertFalse(passed)
-        self.assertEqual(reason, "ranging_unconfirmed_structure_weak")
+        self.assertTrue(passed)
+        self.assertEqual(reason, "passed")
 
-    def test_ranging_unconfirmed_blocks_high_score_weak_continuation_setup(self) -> None:
-        with patch("core.config.runtime.load_runtime_overrides", return_value={}):
+    def test_ranging_unconfirmed_no_longer_adds_second_deterministic_block(self) -> None:
+        with patch(
+            "core.config.runtime.load_runtime_overrides",
+            return_value={
+                "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
+                "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "STABILIZATION_STRICT_ENTRY_ENABLED": False,
+            },
+        ):
             passed, reason = passes_deterministic_candidate_gate(
                 symbol="CRV/USD",
                 positions_state=PositionState(),
@@ -102,8 +123,56 @@ class MoverGateTests(unittest.TestCase):
                     "pullback_hold": False,
                 },
             )
-        self.assertFalse(passed)
-        self.assertEqual(reason, "ranging_unconfirmed_structure_weak")
+        self.assertTrue(passed)
+        self.assertEqual(reason, "passed")
+
+    def test_ranging_unconfirmed_allows_valid_l3_retest_mover(self) -> None:
+        with patch(
+            "core.config.runtime.load_runtime_overrides",
+            return_value={
+                "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
+                "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "STABILIZATION_STRICT_ENTRY_ENABLED": True,
+                "STABILIZATION_ALLOWED_LANES": "L2,L3",
+                "STABILIZATION_MIN_ENTRY_SCORE": 52.0,
+                "STABILIZATION_MIN_NET_EDGE_PCT": 0.0,
+                "STABILIZATION_REQUIRE_TP_AFTER_COST_VALID": True,
+                "STABILIZATION_REQUIRE_TREND_CONFIRMED": False,
+                "STABILIZATION_REQUIRE_SHORT_TF_READY_15M": True,
+                "STABILIZATION_BLOCK_RANGING_MARKET": False,
+                "STABILIZATION_REQUIRE_BUY_RECOMMENDATION": False,
+            },
+        ):
+            passed, reason = passes_deterministic_candidate_gate(
+                symbol="TIA/USD",
+                positions_state=PositionState(),
+                universe_context={"current_symbol_is_top_candidate": False},
+                features={
+                    "symbol": "TIA/USD",
+                    "lane": "L3",
+                    "indicators_ready": True,
+                    "entry_recommendation": "BUY",
+                    "reversal_risk": "LOW",
+                    "entry_score": 62.84,
+                    "rotation_score": -0.22,
+                    "momentum_5": 0.006,
+                    "volume_ratio": 0.88,
+                    "volume_surge": 0.12,
+                    "trend_confirmed": False,
+                    "short_tf_ready_5m": True,
+                    "short_tf_ready_15m": True,
+                    "ranging_market": True,
+                    "structure_quality": 63.07,
+                    "continuation_quality": 48.87,
+                    "trade_quality": 99.88,
+                    "tp_after_cost_valid": True,
+                    "net_edge_pct": 0.10,
+                    "range_breakout_1h": False,
+                    "pullback_hold": True,
+                },
+            )
+        self.assertTrue(passed)
+        self.assertEqual(reason, "passed")
 
     def test_strong_mover_can_bypass_top_candidate_filter(self) -> None:
         with patch("core.config.runtime.load_runtime_overrides", return_value={}):
@@ -133,25 +202,45 @@ class MoverGateTests(unittest.TestCase):
         self.assertTrue(allowed)
 
     def test_watch_lane_conflict_bypass_requires_real_quality(self) -> None:
-        allowed = symbol_in_top_candidates(
-            "LINK/USD",
-            PositionState(),
-            {
-                "symbol": "LINK/USD",
-                "lane": "L3",
-                "entry_recommendation": "WATCH",
-                "promotion_tier": "probe",
-                "reversal_risk": "LOW",
-                "entry_score": 42.0,
-                "rotation_score": 0.02,
-                "momentum_5": 0.001,
-                "volume_ratio": 0.7,
-                "volume_surge": 0.0,
-                "lane_conflict": True,
-                "leader_takeover": False,
-                "leader_urgency": 0.0,
+        with patch(
+            "core.config.runtime.load_runtime_overrides",
+            return_value={
+                "NEMOTRON_ALLOW_WATCH_LOW_LANE_CONFLICT": True,
+                "NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": 40.0,
+                "NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO": 0.7,
+                "LEADER_URGENCY_OVERRIDE_THRESHOLD": 6.0,
             },
-        )
+        ):
+            with patch(
+                "core.policy.nemotron_gate.load_universe_candidate_context",
+                return_value={
+                    "top_scored": [],
+                    "hot_candidates": [],
+                    "avoid_candidates": [],
+                    "top_ranked": [],
+                    "lane_supervision": [],
+                    "current_symbol_is_top_candidate": False,
+                },
+            ):
+                allowed = symbol_in_top_candidates(
+                    "LINK/USD",
+                    PositionState(),
+                    {
+                        "symbol": "LINK/USD",
+                        "lane": "L3",
+                        "entry_recommendation": "WATCH",
+                        "promotion_tier": "probe",
+                        "reversal_risk": "LOW",
+                        "entry_score": 39.0,
+                        "rotation_score": 0.0,
+                        "momentum_5": 0.0,
+                        "volume_ratio": 0.68,
+                        "volume_surge": 0.0,
+                        "lane_conflict": True,
+                        "leader_takeover": False,
+                        "leader_urgency": 0.0,
+                    },
+                )
         self.assertFalse(allowed)
 
 

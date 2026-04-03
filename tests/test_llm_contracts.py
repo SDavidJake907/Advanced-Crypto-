@@ -63,7 +63,7 @@ class LLMContractsTests(unittest.TestCase):
             },
             symbol="TEST/USD",
         )
-        self.assertEqual(parsed["final_decision"]["reason"], "hold_unspecified")
+        self.assertEqual(parsed["final_decision"]["reason"], "reason_missing")
 
     def test_trade_reviewer_accepts_watch_action(self) -> None:
         parsed = normalize_trade_reviewer_output(

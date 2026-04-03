@@ -39,20 +39,20 @@ _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "MEME_PROPOSED_WEIGHT": {"type": float, "default": 0.03},
     "MEME_TREND_CONFLICT_SCALE": {"type": float, "default": 0.5},
     "MEME_LANE_MIN_VOLUME_RATIO": {"type": float, "default": 1.0},
-    "MEME_LANE_MIN_VOLUME_SURGE": {"type": float, "default": 0.25},
+    "MEME_LANE_MIN_VOLUME_SURGE": {"type": float, "default": 2.0},
     "MEME_LANE_SOFT_MAX_SPREAD_PCT": {"type": float, "default": 4.0},
     "MEME_ENTRY_SCORE_BUY_THRESHOLD": {"type": float, "default": 48.0},
     "MEME_ENTRY_SCORE_STRONG_BUY_THRESHOLD": {"type": float, "default": 62.0},
-    "EXIT_ATR_STOP_MULT": {"type": float, "default": 22.5},
+    "EXIT_ATR_STOP_MULT": {"type": float, "default": 1.8},
     "EXIT_ATR_TAKE_PROFIT_MULT": {"type": float, "default": 5.0},
     "EXIT_PRIMARY_TP_ATR_MULT": {"type": float, "default": 1.2},
     "EXIT_MIN_STOP_PCT": {"type": float, "default": 1.5},
-    "L1_EXIT_ATR_STOP_MULT": {"type": float, "default": 18.0},
-    "L1_EXIT_ATR_TAKE_PROFIT_MULT": {"type": float, "default": 8.0},
+    "L1_EXIT_ATR_STOP_MULT": {"type": float, "default": 1.8},
+    "L1_EXIT_ATR_TAKE_PROFIT_MULT": {"type": float, "default": 5.0},
     "L1_EXIT_PRIMARY_TP_ATR_MULT": {"type": float, "default": 1.8},
     "L1_EXIT_MIN_STOP_PCT": {"type": float, "default": 1.2},
-    "L2_EXIT_ATR_STOP_MULT": {"type": float, "default": 16.2},
-    "L2_EXIT_ATR_TAKE_PROFIT_MULT": {"type": float, "default": 6.0},
+    "L2_EXIT_ATR_STOP_MULT": {"type": float, "default": 1.8},
+    "L2_EXIT_ATR_TAKE_PROFIT_MULT": {"type": float, "default": 5.0},
     "L2_EXIT_PRIMARY_TP_ATR_MULT": {"type": float, "default": 1.35},
     "L2_EXIT_MIN_STOP_PCT": {"type": float, "default": 1.5},
     "MEME_EXIT_MIN_STOP_PCT": {"type": float, "default": 3.0},
@@ -70,6 +70,8 @@ _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "EXIT_STALE_MIN_HOLD_MIN": {"type": float, "default": 99999.0},
     "EXIT_STALE_MAX_ABS_PNL_PCT": {"type": float, "default": 99999.0},
     "EXIT_STALE_GREEN_BLOCK": {"type": bool, "default": True},
+    "MEME_EXIT_STALE_MIN_HOLD_MIN": {"type": float, "default": 15.0},
+    "MEME_EXIT_STALE_MAX_ABS_PNL_PCT": {"type": float, "default": 2.0},
     "EXIT_NEVER_PROFITED_MIN_HOLD_MIN": {"type": float, "default": 99999.0},
     "EXIT_FEE_AWARE_GREEN_BLOCK": {"type": bool, "default": True},
     "EXIT_GREEN_ONLY_STOP_OR_TRAIL": {"type": bool, "default": True},
@@ -95,8 +97,8 @@ _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "L2_EXIT_TIGHTEN_MIN_PNL_PCT": {"type": float, "default": 3.0},
     "L3_EXIT_TIGHTEN_MIN_PNL_PCT": {"type": float, "default": 2.5},
     "L4_EXIT_TIGHTEN_MIN_PNL_PCT": {"type": float, "default": 1.5},
-    "MEME_EXIT_ATR_STOP_MULT": {"type": float, "default": 25.2},
-    "MEME_EXIT_ATR_TAKE_PROFIT_MULT": {"type": float, "default": 7.0},
+    "MEME_EXIT_ATR_STOP_MULT": {"type": float, "default": 1.8},
+    "MEME_EXIT_ATR_TAKE_PROFIT_MULT": {"type": float, "default": 5.0},
     "MEME_EXIT_PRIMARY_TP_ATR_MULT": {"type": float, "default": 1.4},
     "MEME_BREAK_EVEN_R": {"type": float, "default": 2.0},
     "MEME_TRAIL_ARM_R": {"type": float, "default": 1.2},
@@ -168,11 +170,11 @@ _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": {"type": bool, "default": True},
     "NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 38.0},
     "NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO": {"type": float, "default": 1.05},
-    "NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 42.0},
+    "NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 52.0},
     "NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.0},
     "MEME_NEMOTRON_WATCH_MIN_ENTRY_SCORE": {"type": float, "default": 38.0},
     "MEME_NEMOTRON_WATCH_MIN_VOLUME_RATIO": {"type": float, "default": 1.0},
-    "MEME_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 42.0},
+    "MEME_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 52.0},
     "MEME_NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 0.95},
     "LEADER_URGENCY_OVERRIDE_THRESHOLD": {"type": float, "default": 0.35},
     "NEMOTRON_VERDICT_CACHE_TTL_SEC": {"type": float, "default": 90.0},
@@ -474,8 +476,22 @@ def is_meme_lane(lane: str | None) -> bool:
     return str(lane or "").upper() == "L4"
 
 
-def get_proposed_weight(symbol: str | None = None, lane: str | None = None) -> float:
+def get_proposed_weight(symbol: str | None = None, lane: str | None = None, atr_pct: float | None = None) -> float:
     resolved_lane = lane or (get_symbol_lane(symbol) if symbol is not None else None)
-    if symbol is not None and is_meme_lane(resolved_lane):
-        return float(get_runtime_setting("MEME_PROPOSED_WEIGHT"))
-    return float(get_runtime_setting("TRADER_PROPOSED_WEIGHT"))
+    is_meme = is_meme_lane(resolved_lane)
+    
+    # Base weight uses Kelly fractions (EXEC_RISK_PER_TRADE_PCT)
+    kelly_key = "MEME_EXEC_RISK_PER_TRADE_PCT" if is_meme else "EXEC_RISK_PER_TRADE_PCT"
+    base_weight = float(get_runtime_setting(kelly_key)) / 100.0
+    
+    # Fallback to hardcoded fallback defaults if Kelly disabled
+    if base_weight <= 0.0 or base_weight > 0.50:
+        base_weight = float(get_runtime_setting("MEME_PROPOSED_WEIGHT" if is_meme else "TRADER_PROPOSED_WEIGHT"))
+        
+    # Dynamic ATR Volatility Scaling
+    if atr_pct and atr_pct > 0.0:
+        # Target nominal move around 5%. If highly volatile (e.g., 10%), halve size. If low volatility (e.g., 2.5%), double it.
+        vol_scalar = 5.0 / atr_pct
+        base_weight *= max(0.5, min(vol_scalar, 2.0))
+        
+    return base_weight

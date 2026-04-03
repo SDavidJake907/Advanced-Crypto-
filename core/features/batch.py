@@ -643,8 +643,52 @@ def _compute_short_tf_features(
         trend = 1 if latest > closes[-lookback] else (-1 if latest < closes[-lookback] else 0)
         momentums.append(float(mom))
         trends.append(int(trend))
-        readiness.append(True)
     return momentums, trends, readiness
+
+
+def _compute_vwrs(
+    frames: list[pd.DataFrame],
+    btc_frame: pd.DataFrame | None,
+    lookback: int = 20,
+) -> np.ndarray:
+    """Compute Volume-Weighted Relative Strength vs BTC over a window."""
+    results: list[float] = []
+    btc_rets: np.ndarray | None = None
+    
+    if btc_frame is not None and not btc_frame.empty and len(btc_frame) > lookback:
+        btc_closes = btc_frame["close"].to_numpy(dtype=np.float64)
+        btc_window = btc_closes[-(lookback + 1):]
+        btc_rets = np.zeros(lookback, dtype=np.float64)
+        for i in range(1, len(btc_window)):
+            prev = btc_window[i - 1]
+            btc_rets[i - 1] = (btc_window[i] - prev) / prev if prev > 0 else 0.0
+
+    for frame in frames:
+        if frame.empty or "close" not in frame.columns or "volume" not in frame.columns or len(frame) <= lookback:
+            results.append(0.0)
+            continue
+            
+        closes = frame["close"].to_numpy(dtype=np.float64)[-(lookback + 1):]
+        volumes = frame["volume"].to_numpy(dtype=np.float64)[-(lookback):]
+        
+        rets = np.zeros(lookback, dtype=np.float64)
+        for i in range(1, len(closes)):
+            prev = closes[i - 1]
+            rets[i - 1] = (closes[i] - prev) / prev if prev > 0 else 0.0
+
+        if btc_rets is not None and len(btc_rets) == len(rets):
+            rel_rets = rets - btc_rets
+        else:
+            rel_rets = rets
+            
+        vol_sum = np.sum(volumes)
+        if vol_sum <= 0:
+            results.append(0.0)
+        else:
+            weighted_ret = np.sum(rel_rets * volumes) / vol_sum
+            results.append(float(weighted_ret))
+            
+    return np.asarray(results, dtype=np.float64)
 
 
 def _build_coin_profile(
@@ -865,6 +909,7 @@ def compute_features_batch(
             "vwio": np.array([], dtype=np.float64),
             "trend_confirmed": np.array([], dtype=bool),
             "ranging_market": np.array([], dtype=bool),
+            "vwrs": np.array([], dtype=np.float64),
             "momentum_5m": np.array([], dtype=np.float64),
             "trend_5m": np.array([], dtype=np.int64),
             "short_tf_ready_5m": np.array([], dtype=bool),
@@ -992,6 +1037,7 @@ def compute_features_batch(
             "vwio": np.zeros(n_assets, dtype=np.float64),
             "trend_confirmed": np.zeros(n_assets, dtype=bool),
             "ranging_market": np.zeros(n_assets, dtype=bool),
+            "vwrs": np.zeros(n_assets, dtype=np.float64),
             "momentum_5m": zeros.copy(),
             "trend_5m": np.zeros(n_assets, dtype=np.int64),
             "short_tf_ready_5m": np.zeros(n_assets, dtype=bool),
@@ -1266,6 +1312,21 @@ def compute_features_batch(
         trend_15m_list = [0] * n_assets
         short_tf_ready_15m = [False] * n_assets
 
+    # Compute VWRS using the 15m timeframe (approx 5h given 20 bars)
+    btc_frame_15m: pd.DataFrame | None = None
+    if ohlc_15m_by_symbol and "BTC/USD" in ohlc_15m_by_symbol:
+        btc_frame_15m = ohlc_15m_by_symbol["BTC/USD"]
+    
+    # We use 15m frames for VWRS if available, fallback to primary frames if not
+    frames_for_vwrs = []
+    for sym in symbols:
+        if ohlc_15m_by_symbol and sym in ohlc_15m_by_symbol:
+            frames_for_vwrs.append(ohlc_15m_by_symbol[sym])
+        else:
+            frames_for_vwrs.append(ohlc_by_symbol.get(sym, pd.DataFrame()))
+            
+    vwrs_arr = _compute_vwrs(frames_for_vwrs, btc_frame_15m, lookback=20)
+
     # Per-symbol finbert scores
     finbert_per_symbol = [
         float(finbert_scores.get(sym, 0.0)) if finbert_scores else 0.0
@@ -1361,6 +1422,7 @@ def compute_features_batch(
         "compression_score": compression_score,
         "expansion_score": expansion_score,
         "volatility_state": volatility_state,
+        "vwrs": vwrs_arr,
         "momentum_5m": np.asarray(momentum_5m_list, dtype=np.float64),
         "trend_5m": np.asarray(trend_5m_list, dtype=np.int64),
         "short_tf_ready_5m": np.asarray(short_tf_ready_5m, dtype=bool),
@@ -1376,6 +1438,20 @@ def compute_features_batch(
 
 
 def slice_features_for_asset(features_batch: dict[str, Any], asset_idx: int, *, lane_hint: str | None = None) -> dict[str, Any]:
+    def _safe_batch_scalar(key: str, default: Any) -> Any:
+        values = features_batch.get(key)
+        if values is None:
+            return default
+        try:
+            if len(values) <= asset_idx:
+                return default
+        except TypeError:
+            return default
+        try:
+            return values[asset_idx]
+        except Exception:
+            return default
+
     symbol = features_batch["symbols"][asset_idx]
     resolved_lane = str(lane_hint or "").upper()
     features = {
@@ -1436,15 +1512,15 @@ def slice_features_for_asset(features_batch: dict[str, Any], asset_idx: int, *, 
         "trend_confirmed": bool(features_batch["trend_confirmed"][asset_idx]),
         "ranging_market": bool(features_batch["ranging_market"][asset_idx]),
         "volatility_percentile": float(features_batch["volatility_percentile"][asset_idx]),
-        "compression_score": float(features_batch["compression_score"][asset_idx]),
         "expansion_score": float(features_batch["expansion_score"][asset_idx]),
         "volatility_state": str(features_batch["volatility_state"][asset_idx]),
-        "momentum_5m": float(features_batch["momentum_5m"][asset_idx]),
-        "trend_5m": int(features_batch["trend_5m"][asset_idx]),
-        "short_tf_ready_5m": bool(features_batch["short_tf_ready_5m"][asset_idx]),
-        "momentum_15m": float(features_batch["momentum_15m"][asset_idx]),
-        "trend_15m": int(features_batch["trend_15m"][asset_idx]),
-        "short_tf_ready_15m": bool(features_batch["short_tf_ready_15m"][asset_idx]),
+        "vwrs": float(features_batch["vwrs"][asset_idx]),
+        "momentum_5m": float(_safe_batch_scalar("momentum_5m", 0.0)),
+        "trend_5m": int(_safe_batch_scalar("trend_5m", 0)),
+        "short_tf_ready_5m": bool(_safe_batch_scalar("short_tf_ready_5m", False)),
+        "momentum_15m": float(_safe_batch_scalar("momentum_15m", 0.0)),
+        "trend_15m": int(_safe_batch_scalar("trend_15m", 0)),
+        "short_tf_ready_15m": bool(_safe_batch_scalar("short_tf_ready_15m", False)),
         "finbert_score": float(features_batch["finbert_score"][asset_idx]),
         "xgb_score": float(features_batch["xgb_score"][asset_idx]),
     }
@@ -1520,11 +1596,10 @@ def slice_features_for_asset(features_batch: dict[str, Any], asset_idx: int, *, 
         "macro_timeframe": "4h",
         "trigger_timeframe": "5m" if _lane == "L4" else "15m",
     })
-    # Inject universe-assigned lane before apply_policy_pipeline so classify_lane uses it as anchor.
+    # Inject universe-assigned lane as universe_lane so it doesn't suppress runtime classification
     # pipeline.py: enriched["lane"] = enriched.get("lane") or classify_lane(...)
-    # Setting it here means the runtime classifier only fires when the universe has no opinion.
     if lane_hint:
-        features["lane"] = lane_hint.upper()
+        features["universe_lane"] = lane_hint.upper()
         resolved_lane = lane_hint.upper()
     else:
         resolved_lane = str(features.get("lane", "L3") or "L3").upper()

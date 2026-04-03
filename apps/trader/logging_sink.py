@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -50,12 +51,14 @@ CONSOLE_EVENT_LOG    = os.getenv("CONSOLE_EVENT_LOG", "true").lower() == "true"
 def now_iso() -> str:
     return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
+_log_lock = threading.Lock()
 
 def _append_jsonl(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    rotate_jsonl_if_needed(path)
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(payload, default=str) + "\n")
+    with _log_lock:
+        rotate_jsonl_if_needed(path)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(payload, default=str) + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -256,11 +259,11 @@ def _maybe_emit_alert_from_account_sync(payload: dict) -> None:
     if trades_history_error:
         invalid_key = "EAPI:Invalid key" in trades_history_error
         emit_alert(
-            level="warning",
+            level="info" if invalid_key else "warning",
             source="account_sync",
             code="trades_history_invalid_key" if invalid_key else "trades_history_fallback",
             message=(
-                "TradesHistory rejected by Kraken API key; likely missing permission or wrong key scope. Using ledger fallback."
+                "TradesHistory permission absent (expected); securely utilizing ledger fallback for closed trades."
                 if invalid_key
                 else "TradesHistory unavailable; using ledger fallback"
             ),

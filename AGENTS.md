@@ -108,6 +108,8 @@ This repo is a modular crypto trading system with deterministic scoring, AI-assi
 - If a HOLD reason can be made more specific, prefer specificity over generic wording.
 - Do not let prompt examples normalize lazy outputs that weaken diagnosis.
 - Keep reason taxonomies short, stable, and log-friendly.
+- Do not invent synthetic blocker labels when a symbol simply loses batch priority.
+- Treat ranging market state as caution by default; leave actual veto power to clear deterministic risk, cost, portfolio, or execution rules.
 
 ## Runtime safety
 - Treat live fee assumptions, spread assumptions, and cost floors as production risk settings.

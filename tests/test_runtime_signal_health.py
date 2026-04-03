@@ -2,12 +2,12 @@ import unittest
 
 import pandas as pd
 
-from apps.trader.main import (
-    _apply_lane_supervision,
-    _market_sentiment_fallback,
-    _prune_symbol_tracking_state,
-    _select_symbols_for_cycle,
+from apps.trader.cycle import (
+    apply_lane_supervision,
+    market_sentiment_fallback,
+    select_symbols_for_cycle,
 )
+from apps.trader.positions import prune_symbol_tracking_state
 from core.data.live_buffer import LiveMarketDataFeed
 from core.features.batch import _compute_short_tf_features
 from core.models.xgb_entry import XGBEntryModel
@@ -33,7 +33,7 @@ class RuntimeSignalHealthTests(unittest.TestCase):
             "DOGE/USD": pd.DataFrame({"timestamp": [pd.Timestamp("2026-01-01T00:00:00Z")], "close": [10.0]}),
             "SOL/USD": pd.DataFrame({"timestamp": [pd.Timestamp("2026-01-01T00:01:00Z")], "close": [20.0]}),
         }
-        active, static, prices = _select_symbols_for_cycle(
+        active, static, prices = select_symbols_for_cycle(
             ["BTC/USD", "DOGE/USD", "SOL/USD"],
             frames,
             last_bar_keys={
@@ -79,7 +79,7 @@ class RuntimeSignalHealthTests(unittest.TestCase):
         self.assertEqual(ready, [False])
 
     def test_market_sentiment_fallback_returns_non_zero_for_supportive_snapshot(self) -> None:
-        score = _market_sentiment_fallback("DOGE/USD", _Snapshot(65, 2.0, ["DOGE"]))
+        score = market_sentiment_fallback("DOGE/USD", _Snapshot(65, 2.0, ["DOGE"]))
         self.assertGreater(score, 0.0)
 
     def test_xgb_model_uses_heuristic_proxy_when_model_missing(self) -> None:
@@ -103,7 +103,7 @@ class RuntimeSignalHealthTests(unittest.TestCase):
 
     def test_apply_lane_supervision_preserves_dynamic_lane(self) -> None:
         features = {"symbol": "DOGE/USD", "lane": "L1"}
-        merged = _apply_lane_supervision(
+        merged = apply_lane_supervision(
             features,
             {
                 "universe_lane": "L4",
@@ -122,7 +122,7 @@ class RuntimeSignalHealthTests(unittest.TestCase):
         last_bar_keys = {"BTC/USD": "k1", "OLD/USD": "k2"}
         last_exit_ts = {"OLD/USD": 1.0, "DOGE/USD": 9999999999.0}
 
-        _prune_symbol_tracking_state(
+        prune_symbol_tracking_state(
             ["BTC/USD", "SOL/USD"],
             positions_state,
             last_prices=last_prices,

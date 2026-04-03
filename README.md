@@ -29,6 +29,18 @@ This repository exists to run a real trading stack without moving the core busin
 7. Execution and fill tracking
 8. Exit management, trade memory, and review feedback
 
+Exit ownership note:
+- Phi-3 advises live exit posture from chart/state data
+- deterministic code decides the actual exit through stop, trail, stale, and protection rules
+- Nemotron is not used for live exits
+
+## Current Decision Rules
+
+- Hard vetoes belong in deterministic risk, portfolio, and execution layers.
+- Ranging market state is caution, not an automatic entry kill, when the candidate already clears score and volume floors.
+- Nemotron may decline a setup, but the reason should be specific and loggable; soft labels are not substitutes for a real blocker.
+- Batch priority is ranking context, not a synthetic veto. A symbol losing rank should not look identical to a structurally bad setup.
+
 ```text
 Market Data -> Feature Engine -> Deterministic Scoring -> Phi-3 Verification
            -> Final Candidate Payload -> Nemotron Judgment
@@ -55,6 +67,7 @@ Owns:
 - candle-context review
 - market-state and posture review from structured packets
 - structured chart-evidence translation for Nemo, not free-form trade narration
+- exit-posture guidance for already-open positions
 
 ### Nemotron
 
@@ -62,6 +75,7 @@ Owns:
 - final structured `OPEN / HOLD / FLAT` judgment on finalists
 - comparative ranking on the candidate set it is given
 - reasoned decision output for the live strategy layer
+- offline outcome analysis only when explicitly used outside the live exit path
 
 ### Runtime Enforcement
 
@@ -71,6 +85,7 @@ Owns:
 - fee/spread/slippage floors
 - portfolio replacement rules
 - hard vetoes over any model output
+- final stop, trail, stale-timer, and forced-exit authority
 
 ## Repository Layout
 
@@ -407,9 +422,9 @@ Current runtime note:
 - local strategist receives a compact canonical candidate packet instead of the full wide packet
 - `lesson_summary` is preferred over long lesson dumps
 - `behavior_score` can still be provided, but local payloads should stay compact
-- `Phi-3` should translate chart data into machine-readable evidence, not vague prose
+- `Phi-3` should translate chart data into machine-readable evidence, not vague prose or trade advice
 - current Phi handoff includes:
-  - `pattern_explanation`: structure pattern, validity, confidence, quality/context, warnings, and recommended Nemo interpretation
+  - `pattern_explanation`: structure phase, confidence, quality/context, warnings, and missing confirmation
   - `candle_evidence`: primary candle, bias, strength, location context, confirmation score, and warning flags
 - `Phi-3` (NPU): market-state scan, posture review, watchlist flagging — boosts entry_score for flagged symbols
 - `Phi-3` pattern verifier: chart-structure and candle-context verification only; it helps Nemo judge finalists, but it does not make the final trade decision
@@ -425,12 +440,9 @@ Phi should explain the chart to Nemo as structured evidence, not as a story.
 
 Current evidence layers passed from Phi into the strategist path:
 - `pattern_explanation`
-  - `structure_pattern`
-  - `structure_bias`
-  - `structure_validity`
+  - `structure_phase`
   - `structure_confidence`
   - quality/context/warning fields
-  - `recommended_nemo_interpretation`
 - `candle_evidence`
   - `primary_candle`
   - `candle_bias`
@@ -438,6 +450,18 @@ Current evidence layers passed from Phi into the strategist path:
   - `location_context`
   - `confirmation_score`
   - `warning_flags`
+
+Entry interpretation order:
+- candle structure first
+- EMA/support/retest structure second
+- breakout or pullback thesis validity third
+- momentum, volume, and macro context last
+
+Entry guardrails:
+- one bullish candle alone is not enough for an `OPEN`
+- one weak candle alone is not enough for a non-entry
+- retest-holding or confirmed-breakout structure with supportive candle confirmation should be treated as strong evidence
+- breakout-failure or failed-retest structure should weigh more than generic momentum excitement
 
 Design rule:
 - deterministic code computes the market facts

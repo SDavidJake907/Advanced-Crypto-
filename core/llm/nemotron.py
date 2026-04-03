@@ -326,33 +326,150 @@ class NemotronStrategist:
     def _phi_requires_explicit_override(self, *, features: dict[str, Any], market_state_review: dict[str, Any]) -> bool:
         pattern_explanation = market_state_review.get("pattern_explanation", {}) if isinstance(market_state_review.get("pattern_explanation", {}), dict) else {}
         candle_evidence = market_state_review.get("candle_evidence", {}) if isinstance(market_state_review.get("candle_evidence", {}), dict) else {}
-        recommended = pattern_explanation.get("recommended_nemo_interpretation", {}) if isinstance(pattern_explanation.get("recommended_nemo_interpretation", {}), dict) else {}
+        pattern_quality = pattern_explanation.get("pattern_quality", {}) if isinstance(pattern_explanation.get("pattern_quality", {}), dict) else {}
 
         recommendation = str(features.get("entry_recommendation", "WATCH") or "WATCH").upper()
         reversal_risk = str(features.get("reversal_risk", "MEDIUM") or "MEDIUM").upper()
-        structure_validity = str(pattern_explanation.get("structure_validity", "unclear") or "unclear")
+        structure_phase = str(pattern_explanation.get("structure_phase", "unclear") or "unclear")
         structure_confidence = float(pattern_explanation.get("structure_confidence", 0.0) or 0.0)
-        prefer_action = str(recommended.get("prefer_action", "HOLD") or "HOLD").upper()
-        skepticism_penalty = int(recommended.get("skepticism_penalty", 0) or 0)
+        breakout_quality = float(pattern_quality.get("breakout_quality_score", 0.0) or 0.0)
+        retest_quality = float(pattern_quality.get("retest_quality_score", 0.0) or 0.0)
+        location_quality = float(pattern_quality.get("location_quality_score", 0.0) or 0.0)
         candle_confirmation = float(candle_evidence.get("confirmation_score", 0.0) or 0.0)
         candle_bias = str(candle_evidence.get("candle_bias", "neutral") or "neutral")
         late_move_risk = str(market_state_review.get("late_move_risk", "moderate") or "moderate")
         breakout_state = str(market_state_review.get("breakout_state", "unclear") or "unclear")
+        volume_confirmation = str(market_state_review.get("volume_confirmation", "neutral") or "neutral")
+        pullback_quality = str(market_state_review.get("pullback_quality", "unclear") or "unclear")
         score = float(features.get("entry_score", 0.0) or 0.0)
 
         return (
             recommendation in {"BUY", "STRONG_BUY"}
             and reversal_risk != "HIGH"
-            and prefer_action == "OPEN"
-            and structure_validity == "valid"
+            and structure_phase in {"confirmed_breakout", "retest_holding", "trend_expansion", "attempting_breakout"}
             and structure_confidence >= 0.6
+            and breakout_quality >= 0.5
+            and retest_quality >= 0.42
+            and location_quality >= 0.5
             and candle_confirmation >= 0.65
             and candle_bias != "bearish"
-            and skepticism_penalty <= 1
             and late_move_risk != "extended"
             and breakout_state in {"fresh_breakout", "retest_holding", "breakout_attempt"}
+            and volume_confirmation in {"supportive", "neutral"}
+            and pullback_quality in {"clean_retest", "higher_low_support", "loose_retest"}
             and score >= 58.0
         )
+
+    def _correct_fake_portfolio_full(
+        self,
+        *,
+        integrated_reflex: dict[str, Any],
+        portfolio_decision: dict[str, Any],
+        features: dict[str, Any],
+        reflex: dict[str, Any],
+        phi_chart_support: str,
+        phi_requires_explicit_override: bool,
+    ) -> dict[str, Any]:
+        if str(integrated_reflex.get("reason", "") or "") != "portfolio_full":
+            return integrated_reflex
+        if str(portfolio_decision.get("decision", "allow") or "allow") in {"block", "replace"}:
+            return integrated_reflex
+
+        corrected = dict(integrated_reflex)
+        debug = corrected.get("debug", {}) if isinstance(corrected.get("debug", {}), dict) else {}
+        debug["portfolio_reason_corrected"] = True
+        corrected["debug"] = debug
+
+        if (
+            str(reflex.get("reflex", "allow")) == "allow"
+            and str(features.get("entry_recommendation", "WATCH") or "WATCH").upper() in {"BUY", "STRONG_BUY"}
+            and str(features.get("reversal_risk", "MEDIUM") or "MEDIUM").upper() != "HIGH"
+            and (phi_chart_support == "strong" or phi_requires_explicit_override)
+        ):
+            corrected.update(
+                {
+                    "action": TRADE_ACTION_OPEN,
+                    "reason": "phi_structure_confirmed",
+                    "override_signal": "LONG",
+                    "size_factor_hint": max(float(corrected.get("size_factor_hint", 1.0) or 1.0), 0.6),
+                }
+            )
+            debug["primary_blocker"] = ""
+            return corrected
+
+        corrected["reason"] = "reason_missing"
+        return corrected
+
+    def _specific_hold_reason(
+        self,
+        *,
+        features: dict[str, Any],
+        market_state_review: dict[str, Any],
+        portfolio_decision: dict[str, Any] | None = None,
+        current_reason: str = "",
+    ) -> str:
+        reason = str(current_reason or "").strip()
+        if reason and reason not in {"hold_unspecified", "reason_missing"}:
+            return reason
+        if isinstance(portfolio_decision, dict) and str(portfolio_decision.get("decision", "allow") or "allow") in {"block", "replace"}:
+            return "portfolio_block"
+        if str(features.get("reversal_risk", "MEDIUM") or "MEDIUM").upper() == "HIGH":
+            return "reversal_risk_high"
+        net_edge_pct = float(
+            features.get(
+                "net_edge_pct",
+                ((features.get("point_breakdown") or {}).get("net_edge_pct", 0.0) if isinstance(features.get("point_breakdown"), dict) else 0.0),
+            )
+            or 0.0
+        )
+        if net_edge_pct <= 0.0:
+            return "net_edge_too_low"
+        volume_ratio = float(features.get("volume_ratio", 1.0) or 1.0)
+        volume_gate = float(
+            get_runtime_setting("MEME_NEMOTRON_GATE_MIN_VOLUME_RATIO")
+            if str(features.get("lane", "L3") or "L3").upper() == "L4"
+            else get_runtime_setting("NEMOTRON_GATE_MIN_VOLUME_RATIO")
+        )
+        if volume_ratio < max(volume_gate, 0.95):
+            return "volume_too_light"
+        if bool(features.get("ranging_market", False)):
+            return "range_not_clean"
+        if not bool(features.get("trend_confirmed", False)):
+            return "trend_unconfirmed"
+        if (
+            float(features.get("momentum_5", 0.0) or 0.0) <= 0.0
+            or not bool(features.get("short_tf_ready_15m", False))
+        ):
+            return "momentum_not_confirmed"
+        structure_phase = str(((market_state_review.get("pattern_explanation") or {}).get("structure_phase", "unclear")) or "unclear")
+        breakout_state = str(market_state_review.get("breakout_state", "unclear") or "unclear")
+        if structure_phase in {"unclear", "breakout_failure"} or breakout_state == "unclear":
+            return "pattern_not_confirmed"
+        return "momentum_not_confirmed"
+
+    def _normalize_live_hold_reason(
+        self,
+        *,
+        integrated_reflex: dict[str, Any],
+        features: dict[str, Any],
+        market_state_review: dict[str, Any],
+        portfolio_decision: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if str(integrated_reflex.get("action", "HOLD") or "HOLD").upper() != TRADE_ACTION_HOLD:
+            return integrated_reflex
+        normalized = dict(integrated_reflex)
+        debug = normalized.get("debug", {}) if isinstance(normalized.get("debug", {}), dict) else {}
+        normalized_reason = self._specific_hold_reason(
+            features=features,
+            market_state_review=market_state_review,
+            portfolio_decision=portfolio_decision,
+            current_reason=str(normalized.get("reason", "") or ""),
+        )
+        if normalized_reason != str(normalized.get("reason", "") or ""):
+            debug["normalized_hold_reason"] = normalized_reason
+        normalized["debug"] = debug
+        normalized["reason"] = normalized_reason
+        return normalized
 
     def _decision_fingerprint(
         self,
@@ -589,6 +706,8 @@ class NemotronStrategist:
             }
         )
         nemotron_ms = 0.0
+        phi_chart_support = "weak"
+        phi_requires_explicit_override = False
         try:
             t_nemo_start = time.perf_counter()
             raw = nemotron_chat(
@@ -617,6 +736,35 @@ class NemotronStrategist:
                 "visual_review": visual_review,
                 "market_state_review": market_state_review,
             }
+            phi_chart_support = self._phi_chart_support_level(
+                features=features,
+                market_state_review=market_state_review,
+            )
+            phi_requires_explicit_override = self._phi_requires_explicit_override(
+                features=features,
+                market_state_review=market_state_review,
+            )
+            if (
+                str(integrated_reflex.get("action", "HOLD")).upper() == TRADE_ACTION_HOLD
+                and str(integrated_reflex.get("reason", "") or "") in {"m5_zero", "hold_unspecified", "batch_priority_lower", "batch_hold"}
+                and (phi_chart_support == "strong" or phi_requires_explicit_override)
+                and str(reflex.get("reflex", "allow")) == "allow"
+                and str(features.get("entry_recommendation", "WATCH") or "WATCH").upper() in {"BUY", "STRONG_BUY"}
+                and str(features.get("reversal_risk", "MEDIUM") or "MEDIUM").upper() != "HIGH"
+            ):
+                debug = integrated_reflex.get("debug", {}) if isinstance(integrated_reflex.get("debug", {}), dict) else {}
+                debug["phi_chart_support"] = phi_chart_support
+                debug["phi_requires_explicit_override"] = phi_requires_explicit_override
+                debug["primary_blocker"] = ""
+                integrated_reflex.update(
+                    {
+                        "action": TRADE_ACTION_OPEN,
+                        "reason": "phi_structure_confirmed",
+                        "debug": debug,
+                        "override_signal": "LONG",
+                        "size_factor_hint": 0.6,
+                    }
+                )
         except Exception as exc:
             self._log_fallback(payload, exc)
             integrated_reflex = self._build_model_failure_fallback(
@@ -631,6 +779,58 @@ class NemotronStrategist:
             advisory_ms = 0.0
             integrated_reflex["visual_review"] = filtered_visual_review
             integrated_reflex["market_state_review"] = market_state_review
+        signal = strategy_decision(self.strategy, features, reflex_decision=integrated_reflex)
+        if self._reflex_is_hard_block(reflex):
+            signal = "FLAT"
+        risk_checks = risk_adjust(
+            self.risk_engine,
+            signal=signal,
+            features=features,
+            portfolio_state=portfolio_state,
+        )
+        portfolio_decision = portfolio_evaluate(
+            config=self.portfolio_config,
+            positions=positions_state,
+            symbol=symbol,
+            signal=signal,
+            proposed_weight=proposed_weight,
+            features=features,
+            symbols=symbols,
+        )
+        corrected_reflex = self._correct_fake_portfolio_full(
+            integrated_reflex=integrated_reflex,
+            portfolio_decision=portfolio_decision,
+            features=features,
+            reflex=reflex,
+            phi_chart_support=phi_chart_support,
+            phi_requires_explicit_override=phi_requires_explicit_override,
+        )
+        if corrected_reflex != integrated_reflex:
+            integrated_reflex = corrected_reflex
+            signal = strategy_decision(self.strategy, features, reflex_decision=integrated_reflex)
+            if self._reflex_is_hard_block(reflex):
+                signal = "FLAT"
+            risk_checks = risk_adjust(
+                self.risk_engine,
+                signal=signal,
+                features=features,
+                portfolio_state=portfolio_state,
+            )
+            portfolio_decision = portfolio_evaluate(
+                config=self.portfolio_config,
+                positions=positions_state,
+                symbol=symbol,
+                signal=signal,
+                proposed_weight=proposed_weight,
+                features=features,
+                symbols=symbols,
+            )
+        integrated_reflex = self._normalize_live_hold_reason(
+            integrated_reflex=integrated_reflex,
+            features=features,
+            market_state_review=market_state_review,
+            portfolio_decision=portfolio_decision,
+        )
         signal = strategy_decision(self.strategy, features, reflex_decision=integrated_reflex)
         if self._reflex_is_hard_block(reflex):
             signal = "FLAT"
@@ -787,13 +987,12 @@ class NemotronStrategist:
             late_move_risk = str(market_state_review.get("late_move_risk", "moderate") or "moderate")
             pattern_explanation = market_state_review.get("pattern_explanation", {}) if isinstance(market_state_review.get("pattern_explanation", {}), dict) else {}
             candle_evidence = market_state_review.get("candle_evidence", {}) if isinstance(market_state_review.get("candle_evidence", {}), dict) else {}
-            structure_pattern = str(pattern_explanation.get("structure_pattern", "none") or "none")
-            structure_validity = str(pattern_explanation.get("structure_validity", "unclear") or "unclear")
+            structure_phase = str(pattern_explanation.get("structure_phase", "unclear") or "unclear")
             structure_confidence = float(pattern_explanation.get("structure_confidence", 0.0) or 0.0)
-            recommended_interpretation = pattern_explanation.get("recommended_nemo_interpretation", {}) if isinstance(pattern_explanation.get("recommended_nemo_interpretation", {}), dict) else {}
-            pattern_prefer_action = str(recommended_interpretation.get("prefer_action", "HOLD") or "HOLD")
-            structure_bonus = int(recommended_interpretation.get("structure_bonus", 0) or 0)
-            skepticism_penalty = int(recommended_interpretation.get("skepticism_penalty", 0) or 0)
+            phi_pattern_quality = pattern_explanation.get("pattern_quality", {}) if isinstance(pattern_explanation.get("pattern_quality", {}), dict) else {}
+            breakout_quality_score = float(phi_pattern_quality.get("breakout_quality_score", 0.0) or 0.0)
+            retest_quality_score = float(phi_pattern_quality.get("retest_quality_score", 0.0) or 0.0)
+            location_quality_score = float(phi_pattern_quality.get("location_quality_score", 0.0) or 0.0)
             primary_candle = str(candle_evidence.get("primary_candle", "none") or "none")
             candle_bias = str(candle_evidence.get("candle_bias", "neutral") or "neutral")
             candle_strength = float(candle_evidence.get("candle_strength", 0.0) or 0.0)
@@ -801,6 +1000,12 @@ class NemotronStrategist:
             lane_candidate = str(lane_supervision.get("lane_candidate", "") or "")
             lane_conflict = bool(lane_supervision.get("lane_conflict", False))
             universe_lane = str(lane_supervision.get("universe_lane", "") or "")
+            symbol_lessons = self._memory_store.build_symbol_lesson_block(sym, n=3)
+            symbol_lesson_tag = "-"
+            if symbol_lessons:
+                lesson_lines = [line.strip() for line in symbol_lessons.splitlines() if line.strip() and not line.startswith("===")]
+                if lesson_lines:
+                    symbol_lesson_tag = " / ".join(lesson_lines[:2])[:180]
             rows.append(
                 f"{sym:<14}|{lane:<3}|score:{score:>4.0f}|{rec:<10}|{risk:<6}"
                 f"|m5:{m5:>+5.1f}%|m14:{m14:>+5.1f}%|rsi:{rsi:>4.0f}|vol:{vol:>4.1f}x|vs:{vs:>4.1f}%"
@@ -810,12 +1015,12 @@ class NemotronStrategist:
                 f"|ema:{'Y' if ema9 else 'N'}|brk:{'Y' if brk else 'N'}|pb:{'Y' if pb else 'N'}|hl:{hl}"
                 f"|net_edge:{net_edge:>+5.2f}%|cost_pen:{cost_penalty:>+4.0f}pts"
                 f"|phi3:{phi3}|mkt:{market_state}|bias:{lane_bias}|mkt_cf:{market_confidence:>3.2f}"
-                f"|sp:{structure_pattern}|sval:{structure_validity}|scf:{structure_confidence:>3.2f}"
+                f"|phase:{structure_phase}|scf:{structure_confidence:>3.2f}|bq:{breakout_quality_score:>3.2f}|rtq:{retest_quality_score:>3.2f}|locq:{location_quality_score:>3.2f}"
                 f"|brk_state:{breakout_state}|trend_stage:{trend_stage}|pbq:{pullback_quality}|vol_cf:{volume_confirmation}|late:{late_move_risk}"
-                f"|nemo_act:{pattern_prefer_action}|sbonus:{structure_bonus}|skep:{skepticism_penalty}"
                 f"|candle:{primary_candle}|cbias:{candle_bias}|cstr:{candle_strength:>3.2f}|ccf:{candle_confirmation_score:>3.2f}"
                 f"|lane_sup:{lane_candidate or '-'}|lane_conflict:{'Y' if lane_conflict else 'N'}|univ_lane:{universe_lane or '-'}"
                 f"|pat:{pattern_name}|pver:{pattern_validity}|pqs:{pattern_quality:>3.2f}|ext:{extension_risk:>3.2f}"
+                f"|mem:{symbol_lesson_tag}"
             )
         table = "\n".join(rows)
 
@@ -964,7 +1169,7 @@ class NemotronStrategist:
             elif batch_parse_failed:
                 d = _safe_batch_model_failure_decision(sym, features, reflex)
             else:
-                d = {"action": "HOLD", "reason": "not_ranked_by_batch"}
+                d = {"action": "HOLD", "reason": "batch_priority_lower"}
             action, _normalized_action_fields = normalize_trade_action(d.get("action", TRADE_ACTION_HOLD))
             side_raw = d.get("side")
             side = str(side_raw).upper() if side_raw else None
@@ -987,7 +1192,7 @@ class NemotronStrategist:
 
             if (
                 action == "HOLD"
-                and reason in {"m5_zero", "hold_unspecified", "not_ranked_by_batch", "batch_hold"}
+                and reason in {"m5_zero", "hold_unspecified", "batch_priority_lower", "batch_hold"}
                 and (phi_chart_support == "strong" or phi_requires_explicit_override)
                 and str(reflex.get("reflex", "allow")) == "allow"
                 and str(features.get("entry_recommendation", "WATCH") or "WATCH").upper() in {"BUY", "STRONG_BUY"}
@@ -1053,6 +1258,47 @@ class NemotronStrategist:
                 features=features,
                 symbols=symbols,
             )
+            corrected_reflex = self._correct_fake_portfolio_full(
+                integrated_reflex=integrated_reflex,
+                portfolio_decision=portfolio_decision,
+                features=features,
+                reflex=reflex,
+                phi_chart_support=phi_chart_support,
+                phi_requires_explicit_override=phi_requires_explicit_override,
+            )
+            if corrected_reflex != integrated_reflex:
+                integrated_reflex = corrected_reflex
+                action = str(integrated_reflex.get("action", action) or action).upper()
+                reason = str(integrated_reflex.get("reason", reason) or reason)
+                side = str(integrated_reflex.get("override_signal", side) or side).upper() if integrated_reflex.get("override_signal") else side
+                if side == "FLAT":
+                    side = None
+                signal = strategy_decision(self.strategy, features, reflex_decision=integrated_reflex)
+                if self._reflex_is_hard_block(reflex):
+                    signal = "FLAT"
+                risk_checks = risk_adjust(
+                    self.risk_engine,
+                    signal=signal,
+                    features=features,
+                    portfolio_state=portfolio_state,
+                )
+                portfolio_decision = portfolio_evaluate(
+                    config=self.portfolio_config,
+                    positions=positions_state,
+                    symbol=sym,
+                    signal=signal,
+                    proposed_weight=proposed_weight,
+                    features=features,
+                    symbols=symbols,
+                )
+            integrated_reflex = self._normalize_live_hold_reason(
+                integrated_reflex=integrated_reflex,
+                features=features,
+                market_state_review=market_state_review,
+                portfolio_decision=portfolio_decision,
+            )
+            action = str(integrated_reflex.get("action", action) or action).upper()
+            reason = str(integrated_reflex.get("reason", reason) or reason)
             if portfolio_decision["reasons"]:
                 risk_checks.extend(portfolio_decision["reasons"])
             if portfolio_decision["decision"] == "block" and "block" not in risk_checks:

@@ -154,6 +154,7 @@ async def _kraken_trade_stream(symbols: list[str]):
                     }
                 )
             )
+            await asyncio.sleep(0.5)
         while True:
             raw = await ws.recv()
             msg = json.loads(raw)

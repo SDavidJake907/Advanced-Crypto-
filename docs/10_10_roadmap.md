@@ -10,10 +10,10 @@ This document outlines the steps necessary to elevate KrakenSK from an 8.5/10 to
 - [ ] Build decentralized RateLimiter & API Watchdog for Kraken
 
 ### Phase 2: Intelligence & LLM Tuning
-- [ ] Inject `TradeMemory` "Lessons Learned" into Nemotron's strategizing context
-- [ ] Simplify Nemotron 9B prompt (reduce nested logic, move bias defaults to Python)
-- [ ] Adjust LLM generation settings: `top_p=1.0`, `max_tokens=800`
-- [ ] Inject `hurst` and `bb_bandwidth` into `_compact_advisory_features`
+- [x] Inject `TradeMemory` "Lessons Learned" into Nemotron's strategizing context
+- [x] Simplify Nemotron 9B prompt (reduce nested logic, move bias defaults to Python)
+- [x] Adjust LLM generation settings: `top_p=1.0`, `max_tokens=800`
+- [x] Inject `hurst` and `bb_bandwidth` into `_compact_advisory_features`
 
 ### Phase 3: Strategy & Scoring Gaps
 - [ ] Upgrade Universe Ranking: use 15m VWRS (Volume-Weighted Relative Strength) instead of 1h lag

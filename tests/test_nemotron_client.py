@@ -226,6 +226,10 @@ class NemotronClientTests(unittest.TestCase):
             },
             clear=False,
         ):
+            if "NEMOTRON_MODEL" in os.environ:
+                del os.environ["NEMOTRON_MODEL"]
+            if "ADVISORY_LOCAL_MODEL" in os.environ:
+                del os.environ["ADVISORY_LOCAL_MODEL"]
             self.assertEqual(nemotron_provider_model(), "gemma4:e4b")
             self.assertEqual(advisory_provider_model(), "gemma4:e4b")
 
@@ -646,14 +650,12 @@ class NemotronBatchParsingTests(unittest.TestCase):
             "pullback_quality": "clean_retest",
             "late_move_risk": "contained",
             "pattern_explanation": {
-                "structure_pattern": "trend_retest",
-                "structure_bias": "bullish",
-                "structure_validity": "valid",
+                "structure_phase": "retest_holding",
                 "structure_confidence": 0.68,
-                "recommended_nemo_interpretation": {
-                    "structure_bonus": 4,
-                    "skepticism_penalty": 0,
-                    "prefer_action": "OPEN",
+                "pattern_quality": {
+                    "breakout_quality_score": 0.58,
+                    "retest_quality_score": 0.72,
+                    "location_quality_score": 0.66,
                 },
             },
             "candle_evidence": {
@@ -692,6 +694,46 @@ class NemotronBatchParsingTests(unittest.TestCase):
 
         self.assertEqual(results["BTC/USD"].execution["nemotron"]["reason"], "wrapped_hold")
         self.assertEqual(results["BTC/USD"].signal, "FLAT")
+
+    def test_batch_decide_includes_symbol_specific_memory_in_candidate_rows(self) -> None:
+        strategist = self._make_strategist()
+        strategist._memory_store.build_lessons_block = lambda max_lessons=8: ""
+        strategist._memory_store.build_symbol_lesson_block = lambda symbol, n=3: (
+            f"=== RECENT {symbol} LESSONS ===\n"
+            "- [LOSS] exit=stop pnl=-1.20% held=12m entry=breakout\n"
+            "- [WIN] exit=target pnl=+2.10% held=18m entry=retest"
+        )
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+        seen_payloads: list[dict[str, object]] = []
+
+        raw = (
+            '{"reasoning":"memory attached","decisions":'
+            '[{"symbol":"BTC/USD","action":"HOLD","reason":"memory_hold"}]}'
+        )
+
+        def fake_nemotron_chat(payload: dict[str, object], *, system: str, max_tokens: int) -> str:
+            seen_payloads.append(payload)
+            return raw
+
+        with patch("core.llm.nemotron.nemotron_chat", side_effect=fake_nemotron_chat):
+            with patch("core.llm.nemotron.nemotron_provider_name", return_value="nvidia"):
+                with patch("core.llm.nemotron.strategy_decision", return_value="FLAT"):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=["no_action"]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            results = strategist.batch_decide(
+                                candidates=[self._candidate()],
+                                portfolio_state=portfolio_state,
+                                positions_state=positions_state,
+                                symbols=["BTC/USD"],
+                            )
+
+        self.assertEqual(results["BTC/USD"].execution["nemotron"]["reason"], "memory_hold")
+        self.assertEqual(len(seen_payloads), 1)
+        self.assertIn("mem:- [LOSS] exit=stop pnl=-1.20% held=12m entry=breakout", str(seen_payloads[0]["candidates"]))
 
     def test_batch_decide_falls_back_when_decisions_missing(self) -> None:
         strategist = self._make_strategist()
@@ -890,7 +932,7 @@ class NemotronBatchParsingTests(unittest.TestCase):
         self.assertEqual(results["NEAR/USD"].execution["nemotron"]["debug"]["phi_chart_support"], "strong")
         self.assertEqual(executions[0]["signal"], "LONG")
 
-    def test_batch_decide_overrides_not_ranked_when_phi_requires_explicit_override(self) -> None:
+    def test_batch_decide_overrides_batch_priority_lower_when_phi_requires_explicit_override(self) -> None:
         strategist = self._make_strategist()
         portfolio_state = PortfolioState(cash=100.0)
         positions_state = PositionState()
@@ -898,7 +940,7 @@ class NemotronBatchParsingTests(unittest.TestCase):
 
         raw = (
             '{"reasoning":"actionable retest candidate","decisions":'
-            '[{"symbol":"ONDO/USD","action":"HOLD","reason":"not_ranked_by_batch"}]}'
+            '[{"symbol":"ONDO/USD","action":"HOLD","reason":"batch_priority_lower"}]}'
         )
 
         def fake_execution_place_order(executor, signal, symbol, features, portfolio_state, size_factor):  # type: ignore[no-untyped-def]
@@ -978,6 +1020,222 @@ class NemotronBatchParsingTests(unittest.TestCase):
 
         self.assertEqual(result.execution["nemotron"]["reason"], "model_parse_failed_deterministic_open")
         self.assertEqual(result.signal, "LONG")
+
+    def test_single_decide_overrides_hold_unspecified_for_strong_phi_evidence(self) -> None:
+        strategist = self._make_strategist()
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+        candidate = self._strong_buy_candidate()
+        candidate["features"]["entry_score"] = 80.67
+
+        parsed = {
+            "final_decision": {
+                "symbol": "BTC/USD",
+                "action": "HOLD",
+                "side": None,
+                "size": 0,
+                "reason": "hold_unspecified",
+                "debug": {},
+            }
+        }
+
+        with patch("core.llm.nemotron.nemotron_chat", return_value=json.dumps(parsed)):
+            with patch("core.llm.nemotron.build_advisory_bundle") as advisory_mock:
+                advisory_mock.return_value = type(
+                    "Bundle",
+                    (),
+                    {
+                        "reflex": {"reflex": "allow", "micro_state": "stable", "reason": "test"},
+                        "market_state_review": {
+                            "market_state": "trending",
+                            "lane_bias": "favor_trend",
+                            "reason": "trend_confirmation_with_ema_and_macd",
+                            "breakout_state": "retest_holding",
+                            "trend_stage": "confirmed",
+                            "volume_confirmation": "supportive",
+                            "pullback_quality": "clean_retest",
+                            "late_move_risk": "contained",
+                            "pattern_explanation": {
+                                "structure_phase": "retest_holding",
+                                "structure_confidence": 0.59,
+                                "pattern_quality": {
+                                    "breakout_quality_score": 0.57,
+                                    "retest_quality_score": 0.70,
+                                    "location_quality_score": 0.59,
+                                },
+                            },
+                            "candle_evidence": {
+                                "candle_bias": "neutral",
+                                "confirmation_score": 0.86,
+                            },
+                        },
+                        "visual_review": {},
+                        "timings": {"phi3_ms": 0.0, "advisory_ms": 0.0},
+                    },
+                )()
+                with patch("core.llm.nemotron.strategy_decision", return_value="LONG"):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=[]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            with patch(
+                                "core.llm.nemotron.execution_place_order",
+                                return_value={"status": "filled"},
+                            ):
+                                result = strategist.decide(
+                                    symbol="BTC/USD",
+                                    features=candidate["features"],
+                                    portfolio_state=portfolio_state,
+                                    positions_state=positions_state,
+                                    symbols=["BTC/USD"],
+                                    proposed_weight=0.1,
+                                )
+
+        self.assertEqual(result.execution["nemotron"]["reason"], "phi_structure_confirmed")
+        self.assertEqual(result.execution["nemotron"]["debug"]["phi_chart_support"], "strong")
+        self.assertEqual(result.signal, "LONG")
+
+    def test_single_decide_corrects_fake_portfolio_full_when_portfolio_allows(self) -> None:
+        strategist = self._make_strategist()
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+        candidate = self._strong_buy_candidate()
+        candidate["features"]["entry_score"] = 80.67
+
+        parsed = {
+            "final_decision": {
+                "symbol": "BTC/USD",
+                "action": "HOLD",
+                "side": None,
+                "size": 0,
+                "reason": "portfolio_full",
+                "debug": {},
+            }
+        }
+
+        with patch("core.llm.nemotron.nemotron_chat", return_value=json.dumps(parsed)):
+            with patch("core.llm.nemotron.build_advisory_bundle") as advisory_mock:
+                advisory_mock.return_value = type(
+                    "Bundle",
+                    (),
+                    {
+                        "reflex": {"reflex": "allow", "micro_state": "stable", "reason": "test"},
+                        "market_state_review": {
+                            "market_state": "trending",
+                            "lane_bias": "favor_trend",
+                            "reason": "trend_confirmation_with_ema_and_macd",
+                            "breakout_state": "retest_holding",
+                            "trend_stage": "confirmed",
+                            "volume_confirmation": "supportive",
+                            "pullback_quality": "clean_retest",
+                            "late_move_risk": "contained",
+                            "pattern_explanation": {
+                                "structure_phase": "retest_holding",
+                                "structure_confidence": 0.59,
+                                "pattern_quality": {
+                                    "breakout_quality_score": 0.57,
+                                    "retest_quality_score": 0.70,
+                                    "location_quality_score": 0.59,
+                                },
+                            },
+                            "candle_evidence": {
+                                "candle_bias": "neutral",
+                                "confirmation_score": 0.86,
+                            },
+                        },
+                        "visual_review": {},
+                        "timings": {"phi3_ms": 0.0, "advisory_ms": 0.0},
+                    },
+                )()
+                with patch("core.llm.nemotron.strategy_decision", return_value="LONG"):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=[]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            with patch(
+                                "core.llm.nemotron.execution_place_order",
+                                return_value={"status": "filled"},
+                            ):
+                                result = strategist.decide(
+                                    symbol="BTC/USD",
+                                    features=candidate["features"],
+                                    portfolio_state=portfolio_state,
+                                    positions_state=positions_state,
+                                    symbols=["BTC/USD"],
+                                    proposed_weight=0.1,
+                                )
+
+        self.assertEqual(result.execution["nemotron"]["reason"], "phi_structure_confirmed")
+        self.assertTrue(result.execution["nemotron"]["debug"]["portfolio_reason_corrected"])
+        self.assertEqual(result.signal, "LONG")
+
+    def test_single_decide_replaces_hold_unspecified_with_specific_hold_reason(self) -> None:
+        strategist = self._make_strategist()
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+        candidate = self._strong_buy_candidate()
+        candidate["features"]["trend_confirmed"] = False
+        candidate["features"]["momentum_5"] = 0.0
+        candidate["features"]["net_edge_pct"] = 0.2
+        candidate["features"]["point_breakdown"] = {"net_edge_pct": 0.2}
+
+        parsed = {
+            "final_decision": {
+                "symbol": "BTC/USD",
+                "action": "HOLD",
+                "side": None,
+                "size": 0,
+                "reason": "hold_unspecified",
+                "debug": {},
+            }
+        }
+
+        with patch("core.llm.nemotron.nemotron_chat", return_value=json.dumps(parsed)):
+            with patch("core.llm.nemotron.build_advisory_bundle") as advisory_mock:
+                advisory_mock.return_value = type(
+                    "Bundle",
+                    (),
+                    {
+                        "reflex": {"reflex": "allow", "micro_state": "stable", "reason": "test"},
+                        "market_state_review": {
+                            "market_state": "transition",
+                            "lane_bias": "favor_selective",
+                            "reason": "mixed_market_structure",
+                            "breakout_state": "unclear",
+                            "trend_stage": "unclear",
+                            "volume_confirmation": "neutral",
+                            "pullback_quality": "unclear",
+                            "late_move_risk": "moderate",
+                            "pattern_explanation": {
+                                "structure_phase": "unclear",
+                                "structure_confidence": 0.3,
+                                "pattern_quality": {},
+                            },
+                            "candle_evidence": {"candle_bias": "neutral", "confirmation_score": 0.2},
+                        },
+                        "visual_review": {},
+                        "timings": {"phi3_ms": 0.0, "advisory_ms": 0.0},
+                    },
+                )()
+                with patch("core.llm.nemotron.strategy_decision", return_value="FLAT"):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=[]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            result = strategist.decide(
+                                symbol="BTC/USD",
+                                features=candidate["features"],
+                                portfolio_state=portfolio_state,
+                                positions_state=positions_state,
+                                symbols=["BTC/USD"],
+                                proposed_weight=0.1,
+                            )
+
+        self.assertEqual(result.execution["nemotron"]["reason"], "trend_unconfirmed")
+        self.assertEqual(result.execution["nemotron"]["debug"]["normalized_hold_reason"], "trend_unconfirmed")
 
     def test_single_fallback_logging_dedupes_repeated_identical_errors(self) -> None:
         strategist = self._make_strategist()

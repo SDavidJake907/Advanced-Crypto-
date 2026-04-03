@@ -454,7 +454,7 @@ def _extract_first_object(candidate: str) -> str:
     raise json.JSONDecodeError("Unterminated JSON object", candidate, start)
 
 
-def _local_nemotron_extra_body(max_tokens: int = 2048) -> dict[str, Any]:
+def _local_nemotron_extra_body(max_tokens: int = 800) -> dict[str, Any]:
     return {
         "stream": False,
         "keep_alive": "1440h",
@@ -463,13 +463,13 @@ def _local_nemotron_extra_body(max_tokens: int = 2048) -> dict[str, Any]:
         "options": {
             "temperature": 0,
             "top_p": 1.0,
-            "num_predict": max(max_tokens, 6000),  # thinking model: ~4000 think + ~600 json
-            "num_ctx": 24576,  # thinking models need more ctx: input(~2000) + think(~6000) + json(~600)
+            "num_predict": max_tokens,
+            "num_ctx": 24576,  # thinking models need more ctx
         },
     }
 
 
-def _local_nemotron_completion_extra_body(max_tokens: int = 2048) -> dict[str, Any]:
+def _local_nemotron_completion_extra_body(max_tokens: int = 800) -> dict[str, Any]:
     return {
         "stream": False,
         "keep_alive": "1440h",
@@ -525,7 +525,10 @@ def _repair_json_response(
                 timeout_s=timeout_s,
                 extra_body=_local_nemotron_extra_body(max_tokens=400),
             )
-        return _extract_first_object(_strip_reasoning_blocks(repaired))
+        try:
+            return _extract_first_object(_strip_reasoning_blocks(repaired))
+        except json.JSONDecodeError:
+            return "{}"
 
 
 def cleanup_nemotron_lock() -> None:
@@ -793,7 +796,7 @@ def advisory_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int 
     return phi3_chat(user_payload, system=system, max_tokens=max_tokens)
 
 
-def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int = 400) -> str:
+def nemotron_chat(user_payload: dict[str, Any], *, system: str, max_tokens: int = 800) -> str:
     provider = _nemotron_provider()
     if provider == "nvidia":
         base_url = _nemotron_cloud_base_url()

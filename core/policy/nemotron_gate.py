@@ -105,11 +105,15 @@ def _is_range_safe_candidate(features: dict[str, Any]) -> bool:
             and tp_after_cost_valid
             and net_edge_pct > 0.0
             and momentum_5 > 0.0
-            and volume_ratio >= 1.0
-            and trade_quality >= 58.0
-            and structure_quality >= 64.0
-            and continuation_quality >= 64.0
-            and (range_breakout_1h or pullback_hold)
+            and volume_ratio >= 0.85
+            and trade_quality >= 55.0
+            and structure_quality >= 60.0
+            and continuation_quality >= 48.0
+            and (
+                range_breakout_1h
+                or pullback_hold
+                or (momentum_5 >= 0.004 and volume_surge >= 0.10 and continuation_quality >= 52.0)
+            )
         )
 
     return True
@@ -135,9 +139,9 @@ def _passes_market_state_entry_gate(features: dict[str, Any]) -> tuple[bool, str
 
     if not trend_confirmed:
         if ranging_market:
-            if not (_is_strong_mover_candidate(features) and _is_range_safe_candidate(features)):
-                return False, "market_state_ranging_unconfirmed_block"
-            return True, "market_state_ranging_override"
+            if _is_strong_mover_candidate(features) and _is_range_safe_candidate(features):
+                return True, "market_state_ranging_override"
+            return True, "market_state_ranging_caution"
 
         if momentum_5 <= 0.0 and not (range_breakout_1h or pullback_hold):
             return False, "market_state_transition_weak_block"
@@ -347,20 +351,11 @@ def passes_deterministic_candidate_gate(
     if promotion_reason == "falling_short_structure":
         return False, promotion_reason
 
-    if ranging_market and not trend_confirmed and lane in {"L2", "L3"}:
-        if not (_is_strong_mover_candidate(features) and _is_range_safe_candidate(features)):
-            return False, "ranging_unconfirmed_structure_weak"
-
     if promotion_tier == "promote":
         return True, "passed"
 
     if promotion_tier == "probe":
-        if ranging_market and lane in {"L1", "L3"} and not _is_strong_mover_candidate(features):
-            return False, "ranging_market_weak"
         return True, "passed"
-
-    if ranging_market and not _is_strong_mover_candidate(features):
-        return False, "ranging_market_weak"
 
     return False, promotion_reason
 

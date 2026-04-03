@@ -7,6 +7,7 @@ from apps.universe_manager.main import (
     Candidate,
     _apply_candidate_final_score,
     _candidate_final_score_features,
+    _layer_for_candidate,
     _lane_rank_score,
     _refresh_interval_sec,
     _universe_symbol_allowed,
@@ -67,6 +68,13 @@ class UniverseSelectionTests(unittest.TestCase):
             os.environ["MEME_SYMBOLS"] = "WIF/USD"
             self.assertFalse(_universe_symbol_allowed("WIF/USD"))
             self.assertTrue(_universe_symbol_allowed("BTC/USD"))
+
+    def test_universe_symbol_allowed_keeps_core_seeded_meme_symbol(self) -> None:
+        os.environ["MEME_UNIVERSE_ENABLED"] = "false"
+        os.environ["MEME_SYMBOLS"] = "FET/USD,WIF/USD"
+        os.environ["CORE_ACTIVE_UNIVERSE"] = "BTC/USD,ETH/USD,FET/USD"
+        self.assertTrue(_universe_symbol_allowed("FET/USD"))
+        self.assertFalse(_universe_symbol_allowed("WIF/USD"))
 
     def test_universe_symbol_allowed_restricts_to_core_and_conditional_seed(self) -> None:
         os.environ["UNIVERSE_STRICT_SEED_ONLY"] = "true"
@@ -224,7 +232,7 @@ class UniverseSelectionTests(unittest.TestCase):
     @patch("apps.universe_manager.main.load_synced_position_symbols", return_value=[])
     @patch("apps.universe_manager.main.load_universe", return_value={"active_pairs": [], "meta": {}})
     @patch("apps.universe_manager.main.save_universe", side_effect=_fake_save_universe)
-    def test_rebalance_treats_l4_candidate_as_meme_even_if_not_listed(
+    def test_rebalance_keeps_core_seeded_l4_candidate_active(
         self,
         _save_universe,
         _load_universe,
@@ -257,8 +265,25 @@ class UniverseSelectionTests(unittest.TestCase):
         ]
 
         result = rebalance_universe(candidates, policy)
-        self.assertNotIn("PLAY/USD", result["active_pairs"])
-        self.assertEqual(result["meta"].get("segment_tags", {}).get("PLAY/USD"), "meme")
+        self.assertIn("PLAY/USD", result["active_pairs"])
+        self.assertEqual(result["meta"].get("segment_tags", {}).get("PLAY/USD"), "core")
+
+    def test_layer_for_candidate_can_promote_seeded_alt_into_momentum_layer(self) -> None:
+        os.environ["CORE_ACTIVE_UNIVERSE"] = "BTC/USD,ETH/USD,FET/USD"
+        candidate = Candidate(
+            pair="FET/USD",
+            score=0.03,
+            volume_usd=500_000,
+            last=0.23,
+            lane="L3",
+            candidate_score=74.0,
+            rank_score=74.0,
+            candidate_recommendation="BUY",
+            momentum_5=0.01,
+            volume_ratio=1.1,
+            trade_quality=66.0,
+        )
+        self.assertEqual(_layer_for_candidate(candidate), "momentum")
 
     @patch("apps.universe_manager.main.build_scan_meta", side_effect=_fake_build_scan_meta)
     @patch("apps.universe_manager.main.load_synced_position_symbols", return_value=[])

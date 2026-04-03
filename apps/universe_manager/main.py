@@ -395,6 +395,7 @@ def _annotate_leader_deltas(candidates: list[Candidate]) -> list[Candidate]:
         candidate.rank_score = (
             candidate.candidate_score
             + candidate.leader_urgency
+            + (candidate.vwrs * 800.0)
             + (candidate.net_edge_pct * 4.0)
             - max(candidate.total_cost_pct - candidate.expected_move_pct, 0.0) * 2.0
             + (candidate.realized_follow_through_pct * 2.0)
@@ -460,6 +461,7 @@ def _lane_rank_score(candidate: Candidate) -> float:
             + abs(candidate.price_zscore) * 8.0
             + max(candidate.momentum_5, 0.0) * 500.0
             + max(candidate.m8h, 0.0) * 200.0
+            + max(candidate.vwrs, 0.0) * 800.0  # Phase 3 prioritization
             + max(candidate.score, 0.0) * 60.0
             + max(candidate.rank_delta, 0) * 2.2
             + max(candidate.momentum_delta, 0.0) * 700.0
@@ -518,6 +520,7 @@ def _lane_rank_score(candidate: Candidate) -> float:
         + max(candidate.momentum_30, 0.0) * 180.0
         + max(candidate.m8h, 0.0) * 180.0
         + max(candidate.m24h, 0.0) * 120.0
+        + max(candidate.vwrs, 0.0) * 800.0  # Phase 3 prioritization
         + max(candidate.volume_ratio - 0.8, 0.0) * 4.0
         + (6.0 if 46.0 <= candidate.rsi <= 64.0 else -4.0)
         + max(candidate.rank_delta, 0) * 1.2
@@ -946,11 +949,15 @@ def _segment_for_symbol(symbol: str, lane: str | None = None) -> str:
 
 
 def _layer_for_candidate(candidate: Candidate) -> str:
-    base_segment = _segment_for_symbol(candidate.pair, candidate.lane)
     normalized = normalize_pair(candidate.pair)
+    base_segment = _segment_for_symbol(candidate.pair, candidate.lane)
     if base_segment == "meme":
+        if normalized in _core_active_universe() and not _meme_universe_enabled():
+            return "core"
         return "meme"
-    if normalized in _core_active_universe() or base_segment in {"major", "store_of_value"}:
+    if normalized in _conditional_universe():
+        return "core"
+    if base_segment in {"major", "store_of_value"}:
         return "core"
 
     recommendation = str(candidate.candidate_recommendation or "WATCH").upper()
@@ -981,6 +988,8 @@ def _universe_symbol_allowed(symbol: str) -> bool:
         return False
     if _symbol_base(normalized) in _excluded_bases():
         return False
+    if normalized in _core_active_universe():
+        return True
     if is_meme_symbol(normalized) and not _meme_universe_enabled():
         return False
     stabilization_universe = _stabilization_universe()

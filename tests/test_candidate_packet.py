@@ -38,6 +38,9 @@ class CandidatePacketTests(unittest.TestCase):
             "bearish_divergence": False,
             "divergence_strength": 0.5,
             "divergence_age_bars": 2,
+            "sentiment_fng_value": 75,
+            "trend_confirmed": True,
+            "ranging_market": False,
             "point_breakdown": {"cost_penalty_pts": 5.0, "net_edge_pct": 0.45},
         }
         expected = compute_final_score(
@@ -60,6 +63,7 @@ class CandidatePacketTests(unittest.TestCase):
         self.assertEqual(packet["final_score"], expected.final_score)
         self.assertEqual(packet["score_breakdown"], expected.score_breakdown)
         self.assertEqual(packet["net_edge_pct"], expected.net_edge_pct)
+        self.assertEqual(packet["fear_greed_bonus"], expected.fear_greed_bonus)
         self.assertEqual(packet["reliability_bonus"], expected.reliability_bonus)
         self.assertEqual(packet["basket_fit_bonus"], expected.basket_fit_bonus)
         self.assertEqual(packet["breakdown_notes"], expected.breakdown_notes)

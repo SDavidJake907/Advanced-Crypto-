@@ -385,41 +385,17 @@ def _heuristic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateR
         if candle_bias == "bearish" and confirmation_score >= 0.55
         else "Candle evidence is present but not decisive."
     )
-    structure_pattern = "none"
-    structure_bias = "neutral"
-    structure_validity = "unclear"
     structure_phase = "unclear"
-    prefer_action = "HOLD"
     if range_breakout and trend_confirmed and volume_confirmation == "supportive":
-        structure_pattern = "range_breakout"
-        structure_bias = "bullish"
-        structure_validity = "valid"
         structure_phase = "confirmed_breakout"
-        prefer_action = "OPEN"
     elif pullback_hold and ema_stack_bullish:
-        structure_pattern = "trend_retest"
-        structure_bias = "bullish"
-        structure_validity = "valid"
         structure_phase = "retest_holding"
-        prefer_action = "OPEN"
     elif trend_confirmed and ema_stack_bullish and momentum_5 > 0.0:
-        structure_pattern = "trend_continuation"
-        structure_bias = "bullish"
-        structure_validity = "valid"
         structure_phase = "trend_expansion"
-        prefer_action = "OPEN"
     elif macd_hist < 0.0 and momentum_5 < 0.0:
-        structure_pattern = "failed_breakout"
-        structure_bias = "bearish"
-        structure_validity = "warning"
         structure_phase = "breakout_failure"
-        prefer_action = "WATCH"
     elif momentum_5 > 0.0 or rotation_score > 0.0:
-        structure_pattern = "breakout_attempt"
-        structure_bias = "bullish"
-        structure_validity = "developing"
         structure_phase = "attempting_breakout"
-        prefer_action = "WATCH"
     symmetry_score = min(max(0.35 + (0.08 * min(higher_low_count, 4)), 0.0), 0.95)
     breakout_quality_score = min(max(
         0.35
@@ -457,26 +433,26 @@ def _heuristic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateR
         ) / 4.0,
         0.0,
     ), 0.95), 2)
-    structure_bonus = 7 if structure_validity == "valid" and structure_confidence >= 0.7 else 4 if structure_validity in {"valid", "developing"} else 0
-    skepticism_penalty = 3 if late_move_risk == "extended" else 2 if volume_confirmation == "weak" else 1 if structure_validity == "developing" else 0
     warnings: list[str] = []
     missing_confirmation: list[str] = []
     if volume_confirmation != "supportive":
         warnings.append("Volume confirmation is not strong.")
     if late_move_risk == "extended":
         warnings.append("Entry is getting extended from base structure.")
-    if structure_validity == "warning":
+    if macd_hist < 0.0 and momentum_5 < 0.0:
         warnings.append("Momentum and structure are weakening together.")
-    if not range_breakout and structure_pattern in {"range_breakout", "breakout_attempt"}:
+    if breakout_state in {"fresh_breakout", "breakout_attempt"} and not range_breakout:
         missing_confirmation.append("No clear breakout close yet.")
-    if not pullback_hold and structure_pattern in {"trend_retest", "breakout_attempt"}:
+    if breakout_state in {"retest_holding", "breakout_attempt"} and not pullback_hold:
         missing_confirmation.append("No clean retest confirmation yet.")
     summary = (
-        "Valid bullish structure with supportive follow-through."
-        if structure_validity == "valid" and prefer_action == "OPEN"
-        else "Bullish structure exists but still needs cleaner confirmation."
-        if structure_validity == "developing"
-        else "Pattern is unclear or conflicting."
+        "Breakout is confirmed with supportive follow-through."
+        if structure_phase == "confirmed_breakout"
+        else "Price is holding the retest with improving structure."
+        if structure_phase == "retest_holding"
+        else "Momentum is improving, but the structure is still developing."
+        if structure_phase in {"attempting_breakout", "trend_expansion"}
+        else "Structure is mixed and currently weakening."
     )
     ema_stack_state = "bullish_stack" if ema_stack_bullish else "mixed_stack"
     ema_slope_state = "rising" if higher_low_count >= 2 and ema_stack_bullish else "flat_to_mixed" if momentum_5 >= 0.0 else "falling"
@@ -491,12 +467,9 @@ def _heuristic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateR
     momentum_state = "positive" if momentum_5 > 0.0 else "flat" if abs(momentum_5) <= 0.001 else "negative"
     acceleration_state = "building" if momentum_5 > 0.0 and momentum_14 > 0.0 else "stalling" if momentum_5 <= 0.0 < momentum_14 else "fading"
     support_context = "higher_low_support" if higher_low_count >= 2 else "ema_support" if pullback_hold else "weak_support"
-    resistance_context = "breaking_range_high" if range_breakout else "below_range_high" if structure_pattern in {"range_breakout", "breakout_attempt"} else "unclear"
-    breakout_level_state = "cleared" if range_breakout else "pressing" if structure_pattern == "breakout_attempt" else "not_cleared"
+    resistance_context = "breaking_range_high" if range_breakout else "below_range_high" if breakout_state == "breakout_attempt" else "unclear"
+    breakout_level_state = "cleared" if range_breakout else "pressing" if breakout_state == "breakout_attempt" else "not_cleared"
     pattern_explanation = {
-        "structure_pattern": structure_pattern,
-        "structure_bias": structure_bias,
-        "structure_validity": structure_validity,
         "structure_phase": structure_phase,
         "structure_confidence": structure_confidence,
         "pattern_quality": {
@@ -545,11 +518,6 @@ def _heuristic_market_state_review(features: dict[str, Any]) -> Phi3MarketStateR
         },
         "warnings": warnings,
         "missing_confirmation": missing_confirmation,
-        "recommended_nemo_interpretation": {
-            "structure_bonus": structure_bonus,
-            "skepticism_penalty": skepticism_penalty,
-            "prefer_action": prefer_action,
-        },
         "summary": summary,
     }
     candle_evidence = dict(pattern_explanation["candle_evidence"])

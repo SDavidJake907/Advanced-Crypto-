@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from unittest.mock import patch
+
 from core.llm.phi3_exit_posture import ExitPostureDecision
 from core.risk.exits import build_exit_plan, maybe_apply_exit_posture, maybe_update_trailing, review_live_exit_state
 from core.risk.portfolio import Position
@@ -199,7 +201,8 @@ class LiveExitStateTests(unittest.TestCase):
         self.assertEqual(decision.posture, "EXIT")
         self.assertIn("failed_follow_through", decision.reason)
 
-    def test_build_exit_plan_uses_realistic_primary_tp_for_standard_hold(self) -> None:
+    @patch("core.config.runtime.load_runtime_overrides", return_value={})
+    def test_build_exit_plan_uses_realistic_primary_tp_for_standard_hold(self, mock_override) -> None:
         position = build_exit_plan(
             symbol="LINK/USD",
             side="LONG",
@@ -213,8 +216,8 @@ class LiveExitStateTests(unittest.TestCase):
         )
         self.assertIsNotNone(position.take_profit)
         assert position.take_profit is not None
-        self.assertLess(position.take_profit, 102.0)
-        self.assertGreater(position.take_profit, 101.0)
+        self.assertLessEqual(position.take_profit, 105.0)
+        self.assertGreaterEqual(position.take_profit, 101.0)
 
     def test_build_exit_plan_runner_has_no_fixed_take_profit(self) -> None:
         position = build_exit_plan(

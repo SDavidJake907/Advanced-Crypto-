@@ -215,7 +215,7 @@ def normalize_trade_reviewer_output(
         "action": action,
         "side": side,
         "size": final_decision.get("size", 0),
-        "reason": reasons[0] if reasons else str(final_decision.get("reason", "hold_unspecified")),
+        "reason": reasons[0] if reasons else str(final_decision.get("reason", "reason_missing")),
         "debug": final_decision.get("debug", {}) if isinstance(final_decision.get("debug", {}), dict) else {},
         "contract": contract,
     }

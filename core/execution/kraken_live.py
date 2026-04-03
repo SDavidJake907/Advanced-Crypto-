@@ -6,7 +6,7 @@ from typing import Any
 from core.config.runtime import get_proposed_weight, get_runtime_setting, is_meme_lane
 from core.data.kraken_rest import KrakenRestClient
 from core.execution.clamp import clamp_order_size
-from core.execution.risk_budget import estimate_entry_risk_fraction
+from core.execution.risk_budget import estimate_entry_risk_fraction, calculate_dynamic_risk_pct
 from core.execution.kraken_rules import load_rules
 from core.execution.order_policy import OrderPlan, build_exit_order_plan, build_order_plan
 from core.risk.fee_filter import evaluate_trade_cost
@@ -239,19 +239,13 @@ class KrakenLiveExecutor:
             risk_per_trade_pct = float(get_runtime_setting("MEME_EXEC_RISK_PER_TRADE_PCT"))
         else:
             risk_per_trade_pct = float(get_runtime_setting("EXEC_RISK_PER_TRADE_PCT"))
-        # Dynamic risk sizing: scale down as account grows to avoid over-exposure
-        if cash >= 2000.0:
-            risk_per_trade_pct = min(risk_per_trade_pct, 5.0)
-        elif cash >= 500.0:
-            risk_per_trade_pct = min(risk_per_trade_pct, 10.0)
-        elif cash >= 200.0:
-            risk_per_trade_pct = min(risk_per_trade_pct, 15.0)
-        # Also scale by ATR volatility — high volatility = smaller position
         atr_pct = float(features.get("atr", 0.0)) / max(float(features.get("price", 1.0) or 1.0), 1e-10) * 100.0
-        if atr_pct > 2.0:
-            risk_per_trade_pct *= 0.75
-        # Trade quality: thin/poor execution → scale size down, never hard-block
-        risk_per_trade_pct *= tq.size_scale
+        risk_per_trade_pct = calculate_dynamic_risk_pct(
+            base_risk_pct=risk_per_trade_pct,
+            cash=cash,
+            atr_pct=atr_pct,
+            trade_quality_scale=tq.size_scale,
+        )
         kraken_symbol = self.client.resolve_order_pair(symbol).replace("/", "").upper()
         rule = self._rules.get(kraken_symbol)
         if rule is None:

@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-04-02T01:19:43+00:00",
+  "updated_at": "2026-04-03T17:20:21+00:00",
   "proposals": [
     {
       "id": "rtovr-20260319151135890085",
@@ -7066,6 +7066,421 @@
           "Nemotron fallback errors indicating potential data parsing issues"
         ],
         "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260402060414774492",
+      "created_at": "2026-04-02T06:04:14+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Frequent nemo_cap_skip and nemotron fallbacks indicate candidate limit constraints and data parsing issues. Ranging market conditions may require relaxed entry filters.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive nemo_cap_skip rejections due to NEMOTRON_TOP_CANDIDATE_COUNT limit (20) in ranging market",
+          "Nemotron JSON parsing errors causing fallbacks (potential data quality issue)",
+          "Overly restrictive buy outside top rules limiting opportunistic entries"
+        ],
+        "confidence": 0.7
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260402073601978425",
+      "created_at": "2026-04-02T07:36:01+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemotron fallbacks and restrictive buy rules causing missed opportunities",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 30,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true,
+        "MEME_PROPOSED_WEIGHT": 0.06
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent nemotron_fallback_hold due to JSON parsing errors",
+          "High entry score symbols (e.g., RENDER/USD 76.0) not being acted on",
+          "Restrictive NEMOTRON_ALLOW_BUY flags preventing outside-top buys",
+          "Low MEME_PROPOSED_WEIGHT limiting meme coin participation"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260402104038880102",
+      "created_at": "2026-04-02T10:40:38+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Excessive nemo_cap skips and nemotron fallbacks in ranging markets; opportunities missed due to conservative candidate limits and high meme thresholds.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_NEMOTRON_GATE_MIN_ENTRY_SCORE": 45.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent nemo_cap_skip rejections despite strong entry scores (e.g., RENDER/USD 58.35)",
+          "Nemotron fallback errors causing conservative holds in L2 lane",
+          "Meme coin entry thresholds (48.0) too high relative to observed scores",
+          "Portfolio capacity underutilized (max 4 positions) due to over-filtering"
+        ],
+        "confidence": 0.75
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260402124327491641",
+      "created_at": "2026-04-02T12:43:27+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemotron parsing failures and over-selection in ranging markets causing missed opportunities",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_PROPOSED_WEIGHT": 0.05
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Nemotron JSON parsing errors leading to fallback holds",
+          "Excessive top candidate count (20) diluting focus in ranging markets",
+          "Low meme proposed weight potentially underutilizing volatile opportunities",
+          "Strict stabilization settings maintaining holds despite valid setups"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260402174908713381",
+      "created_at": "2026-04-02T17:49:08+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemotron batch processing inefficiencies and overly restrictive candidate filtering are limiting trade opportunities. High nemo_cap_skip rates and deferred decisions suggest candidate ranking issues.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 10,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive nemo_cap_skip occurrences due to NEMOTRON_TOP_CANDIDATE_COUNT=20 being too high for current market conditions",
+          "Nemotron fallback errors indicating potential data formatting issues in responses",
+          "Low meme candidate conversion despite high entry scores (e.g., DOGE/USD at 79.41 not being acted upon)",
+          "Strict momentum thresholds filtering out potential trades in ranging markets"
+        ],
+        "confidence": 0.75
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403030105063613",
+      "created_at": "2026-04-03T03:01:05+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemo capacity limits and non-positive net edge blocking trades",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent nemo_cap_skip indicating candidate limit constraints",
+          "Execution blocked due to net_edge_non_positive across multiple candidates",
+          "Potential missed opportunities from restricted buying outside top candidates"
+        ],
+        "confidence": 0.7
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403113839326057",
+      "created_at": "2026-04-03T11:38:39+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemo capacity and volume/entry gates are causing excessive holds on valid opportunities in ranging markets.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_ALLOW_WATCH_LOW_LANE_CONFLICT": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent nemo_cap_skip due to limited candidate capacity (TOP_CANDIDATE_COUNT=20)",
+          "Volume ratio gates (0.70/0.85) blocking entries despite bullish patterns",
+          "Entry score gates (48.0) too high for current market conditions",
+          "Excessive deferals from stabilization and regime mismatch checks"
+        ],
+        "confidence": 0.75
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403115449328188",
+      "created_at": "2026-04-03T11:54:49+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Frequent NEMOTRON capacity skips and ranging market conditions indicate potential bottlenecks in candidate selection and market state interpretation.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "TRADER_SMOOTHING_BARS": 3,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive 'nemo_cap_skip' decisions suggest NEMOTRON_TOP_CANDIDATE_COUNT may be too restrictive",
+          "Multiple high-ranked candidates (TIA/USD, FET/USD) held due to capacity constraints despite strong metrics",
+          "Ranging market state causing ambiguous signals across multiple symbols",
+          "L3/L4 lanes underutilized compared to L1/L2 indicating potential lane assignment inefficiencies"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403121824282773",
+      "created_at": "2026-04-03T12:18:24+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemo budget saturation causing frequent holds; lane supervision shows mixed signals in ranging market",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive 'nemo_cap_skip' holds due to limited candidate capacity (20)",
+          "Ranging market dynamics causing indecisive candle patterns and weak volume confirmation",
+          "High number of AVOID recommendations despite positive technical scores",
+          "Nemotron fallback errors indicating potential JSON parsing issues"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403125407116545",
+      "created_at": "2026-04-03T12:54:07+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemotron candidate cap limiting opportunities, meme universe underutilized, and ranging market causing hesitation.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Nemotron skipping candidates due to top candidate cap (nemo_cap_skip in debug logs)",
+          "L3 lane underutilized with empty shortlist",
+          "Meme symbols in watchlist but limited active slots (MEME_ACTIVE_UNIVERSE_MAX=2)",
+          "Ranging market state with weak volume confirmation causing deferred decisions",
+          "Recurring Nemotron JSON parsing fallback errors"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403130642756705",
+      "created_at": "2026-04-03T13:06:42+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemo budget constraints causing missed opportunities; meme universe underutilized; L1 lane underpopulated",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true,
+        "MEME_PROPOSED_WEIGHT": 0.05
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Multiple symbols skipped due to Nemo capacity limits (nemo_cap_skip)",
+          "Meme universe active max set to 2 despite enabled status",
+          "L1 lane remains empty while L3 contains high-ranked candidates",
+          "Recent trade history shows low win rate for some core symbols"
+        ],
+        "confidence": 0.72
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403132632803185",
+      "created_at": "2026-04-03T13:26:32+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemotron fallbacks and candidate capacity constraints are primary blockers. Adjustments to candidate count and meme exposure may improve opportunity capture.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_PROPOSED_WEIGHT": 0.05
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent Nemotron fallbacks due to JSON parsing errors (15+ occurrences in recent debug)",
+          "Nemo capacity constraints causing high-scoring candidates (FET/USD, TIA/USD) to be skipped",
+          "Meme universe underutilization despite MEME_UNIVERSE_ENABLED=true"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403135717939213",
+      "created_at": "2026-04-03T13:57:17+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Adjustments to focus on higher-quality candidates and relax volume constraints for meme assets",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_NEMOTRON_WATCH_MIN_VOLUME_RATIO": 0.8
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive deferrals due to strict volume ratio requirements",
+          "Overly broad candidate selection diluting focus",
+          "Missed opportunities from conservative market regime detection"
+        ],
+        "confidence": 0.75
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403141445159573",
+      "created_at": "2026-04-03T14:14:45+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemotron fallback errors and low net edge rejections dominating recent decisions. Market in ranging state with weak volume confirmation across multiple candidates.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent Nemotron JSON parsing errors causing fallback holds (15+ occurrences in recent debug)",
+          "Multiple high-scoring candidates (e.g., ADA/USD 76.51, XRP/USD 74.31) rejected due to volume ratio gates",
+          "Meme universe enabled but DOGE/USD (70.35 score) held due to unspecified reason",
+          "Ranging market conditions causing pattern confirmation issues across L2/L3 candidates",
+          "Portfolio holding XLM/USD with broken structure but no replacement executed"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403144532647432",
+      "created_at": "2026-04-03T14:45:32+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Nemotron batch filtering and strict momentum thresholds are limiting trade opportunities despite strong candidates. Market is ranging with mixed momentum signals.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Nemotron batch processing only allowing ALGO/USD despite other strong candidates (FET/USD, MON/USD) with high scores",
+          "Strict momentum thresholds (TRADER_BASE_MOMO_THRESHOLD=0.002) filtering out potential trades",
+          "Nemotron JSON parsing errors causing fallbacks in decision process",
+          "Low volume confirmation in ranging market reducing trade triggers"
+        ],
+        "confidence": 0.5
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403172021822680",
+      "created_at": "2026-04-03T17:20:21+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging phase with mixed signals; many candidates deferred due to low net edge, regime mismatch, and high reversal risk. Meme universe active but underperforming. Trade memory shows low conviction entries.",
+      "updates": {
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003,
+        "TRADER_RSI_OVERBOUGHT": 75.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'range_signals_detected' causing deferred decisions despite positive entry scores",
+          "Low net edge percentages leading to 'net_edge_too_low' rejections",
+          "High reversal risk ('reversal_risk_high') limiting aggressive entries",
+          "Meme universe symbols showing weak structure and overbought conditions",
+          "Nemotron fallback errors indicating potential data quality issues"
+        ],
+        "confidence": 0.35
       },
       "status": "pending"
     }

@@ -26,7 +26,7 @@ from apps.trader.logging_sink import (
     log_trace,
     now_iso,
 )
-from core.llm.micro_prompts import nemotron_review_outcome, phi3_review_exit_posture
+from core.llm.micro_prompts import phi3_review_exit_posture
 from core.memory.trade_memory import TradeMemoryStore, build_outcome_record
 from core.policy.nemotron_gate import load_universe_candidate_context
 from core.risk.exits import build_exit_plan, evaluate_exit
@@ -146,6 +146,7 @@ def prune_symbol_tracking_state(
     last_bar_keys: dict[str, str],
     last_exit_ts: dict[str, float],
     retention_sec: float,
+    additional_caches: tuple[dict, ...] | None = None,
 ) -> None:
     allowed = {str(s).strip().upper() for s in current_symbols if str(s).strip()}
     allowed.update(p.symbol for p in positions_state.all())
@@ -153,6 +154,11 @@ def prune_symbol_tracking_state(
         for sym in list(mapping.keys()):
             if sym not in allowed:
                 mapping.pop(sym, None)
+    if additional_caches:
+        for mapping in additional_caches:
+            for sym in list(mapping.keys()):
+                if sym not in allowed:
+                    mapping.pop(sym, None)
     cutoff = time.time() - max(retention_sec, 0.0)
     for sym in list(last_exit_ts.keys()):
         if sym in allowed:
@@ -227,6 +233,41 @@ def _build_outcome_fields(
         "mae_r": position.mae_r,
         "etd_pct": position.etd_pct,
         "etd_r": position.etd_r,
+    }
+
+
+def _deterministic_outcome_review(outcome: dict[str, Any]) -> dict[str, Any]:
+    pnl_pct = float(outcome.get("pnl_pct", 0.0) or 0.0)
+    exit_reason = str(outcome.get("exit_reason", "unknown") or "unknown")
+    capture = float(outcome.get("capture_vs_mfe_pct", 0.0) or 0.0)
+    structure_state = str(outcome.get("structure_state", "") or "").lower()
+
+    if pnl_pct > 0.02 and capture >= 0.5:
+        return {
+            "outcome_class": "good_breakout",
+            "lesson": "winner_held_well",
+            "suggested_adjustment": "keep_current_posture",
+            "confidence": 0.75,
+        }
+    if "stop" in exit_reason or structure_state == "broken":
+        return {
+            "outcome_class": "chop_fakeout" if pnl_pct >= -0.01 else "weak_follow_through",
+            "lesson": "stopped_out_early" if pnl_pct >= -0.01 else "entry_lacked_follow_through",
+            "suggested_adjustment": "review_entry_timing" if pnl_pct >= -0.01 else "tighten_promotion",
+            "confidence": 0.7 if pnl_pct >= -0.01 else 0.65,
+        }
+    if pnl_pct < 0:
+        return {
+            "outcome_class": "weak_follow_through",
+            "lesson": "entry_lacked_follow_through",
+            "suggested_adjustment": "tighten_promotion",
+            "confidence": 0.65,
+        }
+    return {
+        "outcome_class": "normal_exit",
+        "lesson": "neutral_outcome",
+        "suggested_adjustment": "no_change",
+        "confidence": 0.5,
     }
 
 
@@ -353,13 +394,13 @@ def handle_open_position(
             ))
 
             outcome_fields = _build_outcome_fields(updated_position, pnl_pct, hold_minutes, exit_reason, features)
-            outcome_review = nemotron_review_outcome({
+            outcome_review = _deterministic_outcome_review({
                 **outcome_fields,
                 "entry_reasons": list(updated_position.entry_reasons),
                 "entry_score": features.get("entry_score"),
                 "entry_recommendation": features.get("entry_recommendation"),
                 "reversal_risk": features.get("reversal_risk"),
-            }).to_dict()
+            })
 
             log_outcome_review({"ts": now_iso(), **outcome_fields, "review": outcome_review})
 

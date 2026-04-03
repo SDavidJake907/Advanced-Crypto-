@@ -136,7 +136,7 @@ class NemotronPolicyTests(unittest.TestCase):
             )
         self.assertTrue(allowed)
 
-    def test_should_run_nemotron_blocks_non_positive_net_edge(self) -> None:
+    def test_should_run_nemotron_no_longer_blocks_only_on_non_positive_net_edge(self) -> None:
         with patch("core.config.runtime.load_runtime_overrides", return_value={}):
             allowed = should_run_nemotron(
                 symbol="TEST/USD",
@@ -153,9 +153,9 @@ class NemotronPolicyTests(unittest.TestCase):
                     "net_edge_pct": 0.0,
                 },
                 positions_state=PositionState(),
-                universe_context={"current_symbol_is_top_candidate": True},
-            )
-        self.assertFalse(allowed)
+                    universe_context={"current_symbol_is_top_candidate": True},
+                )
+        self.assertTrue(allowed)
 
     def test_should_run_nemotron_allows_buy_candidate_with_positive_technicals(self) -> None:
         with patch("core.config.runtime.load_runtime_overrides", return_value={}):

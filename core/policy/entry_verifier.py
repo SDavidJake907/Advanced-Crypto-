@@ -178,11 +178,13 @@ def compute_entry_verification(
     score += _clamp((risk_quality - 50.0) * 0.10, -5.0, 5.0)
 
     # Raw momentum/volume stay as lighter confirmation to avoid double-counting.
-    score += _clamp(momentum_5 * 320.0, -8.0, 10.0) * structure_confirmation_scale
-    score += _clamp(momentum_14 * 180.0, -4.0, 6.0) * structure_confirmation_scale
-    score += _clamp(momentum_30 * 70.0, -2.0, 3.0) * structure_confirmation_scale
-    score += trend_1h * 3.0
-    score += _clamp((volume_ratio - 1.0) * 6.0, -3.0, 6.0) * structure_confirmation_scale
+    momentum_1 = float(features.get("momentum_1", 0.0))
+    score += _clamp(momentum_5 * 400.0, -10.0, 12.0) * structure_confirmation_scale
+    score += _clamp(momentum_1 * 400.0, -3.0, 4.0) * structure_confirmation_scale
+    score += _clamp(momentum_14 * 100.0, -2.0, 2.0) * structure_confirmation_scale
+    score += trend_1h * 4.0
+    volume_ratio_log = float(np.log1p(max(volume_ratio, 0.0)))
+    score += _clamp((volume_ratio_log - 0.693) * 8.0, -3.0, 6.0) * structure_confirmation_scale
     score += _clamp(volume_surge * 5.0, 0.0, 5.0) * structure_confirmation_scale
     if structure_confirmation_scale < 1.0:
         reasons.append("confirmation_capped_by_structure")

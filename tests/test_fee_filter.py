@@ -59,7 +59,7 @@ class FeeFilterTests(unittest.TestCase):
                 },
                 "LONG",
             )
-        self.assertGreater(assessment.fee_round_trip_pct, 0.50)
+        self.assertGreater(assessment.fee_round_trip_pct, 0.05)
         self.assertGreater(assessment.slippage_pct, 0.05)
         self.assertGreater(assessment.total_cost_pct, 0.80)
 

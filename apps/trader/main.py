@@ -65,7 +65,6 @@ from core.llm.client import advisory_provider_name
 from core.llm.phi3_pattern_verifier import verify_pattern_evidence
 from core.llm.micro_prompts import (
     deterministic_market_state_review,
-    nemotron_review_outcome,
     phi3_review_exit_posture,
 )
 from core.llm.client import unload_nemotron_model
@@ -144,6 +143,25 @@ def _compute_phi3_reflex_dict(features: dict[str, object]) -> dict[str, object]:
 
 
 _format_decision_timings = format_decision_timings
+
+
+def _entry_nemo_limit_for_cycle() -> int:
+    """Use the real candidate budget, not the tiny batch prompt default, to size entry review."""
+    try:
+        runtime_top_n = int(get_runtime_setting("NEMOTRON_TOP_CANDIDATE_COUNT"))
+    except Exception:
+        runtime_top_n = NEMOTRON_MAX_PER_CYCLE
+    configured_top_n = max(int(NEMOTRON_BATCH_TOP_N), runtime_top_n)
+    return max(1, min(NEMOTRON_MAX_PER_CYCLE, configured_top_n))
+
+
+def _entry_nemo_overflow_limit_for_cycle() -> int:
+    """Allow a small overflow sleeve so strong extra names are not hard-dropped pre-Nemo."""
+    try:
+        configured = int(get_runtime_setting("NEMOTRON_OVERFLOW_REVIEW_COUNT"))
+    except Exception:
+        configured = 4
+    return max(0, configured)
 
 
 
@@ -260,6 +278,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                     last_bar_keys=last_bar_keys,
                     last_exit_ts=last_exit_ts,
                     retention_sec=SYMBOL_STATE_RETENTION_SEC,
+                    additional_caches=(phi3_reflex_cache, phi3_pattern_cache),
                 )
                 console_event({"ts": now_iso(), "event": "reload_applied", "symbols": current_symbols})
             if DATA_SOURCE == "live" and executor.mode == "live" and (time.time() - last_account_sync_ts) >= ACCOUNT_SYNC_INTERVAL_SEC:
@@ -332,6 +351,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                 last_bar_keys=last_bar_keys,
                 last_exit_ts=last_exit_ts,
                 retention_sec=SYMBOL_STATE_RETENTION_SEC,
+                additional_caches=(phi3_reflex_cache, phi3_pattern_cache),
             )
             # Compute FinBERT sentiment scores for active symbols
             finbert_scores: dict[str, float] = {}
@@ -415,25 +435,35 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                 ohlc_30d_by_symbol = dict(zip(eval_symbols, _ohlc_results[5]))
             else:
                 eval_symbols = current_symbols
-                ohlc_by_symbol = {symbol: await fetch_ohlc(symbol) for symbol in current_symbols}
-                ohlc_5m_by_symbol: dict[str, pd.DataFrame] = {}
-                ohlc_15m_by_symbol: dict[str, pd.DataFrame] = {}
-                ohlc_1h_by_symbol = {
-                    symbol: await fetch_ohlc(symbol, base_path=CANDLES_PATH_1H, template=CANDLES_PATH_TEMPLATE_1H)
-                    for symbol in current_symbols
-                }
-                ohlc_7d_by_symbol = {
-                    symbol: await fetch_ohlc(symbol, base_path=CANDLES_PATH_7D, template=CANDLES_PATH_TEMPLATE_7D)
-                    for symbol in current_symbols
-                }
-                ohlc_30d_by_symbol = {
-                    symbol: await fetch_ohlc(symbol, base_path=CANDLES_PATH_30D, template=CANDLES_PATH_TEMPLATE_30D)
-                    for symbol in current_symbols
-                }
+
+                async def _fetch_all_tfs(sym: str) -> tuple[str, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+                    res_1m = await fetch_ohlc(sym)
+                    # 5m and 15m default to empty for static warmup unless passed similarly, but the code was doing empty dicts.
+                    # Retaining original logic: 5m and 15m are empty dicts.
+                    res_1h = await fetch_ohlc(sym, base_path=CANDLES_PATH_1H, template=CANDLES_PATH_TEMPLATE_1H)
+                    res_7d = await fetch_ohlc(sym, base_path=CANDLES_PATH_7D, template=CANDLES_PATH_TEMPLATE_7D)
+                    res_30d = await fetch_ohlc(sym, base_path=CANDLES_PATH_30D, template=CANDLES_PATH_TEMPLATE_30D)
+                    # Use empty dataframes for 5m and 15m to match original map shape logic
+                    return sym, res_1m, pd.DataFrame(), pd.DataFrame(), res_1h, res_7d, res_30d
+
+                _static_results = await asyncio.gather(*[_fetch_all_tfs(sym) for sym in current_symbols])
+
+                ohlc_by_symbol = {}
+                ohlc_5m_by_symbol = {}
+                ohlc_15m_by_symbol = {}
+                ohlc_1h_by_symbol = {}
+                ohlc_7d_by_symbol = {}
+                ohlc_30d_by_symbol = {}
+                
+                for _sym, _1m, _5m, _15m, _1h, _7d, _30d in _static_results:
+                    ohlc_by_symbol[_sym] = _1m
+                    ohlc_1h_by_symbol[_sym] = _1h
+                    ohlc_7d_by_symbol[_sym] = _7d
+                    ohlc_30d_by_symbol[_sym] = _30d
 
             if time.time() - last_ticker_ts >= 10.0:
                 try:
-                    last_ticker_snapshot = market_client.get_ticker_snapshot(eval_symbols)
+                    last_ticker_snapshot = await asyncio.to_thread(market_client.get_ticker_snapshot, eval_symbols)
                     last_ticker_ts = time.time()
                 except Exception:
                     pass
@@ -610,9 +640,13 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                     if (_ema_ok and (_brk or _pb)) or _promo in {"channel_breakout", "channel_retest"}:
                         _structure_syms.add(_sym)
             _score_rank.sort(reverse=True)
-            _entry_nemo_limit = max(1, min(NEMOTRON_MAX_PER_CYCLE, NEMOTRON_BATCH_TOP_N))
+            _entry_nemo_limit = _entry_nemo_limit_for_cycle()
             _ranked_entry_syms = {sym for _, sym in _score_rank[:_entry_nemo_limit]}
-            _nemo_allowed = _held_syms | _ranked_entry_syms | _structure_syms
+            _entry_overflow_limit = _entry_nemo_overflow_limit_for_cycle()
+            _overflow_entry_syms = {
+                sym for _, sym in _score_rank[_entry_nemo_limit : _entry_nemo_limit + _entry_overflow_limit]
+            }
+            _nemo_allowed = _held_syms | _ranked_entry_syms | _overflow_entry_syms | _structure_syms
             _use_batch_nemo = effective_nemotron_batch_mode()
 
             # Batch mode: run ONE Nemo call for all top candidates instead of N serial calls
@@ -633,7 +667,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         continue
                     if _sym in _warmup_syms:
                         continue
-                    if _sym not in _ranked_entry_syms and _sym not in _structure_syms:
+                    if _sym not in _ranked_entry_syms and _sym not in _overflow_entry_syms and _sym not in _structure_syms:
                         continue
                     _lane_supervision = lane_supervision_map.get(_sym)
                     _universe_lane = (_lane_supervision or {}).get("universe_lane")
@@ -705,7 +739,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         "market_state_review": _market_state_review,
                         "lane_supervision": dict(_lane_supervision or {}),
                         "phi3_ms": _phi3_ms,
-                        "proposed_weight": float(get_proposed_weight(_sym, _bf.get("lane"))),
+                        "proposed_weight": float(get_proposed_weight(_sym, _bf.get("lane"), float(_bf.get("atr_pct", 0.0) or 0.0))),
                         "_rank_score": _rank_score,
                         "_elite": _elite,
                         "_promo_rank": _promo_rank,
@@ -752,7 +786,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         ),
                         reverse=True,
                     )
-                    _batch_candidates = _batch_candidates[: max(1, _entry_nemo_limit + len(_structure_syms))]
+                    _batch_candidates = _batch_candidates[: max(1, _entry_nemo_limit + _entry_overflow_limit + len(_structure_syms))]
                     # Deterministic market trend state using BTC as market-wide barometer.
                     # Advisory only — adjusts entry scores so Nemo has accurate context.
                     _mts = _compute_market_trend(
@@ -783,6 +817,8 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         "candidates": len(_batch_candidates),
                         "held_bypass_count": len(_held_syms),
                         "ranked_entry_limit": _entry_nemo_limit,
+                        "overflow_entry_limit": _entry_overflow_limit,
+                        "overflow_entry_count": len(_overflow_entry_syms),
                         "structure_bypass_count": len(_structure_syms),
                         "warmup_skip_count": len(_warmup_syms),
                         "phi3_cache_hits": _phi3_cache_hits,
@@ -851,7 +887,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                 features["sentiment_market_cap_change_24h"] = float(sentiment_snapshot.market_cap_change_24h)
                 features["sentiment_trending_symbols"] = [coin.symbol for coin in sentiment_snapshot.trending[:5]]
                 features["sentiment_symbol_trending"] = symbol.split("/")[0].upper() in set(features["sentiment_trending_symbols"])
-                features["proposed_weight"] = get_proposed_weight(symbol, features.get("lane"))
+                features["proposed_weight"] = get_proposed_weight(symbol, features.get("lane"), float(features.get("atr_pct", 0.0) or 0.0))
                 proposed_weight = float(features["proposed_weight"])
                 features["kelly_fraction"] = memory_store.get_kelly_fraction(symbol)
                 features["symbol_performance"] = memory_store.get_symbol_performance(symbol)
@@ -891,7 +927,8 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         existing_position = positions_state.get(symbol)
 
                 if existing_position is not None and live_qty > 0.0:
-                    pos_action = handle_open_position(
+                    pos_action = await run_blocking_decision(
+                        handle_open_position,
                         symbol, features, existing_position, live_qty,
                         executor=executor,
                         portfolio=portfolio,
@@ -920,9 +957,11 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                 if DECISION_ENGINE == "llm" and symbol not in _nemo_allowed:
                     log_decision_debug({
                         "ts": now_iso(), "symbol": symbol, "phase": "entry",
-                        "action": "HOLD", "reason": "nemo_cap_skip",
+                        "action": "HOLD", "reason": "pre_nemo_shortlist_limit",
                         "entry_score": features.get("entry_score"),
                         "nemo_budget": NEMOTRON_MAX_PER_CYCLE,
+                        "nemo_priority_budget": _entry_nemo_limit,
+                        "nemo_overflow_budget": _entry_overflow_limit,
                     })
                     last_prices[symbol] = float(features.get("price", 0.0) or 0.0)
                     continue

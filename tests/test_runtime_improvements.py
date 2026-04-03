@@ -5,7 +5,7 @@ from unittest.mock import patch
 from core.memory.trade_memory import build_outcome_record
 from core.risk.exits import build_exit_plan
 from core.execution.order_policy import build_exit_order_plan, build_order_plan
-from apps.trader.positions import execute_replacement_exit
+from apps.trader.positions import _deterministic_outcome_review, execute_replacement_exit
 from core.risk.fee_filter import TradeCostAssessment
 from core.risk.portfolio import PortfolioConfig, Position, PositionState, build_opportunity_snapshot, evaluate_trade
 from core.state.portfolio import PortfolioState
@@ -14,6 +14,30 @@ from core.state.position_state_store import load_position_state, merge_persisted
 
 
 class RuntimeImprovementTests(unittest.TestCase):
+    def test_deterministic_outcome_review_classifies_good_winner(self) -> None:
+        review = _deterministic_outcome_review(
+            {
+                "pnl_pct": 0.035,
+                "exit_reason": "take_profit",
+                "capture_vs_mfe_pct": 0.72,
+                "structure_state": "intact",
+            }
+        )
+        self.assertEqual(review["outcome_class"], "good_breakout")
+        self.assertEqual(review["suggested_adjustment"], "keep_current_posture")
+
+    def test_deterministic_outcome_review_classifies_broken_structure_loss(self) -> None:
+        review = _deterministic_outcome_review(
+            {
+                "pnl_pct": -0.018,
+                "exit_reason": "exit_posture:l3_structure_broken_neg",
+                "capture_vs_mfe_pct": 0.1,
+                "structure_state": "broken",
+            }
+        )
+        self.assertEqual(review["outcome_class"], "weak_follow_through")
+        self.assertEqual(review["suggested_adjustment"], "tighten_promotion")
+
     def test_merge_persisted_positions_keeps_existing_exit_plan(self) -> None:
         synced = PositionState()
         synced.add_or_update(Position(symbol="BTC/USD", side="LONG", weight=0.2, entry_price=None, lane="L3"))
@@ -312,6 +336,56 @@ class RuntimeImprovementTests(unittest.TestCase):
 
         self.assertEqual(decision["decision"], "block")
         self.assertIn("max_open_positions_reached", decision["reasons"])
+
+    def test_evaluate_trade_can_replace_small_default_hold_starter(self) -> None:
+        positions = PositionState()
+        positions.add_or_update(
+            Position(
+                symbol="ALGO/USD",
+                side="LONG",
+                weight=0.04,
+                lane="L3",
+                monitor_state="RUN",
+                monitor_reason="default_hold_state",
+                exit_posture="RUN",
+                exit_posture_reason="default_hold_state",
+                structure_state="intact",
+            )
+        )
+        positions.add_or_update(
+            Position(
+                symbol="RENDER/USD",
+                side="LONG",
+                weight=0.15,
+                lane="L3",
+                monitor_state="RUN",
+                monitor_reason="trend_intact_let_run",
+                exit_posture="RUN",
+                exit_posture_reason="trend_intact_let_run",
+                structure_state="intact",
+            )
+        )
+
+        decision = evaluate_trade(
+            config=PortfolioConfig(max_open_positions=2, max_total_gross_exposure=0.6, max_positions_per_sector=3),
+            positions=positions,
+            symbol="FET/USD",
+            side="LONG",
+            proposed_weight=0.15,
+            correlation_row=[0.1, 0.1, 1.0],
+            symbols=["ALGO/USD", "RENDER/USD", "FET/USD"],
+            lane="L2",
+            features={
+                "entry_score": 77.0,
+                "entry_recommendation": "BUY",
+                "trend_confirmed": True,
+                "tp_after_cost_valid": True,
+                "point_breakdown": {"net_edge_pct": 0.8},
+            },
+        )
+
+        self.assertEqual(decision["decision"], "replace")
+        self.assertEqual(decision["replace_symbol"], "ALGO/USD")
 
     def test_execute_replacement_exit_removes_position_when_exit_fills(self) -> None:
         positions = PositionState()

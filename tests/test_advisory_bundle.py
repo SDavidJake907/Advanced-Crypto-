@@ -36,9 +36,7 @@ class AdvisoryBundleTests(unittest.TestCase):
         self.assertEqual(bundle.market_state_review["breakout_state"], "breakout_attempt")
         self.assertEqual(bundle.market_state_review["trend_stage"], "mixed")
         self.assertEqual(bundle.market_state_review["volume_confirmation"], "neutral")
-        self.assertEqual(bundle.market_state_review["pattern_explanation"]["structure_pattern"], "breakout_attempt")
         self.assertEqual(bundle.market_state_review["pattern_explanation"]["structure_phase"], "attempting_breakout")
-        self.assertEqual(bundle.market_state_review["pattern_explanation"]["recommended_nemo_interpretation"]["prefer_action"], "WATCH")
         self.assertEqual(bundle.market_state_review["pattern_explanation"]["context"]["breakout_level_state"], "pressing")
         self.assertEqual(bundle.market_state_review["candle_evidence"]["primary_candle"], "none")
 

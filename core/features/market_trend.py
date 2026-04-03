@@ -22,6 +22,18 @@ class MarketTrendState:
         return self.summary
 
 
+def _safe_batch_value(features_batch: dict[str, Any], key: str, idx: int, default: Any) -> Any:
+    values = features_batch.get(key, default)
+    if isinstance(values, (str, bytes)):
+        return values
+    if hasattr(values, "__getitem__"):
+        try:
+            return values[idx]
+        except (IndexError, KeyError, TypeError):
+            return default
+    return values if values is not None else default
+
+
 def compute_market_trend(
     features_batch: dict[str, Any],
     symbols: list[str],
@@ -64,11 +76,15 @@ def compute_market_trend(
             summary="market:unknown bias:neutral",
         )
 
-    # --- Extract BTC signals ---
-    trend_1h = int(features_batch.get("trend_1h", [0])[idx] if hasattr(features_batch.get("trend_1h", []), "__getitem__") else 0)
-    ema9_ok = bool(features_batch.get("ema9_above_ema20", [False])[idx] if hasattr(features_batch.get("ema9_above_ema20", []), "__getitem__") else False)
-    trend_conf = bool(features_batch.get("trend_confirmed", [False])[idx] if hasattr(features_batch.get("trend_confirmed", []), "__getitem__") else False)
-    macro = str(features_batch.get("macro_30d", ["sideways"])[idx] if hasattr(features_batch.get("macro_30d", []), "__getitem__") else "sideways").lower()
+    # --- Extract BTC signals safely ---
+    trend_1h = int(_safe_batch_value(features_batch, "trend_1h", idx, 0) or 0)
+    trend_conf = bool(_safe_batch_value(features_batch, "trend_confirmed", idx, False))
+    macro = str(_safe_batch_value(features_batch, "macro_30d", idx, "sideways") or "sideways").lower()
+
+    ema9_ok = bool(_safe_batch_value(features_batch, "ema9_above_ema20", idx, False))
+    if not ema9_ok:
+        struct_l23 = features_batch.get("struct_l23", {}) if isinstance(features_batch.get("struct_l23", {}), dict) else {}
+        ema9_ok = bool(_safe_batch_value(struct_l23, "ema9_above_ema20", idx, False))
 
     # --- Score signals ---
     s1 = 1 if trend_1h > 0 else (-1 if trend_1h < 0 else 0)   # 1h direction
