@@ -25,7 +25,7 @@ class MoverAdvisoryTests(unittest.TestCase):
         )
         self.assertEqual(review.promotion_decision, "promote")
         self.assertEqual(review.action_bias, "reduce_size")
-        self.assertEqual(review.reason, "early_mover_probe")
+        self.assertEqual(review.reason, "watch_mover_probe")
 
     def test_market_state_ranging_stays_selective_for_mover(self) -> None:
         review = _heuristic_market_state_review(
@@ -40,7 +40,7 @@ class MoverAdvisoryTests(unittest.TestCase):
         )
         self.assertEqual(review.market_state, "ranging")
         self.assertEqual(review.lane_bias, "favor_selective")
-        self.assertEqual(review.reason, "range_state_but_mover_present")
+        self.assertEqual(review.reason, "selective_range_mover_with_relative_strength")
 
     def test_posture_ranging_promoted_mover_is_not_defensive(self) -> None:
         review = _heuristic_posture_review(
@@ -49,7 +49,7 @@ class MoverAdvisoryTests(unittest.TestCase):
             {"promotion_decision": "promote"},
         )
         self.assertEqual(review.posture, "neutral")
-        self.assertEqual(review.reason, "range_but_allow_movers")
+        self.assertEqual(review.reason, "heuristic_from_candidate_review")
 
 
 if __name__ == "__main__":
