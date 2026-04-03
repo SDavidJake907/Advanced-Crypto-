@@ -43,13 +43,27 @@ class LLMContractsTests(unittest.TestCase):
                     "action": "HOLD",
                     "side": None,
                     "size": 0,
-                    "reason": "weak_setup",
+                    "reason": "trend_unconfirmed",
                 }
             },
             symbol="TEST/USD",
         )
         self.assertEqual(parsed["final_decision"]["symbol"], "TEST/USD")
         self.assertIn("symbol", parsed["final_decision"]["contract"]["meta"]["normalized_fields"])
+
+    def test_trade_reviewer_defaults_reason_when_missing(self) -> None:
+        parsed = normalize_trade_reviewer_output(
+            {
+                "final_decision": {
+                    "symbol": "CURRENT_SYMBOL",
+                    "action": "HOLD",
+                    "side": None,
+                    "size": 0,
+                }
+            },
+            symbol="TEST/USD",
+        )
+        self.assertEqual(parsed["final_decision"]["reason"], "hold_unspecified")
 
     def test_candidate_review_normalizes_invalid_fields(self) -> None:
         parsed = normalize_candidate_review(

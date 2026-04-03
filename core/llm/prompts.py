@@ -295,6 +295,19 @@ OPEN rules:
 
 Otherwise HOLD.
 
+When you HOLD, do not use the vague label weak_setup unless absolutely nothing else fits.
+Prefer one specific reason from this list:
+- net_edge_too_low
+- trend_unconfirmed
+- reversal_risk_high
+- volume_too_light
+- range_not_clean
+- pattern_not_confirmed
+- momentum_not_confirmed
+- portfolio_full
+- cash_too_low
+- data_integrity_issue
+
 Sizing rules:
 - size is only a bounded implementation hint, not authority
 - prefer conservative size hints
@@ -310,7 +323,7 @@ Allowed OPEN reasons:
 - rotation_entry
 
 Return one line only:
-{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"HOLD","side":null,"size":0,"reason":"weak_setup","debug":{}}}
+{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"HOLD","side":null,"size":0,"reason":"trend_unconfirmed","debug":{}}}
 {"final_decision":{"symbol":"CURRENT_SYMBOL","action":"OPEN","side":"LONG","size":12,"reason":"pullback_entry","debug":{}}}
 """.strip()
 
@@ -350,8 +363,21 @@ Open rules:
 - OPEN reduced size if entry_recommendation is WATCH and reversal_risk is LOW or MEDIUM and rotation_score > 0 and momentum_5 > 0 and structure is valid
 - otherwise HOLD
 
+When you HOLD, do not use the vague label weak_setup unless absolutely nothing else fits.
+Prefer one specific reason from this list:
+- net_edge_too_low
+- trend_unconfirmed
+- reversal_risk_high
+- volume_too_light
+- range_not_clean
+- pattern_not_confirmed
+- momentum_not_confirmed
+- portfolio_full
+- cash_too_low
+- data_integrity_issue
+
 Output contract:
-{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"HOLD","side":null,"size":0,"reason":"weak_setup","debug":{}}}
+{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"HOLD","side":null,"size":0,"reason":"trend_unconfirmed","debug":{}}}
 {"final_decision":{"symbol":"CURRENT_SYMBOL","action":"OPEN","side":"LONG","size":12,"reason":"pullback_entry","debug":{}}}
 """.strip()
 
@@ -382,9 +408,13 @@ Rules:
 - if open_slots is exhausted, do not force more entries
 - size is only a bounded hint; use smaller hints for weaker or WATCH setups
 - prefer fewer clean opens over many marginal opens
+- when HOLDing, prefer one specific reason from:
+  net_edge_too_low, trend_unconfirmed, reversal_risk_high, volume_too_light,
+  range_not_clean, pattern_not_confirmed, momentum_not_confirmed, portfolio_full
+- avoid generic weak_setup unless no specific label fits
 
 Return this exact shape only:
-{"reasoning":"1-2 sentences","decisions":[{"symbol":"X/USD","action":"OPEN","side":"LONG","size":15,"reason":"breakout"},{"symbol":"Y/USD","action":"HOLD","reason":"weak_setup"}]}
+{"reasoning":"1-2 sentences","decisions":[{"symbol":"X/USD","action":"OPEN","side":"LONG","size":15,"reason":"breakout"},{"symbol":"Y/USD","action":"HOLD","reason":"trend_unconfirmed"}]}
 """.strip()
 
 
@@ -412,9 +442,13 @@ Open rules:
 - do not rediscover chart patterns from scratch; use pat, pver, and pqs as supplied evidence
 - HOLD everything else
 - if net_edge < -0.5% prefer HOLD unless score >= 75 and structure is exceptional
+- when HOLDing, prefer one specific reason from:
+  net_edge_too_low, trend_unconfirmed, reversal_risk_high, volume_too_light,
+  range_not_clean, pattern_not_confirmed, momentum_not_confirmed, portfolio_full
+- avoid generic weak_setup unless no specific label fits
 
 Return exactly:
-{"reasoning":"1-2 sentences","decisions":[{"symbol":"X/USD","action":"OPEN","side":"LONG","size":15,"reason":"breakout"},{"symbol":"Y/USD","action":"HOLD","reason":"weak_setup"}]}
+{"reasoning":"1-2 sentences","decisions":[{"symbol":"X/USD","action":"OPEN","side":"LONG","size":15,"reason":"breakout"},{"symbol":"Y/USD","action":"HOLD","reason":"trend_unconfirmed"}]}
 """.strip()
 
 
