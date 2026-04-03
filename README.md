@@ -234,7 +234,7 @@ Persistent AI services are started separately with [`scripts/start_models.ps1`](
 
 **Important:** Run `start_models.ps1` first and wait for "Phi-3 ready" before running `start_all.ps1`. Phi-3 takes 2-3 minutes to load on NPU — `start_all.ps1` only waits 15 seconds.
 
-Current note: the active local strategist profile uses `Gemma 4 E4B` through LM Studio with `ADVISORY_MODEL_PROVIDER=local_nemo`, `NEMOTRON_PROVIDER=local`, `NEMOTRON_STRATEGIST_PROVIDER=local`, `LOCAL_LLM_BACKEND=lmstudio`, and `NEMOTRON_BATCH_MODE=false`. In that setup, Phi-3 readiness is not required.
+Current note: the default local strategist profile uses `NVIDIA-Nemotron-Nano-9B-v2` through Ollama with `ADVISORY_MODEL_PROVIDER=local_nemo`, `NEMOTRON_PROVIDER=local`, `NEMOTRON_STRATEGIST_PROVIDER=local`, and `LOCAL_LLM_BACKEND=ollama`. Phi-3 can be started alongside that local strategist path when `START_PHI3_ON_START=true`.
 
 Current reference docs:
 - [LLM operating model](docs/llm_operating_model.md)

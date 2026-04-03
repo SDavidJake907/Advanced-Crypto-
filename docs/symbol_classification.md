@@ -25,6 +25,7 @@ These are core market anchors and generally the first names to compare against b
 | `LTC/USD` | major | older liquid major alt | `L3` |
 | `DOT/USD` | major | liquid large-cap alt | `L2` or `L3` |
 | `TRX/USD` | major | liquid large-cap alt | `L2` or `L3` |
+| `ALGO/USD` | major | liquid legacy infrastructure major alt | `L2` or `L3` |
 
 ## Core Alts
 
