@@ -213,9 +213,14 @@ class VectorBTHarnessTests(unittest.TestCase):
             self.assertEqual(len(result.summary), 1)
             self.assertGreater(len(result.windows), 0)
             self.assertIn("test_regime_bucket", result.windows.columns)
+            self.assertIn("test_phi3_market_state", result.windows.columns)
+            self.assertIn("test_phi3_alignment_rate", result.windows.columns)
             self.assertIn("symbol_group", result.summary.columns)
             self.assertIn("lane_filter", result.summary.columns)
+            self.assertIn("avg_phi3_alignment_rate", result.summary.columns)
             self.assertIn("test_regime_bucket", result.regime_summary.columns)
+            self.assertIn("test_phi3_market_state", result.phi3_summary.columns)
+            self.assertIn("avg_phi3_alignment_rate", result.phi3_summary.columns)
             self.assertIn("selected_threshold", result.windows.columns)
             self.assertTrue(summary_csv.exists())
             self.assertTrue(windows_csv.exists())
@@ -239,6 +244,8 @@ class VectorBTHarnessTests(unittest.TestCase):
             self.assertEqual(len(result.per_symbol_summary), 2)
             self.assertIn("symbol_group", result.aggregate_summary.columns)
             self.assertIn("lane_filter", result.aggregate_summary.columns)
+            self.assertIn("test_phi3_market_state", result.phi3_summary.columns)
+            self.assertIn("lane_filter", result.phi3_summary.columns)
             self.assertGreater(len(result.windows), 0)
 
 

@@ -10,6 +10,7 @@ import vectorbt as vbt
 
 from core.data.loader import CandleLoader
 from core.features.divergence import detect_rsi_divergence
+from core.llm.micro_prompts import deterministic_market_state_review
 from core.policy.pipeline import apply_policy_pipeline
 from core.risk.fee_filter import evaluate_trade_cost
 
@@ -144,6 +145,11 @@ def add_policy_outputs(symbol: str, feature_frame: pd.DataFrame) -> pd.DataFrame
     expected_move_pcts: list[float] = []
     required_edge_pcts: list[float] = []
     expected_edge_pcts: list[float] = []
+    phi3_market_states: list[str] = []
+    phi3_lane_biases: list[str] = []
+    phi3_market_confidences: list[float] = []
+    phi3_alignment_flags: list[bool] = []
+    phi3_reasons: list[str] = []
 
     for _, row in output.iterrows():
         feature_row = _policy_row(symbol, row)
@@ -168,6 +174,25 @@ def add_policy_outputs(symbol: str, feature_frame: pd.DataFrame) -> pd.DataFrame
         expected_move_pcts.append(float(cost.expected_move_pct))
         required_edge_pcts.append(float(cost.required_edge_pct))
         expected_edge_pcts.append(float(cost.expected_edge_pct))
+        phi3_features = {
+            **cost_features,
+            "entry_score": float(policy.get("entry_score", 0.0) or 0.0),
+            "reversal_risk": str(policy.get("reversal_risk", "MEDIUM")),
+            "risk_quality": float(policy.get("risk_quality", 50.0) or 50.0),
+            "ranging_market": bool(row.get("ranging_market", False)),
+            "trend_confirmed": bool(int(row.get("trend_1h", 0) or 0) > 0 and float(row.get("momentum_14", 0.0) or 0.0) > 0.0),
+            "volume_surge": max(float(row.get("volume_ratio", 1.0) or 1.0) - 1.0, 0.0),
+            "sentiment_symbol_trending": False,
+        }
+        phi3_review = deterministic_market_state_review(phi3_features).to_dict()
+        phi3_market_state = str(phi3_review.get("market_state", "transition") or "transition")
+        phi3_lane_bias = str(phi3_review.get("lane_bias", "favor_selective") or "favor_selective")
+        regime_bucket = str(row.get("regime_bucket", "unknown") or "unknown")
+        phi3_market_states.append(phi3_market_state)
+        phi3_lane_biases.append(phi3_lane_bias)
+        phi3_market_confidences.append(float(phi3_review.get("confidence", 0.0) or 0.0))
+        phi3_alignment_flags.append(_phi3_regime_alignment(regime_bucket, phi3_market_state, phi3_lane_bias))
+        phi3_reasons.append(str(phi3_review.get("reason", "")))
 
     output["entry_score"] = entry_scores
     output["entry_recommendation"] = recommendations
@@ -178,6 +203,11 @@ def add_policy_outputs(symbol: str, feature_frame: pd.DataFrame) -> pd.DataFrame
     output["expected_move_pct"] = expected_move_pcts
     output["required_edge_pct"] = required_edge_pcts
     output["expected_edge_pct"] = expected_edge_pcts
+    output["phi3_market_state"] = phi3_market_states
+    output["phi3_lane_bias"] = phi3_lane_biases
+    output["phi3_market_confidence"] = phi3_market_confidences
+    output["phi3_regime_alignment"] = phi3_alignment_flags
+    output["phi3_reason"] = phi3_reasons
     return output
 
 
@@ -200,6 +230,7 @@ class WalkForwardResult:
     summary: pd.DataFrame
     windows: pd.DataFrame
     regime_summary: pd.DataFrame
+    phi3_summary: pd.DataFrame
     feature_frame: pd.DataFrame
 
 
@@ -208,6 +239,7 @@ class BatchWalkForwardResult:
     per_symbol_summary: pd.DataFrame
     aggregate_summary: pd.DataFrame
     regime_summary: pd.DataFrame
+    phi3_summary: pd.DataFrame
     windows: pd.DataFrame
 
 
@@ -265,6 +297,21 @@ def _classify_regime_bucket(row: pd.Series) -> str:
     if trend_1h < 0 or (momentum_14 < 0.0 and momentum_5 <= 0.0):
         return "red"
     return "transition"
+
+
+def _phi3_regime_alignment(regime_bucket: str, market_state: str, lane_bias: str) -> bool:
+    regime = str(regime_bucket or "unknown")
+    state = str(market_state or "transition")
+    bias = str(lane_bias or "favor_selective")
+    if regime == "trend":
+        return state == "trending"
+    if regime == "ranging":
+        return state == "ranging"
+    if regime == "transition":
+        return state == "transition"
+    if regime == "red":
+        return state != "trending" and bias != "favor_trend"
+    return False
 
 
 def _dominant_label(series: pd.Series, default: str = "unknown") -> str:
@@ -600,6 +647,10 @@ def run_walk_forward_validation(
                 "test_end": str(test_slice["timestamp"].iloc[-1]),
                 "test_regime_bucket": _dominant_label(test_slice["regime_bucket"], default="unknown"),
                 "test_lane_mode": _dominant_label(test_slice["lane"], default="unknown"),
+                "test_phi3_market_state": _dominant_label(test_slice["phi3_market_state"], default="unknown"),
+                "test_phi3_lane_bias": _dominant_label(test_slice["phi3_lane_bias"], default="unknown"),
+                "test_phi3_alignment_rate": round(float(test_slice["phi3_regime_alignment"].astype(float).mean()), 4),
+                "test_phi3_market_confidence": round(float(test_slice["phi3_market_confidence"].astype(float).mean()), 4),
                 "selected_threshold": best_threshold,
                 "train_total_return_pct": round(best_train_metrics.get("total_return_pct", 0.0), 4),
                 "train_win_rate_pct": round(best_train_metrics.get("win_rate_pct", 0.0), 4),
@@ -615,6 +666,7 @@ def run_walk_forward_validation(
 
     windows = pd.DataFrame(rows)
     regime_summary = pd.DataFrame()
+    phi3_summary = pd.DataFrame()
     if not windows.empty:
         regime_summary = (
             windows.groupby("test_regime_bucket", as_index=False)
@@ -626,6 +678,22 @@ def run_walk_forward_validation(
                 avg_test_total_trades=("test_total_trades", "mean"),
                 avg_test_max_drawdown_pct=("test_max_drawdown_pct", "mean"),
                 avg_test_sharpe_ratio=("test_sharpe_ratio", "mean"),
+            )
+            .sort_values("avg_test_total_return_pct", ascending=False)
+            .reset_index(drop=True)
+        )
+        phi3_summary = (
+            windows.groupby(["test_phi3_market_state", "test_phi3_lane_bias"], as_index=False)
+            .agg(
+                windows=("symbol", "count"),
+                avg_test_total_return_pct=("test_total_return_pct", "mean"),
+                median_test_total_return_pct=("test_total_return_pct", "median"),
+                avg_test_win_rate_pct=("test_win_rate_pct", "mean"),
+                avg_test_total_trades=("test_total_trades", "mean"),
+                avg_test_max_drawdown_pct=("test_max_drawdown_pct", "mean"),
+                avg_test_sharpe_ratio=("test_sharpe_ratio", "mean"),
+                avg_phi3_alignment_rate=("test_phi3_alignment_rate", "mean"),
+                avg_phi3_market_confidence=("test_phi3_market_confidence", "mean"),
             )
             .sort_values("avg_test_total_return_pct", ascending=False)
             .reset_index(drop=True)
@@ -643,6 +711,8 @@ def run_walk_forward_validation(
                 "avg_test_total_trades": float(windows["test_total_trades"].mean()) if not windows.empty else 0.0,
                 "avg_test_max_drawdown_pct": float(windows["test_max_drawdown_pct"].mean()) if not windows.empty else 0.0,
                 "avg_test_sharpe_ratio": float(windows["test_sharpe_ratio"].mean()) if not windows.empty else 0.0,
+                "avg_phi3_alignment_rate": float(windows["test_phi3_alignment_rate"].mean()) if not windows.empty else 0.0,
+                "avg_phi3_market_confidence": float(windows["test_phi3_market_confidence"].mean()) if not windows.empty else 0.0,
             }
         ]
     )
@@ -654,7 +724,13 @@ def run_walk_forward_validation(
         target = Path(windows_csv_path)
         target.parent.mkdir(parents=True, exist_ok=True)
         windows.to_csv(target, index=False)
-    return WalkForwardResult(summary=summary, windows=windows, regime_summary=regime_summary, feature_frame=features)
+    return WalkForwardResult(
+        summary=summary,
+        windows=windows,
+        regime_summary=regime_summary,
+        phi3_summary=phi3_summary,
+        feature_frame=features,
+    )
 
 
 def run_batch_walk_forward_validation(
@@ -681,6 +757,7 @@ def run_batch_walk_forward_validation(
 ) -> BatchWalkForwardResult:
     per_symbol_frames: list[pd.DataFrame] = []
     regime_frames: list[pd.DataFrame] = []
+    phi3_frames: list[pd.DataFrame] = []
     windows_frames: list[pd.DataFrame] = []
 
     for symbol in symbols:
@@ -707,11 +784,18 @@ def run_batch_walk_forward_validation(
             regime.insert(0, "symbol", symbol)
             regime.insert(1, "symbol_group", _classify_symbol_group(symbol))
             regime_frames.append(regime)
+        if not result.phi3_summary.empty:
+            phi3 = result.phi3_summary.copy()
+            phi3.insert(0, "symbol", symbol)
+            phi3.insert(1, "symbol_group", _classify_symbol_group(symbol))
+            phi3.insert(2, "lane_filter", str((lane_filter or "ALL")).upper())
+            phi3_frames.append(phi3)
         if not result.windows.empty:
             windows_frames.append(result.windows.copy())
 
     per_symbol_summary = pd.concat(per_symbol_frames, ignore_index=True) if per_symbol_frames else pd.DataFrame()
     regime_summary = pd.concat(regime_frames, ignore_index=True) if regime_frames else pd.DataFrame()
+    phi3_summary = pd.concat(phi3_frames, ignore_index=True) if phi3_frames else pd.DataFrame()
     windows = pd.concat(windows_frames, ignore_index=True) if windows_frames else pd.DataFrame()
 
     aggregate_summary = pd.DataFrame()
@@ -752,5 +836,6 @@ def run_batch_walk_forward_validation(
         per_symbol_summary=per_symbol_summary,
         aggregate_summary=aggregate_summary,
         regime_summary=regime_summary,
+        phi3_summary=phi3_summary,
         windows=windows,
     )
