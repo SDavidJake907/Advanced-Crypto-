@@ -648,6 +648,7 @@ Selected runtime controls:
 Universe-specific controls:
 - `MEME_UNIVERSE_ENABLED` blocks meme symbols at universe construction instead of relying on later-stage rejection
 - `MEME_ACTIVE_UNIVERSE_MAX` caps meme slots inside the active universe
+- Universe layering now supports `core`, `momentum`, `recovery`, and `meme` buckets; broad symbols can enter through hard liquidity/spread filters without being hard-locked to the static seed list unless `UNIVERSE_STRICT_SEED_ONLY=true`
 - `UNIVERSE_MIN_REFRESH_INTERVAL_MIN` sets a hard floor on universe refresh cadence
 - `UNIVERSE_RETAIN_BUFFER_MULT` adds a retention band so incumbents do not churn on tiny rank moves
 - `UNIVERSE_EXCLUDED_BASES` blocks whole base-asset classes

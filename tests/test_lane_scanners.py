@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from apps.universe_manager.main import Candidate, build_lane_shortlists
 from core.policy.nemotron_gate import passes_deterministic_candidate_gate
@@ -39,45 +40,46 @@ class LaneScannerTests(unittest.TestCase):
         self.assertTrue(any(symbol in lane_meta["merged"] for symbol in {"WIF/USD", "BONK/USD"}))
 
     def test_lane_shortlisted_symbol_can_pass_gate_without_flat_top_rank(self) -> None:
-        passed, reason = passes_deterministic_candidate_gate(
-            symbol="APT/USD",
-            positions_state=PositionState(),
-            universe_context={
-                "current_symbol_is_top_candidate": False,
-                "lane_shortlists": {
-                    "L2": [
-                        {
-                            "symbol": "APT/USD",
-                            "lane": "L2",
-                            "candidate_score": 61.0,
-                            "recommendation": "BUY",
-                            "risk": "MEDIUM",
-                            "reasons": [],
-                        }
-                    ]
+        with patch("core.config.runtime.load_runtime_overrides", return_value={"STABILIZATION_STRICT_ENTRY_ENABLED": False}):
+            passed, reason = passes_deterministic_candidate_gate(
+                symbol="APT/USD",
+                positions_state=PositionState(),
+                universe_context={
+                    "current_symbol_is_top_candidate": False,
+                    "lane_shortlists": {
+                        "L2": [
+                            {
+                                "symbol": "APT/USD",
+                                "lane": "L2",
+                                "candidate_score": 61.0,
+                                "recommendation": "BUY",
+                                "risk": "MEDIUM",
+                                "reasons": [],
+                            }
+                        ]
+                    },
                 },
-            },
-            features={
-                "symbol": "APT/USD",
-                "lane": "L2",
-                "indicators_ready": True,
-                "entry_recommendation": "BUY",
-                "reversal_risk": "MEDIUM",
-                "entry_score": 61.0,
-                "rotation_score": 0.12,
-                "momentum_5": 0.01,
-                "volume_ratio": 1.1,
-                "volume_surge": 0.2,
-                "trend_confirmed": True,
-                "ranging_market": False,
-                "sentiment_symbol_trending": False,
-                "macro_30d": "sideways",
-                "regime_7d": "choppy",
-                "xgb_score": 65.0,
-                "short_tf_ready_5m": True,
-                "short_tf_ready_15m": True,
-            },
-        )
+                features={
+                    "symbol": "APT/USD",
+                    "lane": "L2",
+                    "indicators_ready": True,
+                    "entry_recommendation": "BUY",
+                    "reversal_risk": "MEDIUM",
+                    "entry_score": 61.0,
+                    "rotation_score": 0.12,
+                    "momentum_5": 0.01,
+                    "volume_ratio": 1.1,
+                    "volume_surge": 0.2,
+                    "trend_confirmed": True,
+                    "ranging_market": False,
+                    "sentiment_symbol_trending": False,
+                    "macro_30d": "sideways",
+                    "regime_7d": "choppy",
+                    "xgb_score": 65.0,
+                    "short_tf_ready_5m": True,
+                    "short_tf_ready_15m": True,
+                },
+            )
         self.assertTrue(passed)
         self.assertEqual(reason, "passed")
 

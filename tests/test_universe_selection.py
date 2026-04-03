@@ -69,6 +69,7 @@ class UniverseSelectionTests(unittest.TestCase):
             self.assertTrue(_universe_symbol_allowed("BTC/USD"))
 
     def test_universe_symbol_allowed_restricts_to_core_and_conditional_seed(self) -> None:
+        os.environ["UNIVERSE_STRICT_SEED_ONLY"] = "true"
         os.environ["CORE_ACTIVE_UNIVERSE"] = "BTC/USD,ETH/USD,SOL/USD,LINK/USD"
         os.environ["CONDITIONAL_UNIVERSE"] = "XRP/USD"
         os.environ["ENABLE_CONDITIONAL_UNIVERSE"] = "true"
@@ -203,7 +204,7 @@ class UniverseSelectionTests(unittest.TestCase):
             max_removes=5,
             cooldown_minutes=180,
             min_volume_usd=200_000,
-            max_spread_bps=12.0,
+            max_spread_bps=25.0,
             min_price=0.05,
             churn_threshold=1.2,
         )
@@ -310,6 +311,7 @@ class UniverseSelectionTests(unittest.TestCase):
         _load_synced,
         _build_scan_meta,
     ) -> None:
+        os.environ["UNIVERSE_STRICT_SEED_ONLY"] = "true"
         os.environ["CORE_ACTIVE_UNIVERSE"] = "BTC/USD,ETH/USD,SOL/USD,LINK/USD"
         os.environ["CONDITIONAL_UNIVERSE"] = "XRP/USD"
         os.environ["ENABLE_CONDITIONAL_UNIVERSE"] = "false"
@@ -344,6 +346,51 @@ class UniverseSelectionTests(unittest.TestCase):
     @patch("apps.universe_manager.main.load_synced_position_symbols", return_value=[])
     @patch("apps.universe_manager.main.load_universe", return_value={"active_pairs": [], "meta": {}})
     @patch("apps.universe_manager.main.save_universe", side_effect=_fake_save_universe)
+    def test_rebalance_universe_can_include_broad_momentum_and_recovery_layers(
+        self,
+        _save_universe,
+        _load_universe,
+        _load_synced,
+        _build_scan_meta,
+    ) -> None:
+        os.environ["CORE_ACTIVE_UNIVERSE"] = "BTC/USD,ETH/USD,SOL/USD"
+        os.environ["ENABLE_CONDITIONAL_UNIVERSE"] = "false"
+        os.environ["ACTIVE_MIN"] = "4"
+        os.environ["ACTIVE_MAX"] = "5"
+        os.environ["ROTATION_SHORTLIST_SIZE"] = "5"
+        os.environ["UNIVERSE_EXPANSION_MIN_ENTRY_SCORE"] = "50"
+        os.environ["UNIVERSE_EXPANSION_MIN_RANK_SCORE"] = "55"
+
+        policy = UniversePolicy(
+            active_min=4,
+            active_max=5,
+            max_adds=5,
+            max_removes=5,
+            cooldown_minutes=180,
+            min_volume_usd=200_000,
+            max_spread_bps=25.0,
+            min_price=0.05,
+            churn_threshold=1.2,
+        )
+        candidates = [
+            Candidate(pair="BTC/USD", score=0.03, volume_usd=1_000_000, last=60000, lane="L1", candidate_score=80.0, rank_score=80.0, spread_bps=6.0, trade_quality=70.0),
+            Candidate(pair="ETH/USD", score=0.025, volume_usd=900_000, last=3000, lane="L1", candidate_score=78.0, rank_score=78.0, spread_bps=7.0, trade_quality=70.0),
+            Candidate(pair="SOL/USD", score=0.024, volume_usd=850_000, last=150.0, lane="L3", candidate_score=76.0, rank_score=76.0, spread_bps=8.0, trade_quality=68.0),
+            Candidate(pair="FET/USD", score=0.028, volume_usd=500_000, last=0.23, lane="L3", candidate_score=74.0, rank_score=74.0, spread_bps=8.0, trade_quality=66.0, momentum_5=0.01, momentum_14=0.02, volume_ratio=1.1, structure_quality=65.0, continuation_quality=66.0, candidate_recommendation="BUY"),
+            Candidate(pair="TIA/USD", score=0.022, volume_usd=450_000, last=0.29, lane="L3", candidate_score=62.0, rank_score=62.0, spread_bps=9.0, trade_quality=60.0, momentum_5=0.002, momentum_14=0.008, volume_ratio=0.95, structure_quality=64.0, continuation_quality=63.0, candidate_recommendation="WATCH"),
+        ]
+
+        result = rebalance_universe(candidates, policy)
+
+        self.assertIn("FET/USD", result["active_pairs"])
+        self.assertIn("TIA/USD", result["active_pairs"])
+        self.assertEqual(result["meta"].get("segment_tags", {}).get("FET/USD"), "momentum")
+        self.assertEqual(result["meta"].get("segment_tags", {}).get("TIA/USD"), "recovery")
+
+    @patch("apps.universe_manager.main.build_scan_meta", side_effect=_fake_build_scan_meta)
+    @patch("apps.universe_manager.main.load_synced_position_symbols", return_value=[])
+    @patch("apps.universe_manager.main.load_universe", return_value={"active_pairs": [], "meta": {}})
+    @patch("apps.universe_manager.main.save_universe", side_effect=_fake_save_universe)
     def test_rebalance_excludes_xrp_by_default_when_conditional_checks_fail(
         self,
         _save_universe,
@@ -365,7 +412,7 @@ class UniverseSelectionTests(unittest.TestCase):
             max_removes=5,
             cooldown_minutes=180,
             min_volume_usd=200_000,
-            max_spread_bps=12.0,
+            max_spread_bps=25.0,
             min_price=0.05,
             churn_threshold=1.2,
         )
@@ -410,7 +457,7 @@ class UniverseSelectionTests(unittest.TestCase):
             max_removes=5,
             cooldown_minutes=180,
             min_volume_usd=200_000,
-            max_spread_bps=12.0,
+            max_spread_bps=25.0,
             min_price=0.05,
             churn_threshold=1.2,
         )

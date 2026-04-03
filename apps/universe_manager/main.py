@@ -829,6 +829,10 @@ def _conditional_universe() -> set[str]:
     return _runtime_symbol_set("CONDITIONAL_UNIVERSE")
 
 
+def _strict_seed_only_enabled() -> bool:
+    return str(os.getenv("UNIVERSE_STRICT_SEED_ONLY", "false") or "").strip().lower() == "true"
+
+
 def _stabilization_universe() -> set[str]:
     return _core_active_universe() | _conditional_universe()
 
@@ -900,6 +904,24 @@ def _conditional_candidate_allowed(candidate: Candidate, core_candidates: list[C
     return False
 
 
+def _broad_candidate_allowed(candidate: Candidate) -> bool:
+    score_floor = float(os.getenv("UNIVERSE_EXPANSION_MIN_ENTRY_SCORE", "50"))
+    rank_floor = float(os.getenv("UNIVERSE_EXPANSION_MIN_RANK_SCORE", "55"))
+    volume_ratio_floor = float(os.getenv("UNIVERSE_EXPANSION_MIN_VOLUME_RATIO", "0.85"))
+    trade_quality_floor = float(os.getenv("UNIVERSE_EXPANSION_MIN_TRADE_QUALITY", "50"))
+    recommendation = str(candidate.candidate_recommendation or "WATCH").upper()
+    risk = str(candidate.candidate_risk or "MEDIUM").upper()
+    if recommendation == "AVOID" or risk == "HIGH":
+        return False
+    if candidate.volume_ratio < volume_ratio_floor:
+        return False
+    if candidate.trade_quality < trade_quality_floor:
+        return False
+    if candidate.candidate_score < score_floor and candidate.rank_score < rank_floor:
+        return False
+    return True
+
+
 def _major_bases() -> set[str]:
     default = "BTC,XBT,ETH,SOL,XRP,ADA,DOGE,TRX,AVAX,LINK,DOT,LTC"
     raw = str(os.getenv("UNIVERSE_MAJOR_BASES", default) or "").strip()
@@ -923,6 +945,34 @@ def _segment_for_symbol(symbol: str, lane: str | None = None) -> str:
     return "core_alt"
 
 
+def _layer_for_candidate(candidate: Candidate) -> str:
+    base_segment = _segment_for_symbol(candidate.pair, candidate.lane)
+    normalized = normalize_pair(candidate.pair)
+    if base_segment == "meme":
+        return "meme"
+    if normalized in _core_active_universe() or base_segment in {"major", "store_of_value"}:
+        return "core"
+
+    recommendation = str(candidate.candidate_recommendation or "WATCH").upper()
+    if (
+        recommendation in {"BUY", "STRONG_BUY"}
+        and candidate.momentum_5 > 0.0
+        and candidate.volume_ratio >= 0.95
+        and candidate.trade_quality >= 55.0
+    ):
+        return "momentum"
+
+    if (
+        recommendation in {"WATCH", "BUY", "STRONG_BUY"}
+        and candidate.momentum_14 >= 0.0
+        and candidate.structure_quality >= 55.0
+        and candidate.continuation_quality >= 55.0
+    ):
+        return "recovery"
+
+    return "core"
+
+
 def _universe_symbol_allowed(symbol: str) -> bool:
     normalized = normalize_pair(symbol)
     if not normalized:
@@ -934,7 +984,7 @@ def _universe_symbol_allowed(symbol: str) -> bool:
     if is_meme_symbol(normalized) and not _meme_universe_enabled():
         return False
     stabilization_universe = _stabilization_universe()
-    if stabilization_universe and normalized not in stabilization_universe:
+    if _strict_seed_only_enabled() and stabilization_universe and normalized not in stabilization_universe:
         return False
     return True
 
@@ -1734,10 +1784,27 @@ def rebalance_universe(candidates: list[Candidate], policy: UniversePolicy) -> d
         for c in candidates
         if c.volume_usd >= policy.min_volume_usd
         and c.last >= policy.min_price
+        and c.spread_bps <= policy.max_spread_bps
         and _universe_symbol_allowed(c.pair)
     ]
     core_candidates = [candidate for candidate in prelim_filtered if normalize_pair(candidate.pair) in _core_active_universe()]
-    filtered = [candidate for candidate in prelim_filtered if _conditional_candidate_allowed(candidate, core_candidates)]
+    conditional_universe = _conditional_universe()
+    filtered = [
+        candidate
+        for candidate in prelim_filtered
+        if (
+            normalize_pair(candidate.pair) in _core_active_universe()
+            or (
+                normalize_pair(candidate.pair) in conditional_universe
+                and _conditional_candidate_allowed(candidate, core_candidates)
+            )
+            or (
+                normalize_pair(candidate.pair) not in conditional_universe
+                and not _strict_seed_only_enabled()
+                and _broad_candidate_allowed(candidate)
+            )
+        )
+    ]
 
     valid_filtered_pairs = {candidate.pair for candidate in filtered}
     active = [pair for pair in active if pair in valid_filtered_pairs or pair in held_symbols]
@@ -1747,24 +1814,64 @@ def rebalance_universe(candidates: list[Candidate], policy: UniversePolicy) -> d
 
     shortlist_size = max(policy.active_min, min(policy.active_max, int(os.getenv("ROTATION_SHORTLIST_SIZE", "10"))))
     lane_shortlists, merged_shortlist, lane_meta = build_lane_shortlists(filtered, shortlist_size=shortlist_size)
-    candidate_pool = merged_shortlist or filtered
+    candidate_pool = filtered
     score_map = {c.pair: max(c.rank_score, c.candidate_score) for c in candidate_pool}
-    segment_tags = {candidate.pair: _segment_for_symbol(candidate.pair, candidate.lane) for candidate in filtered}
+    base_segment_tags = {candidate.pair: _segment_for_symbol(candidate.pair, candidate.lane) for candidate in filtered}
+    segment_tags = {candidate.pair: _layer_for_candidate(candidate) for candidate in filtered}
 
     target_total = min(policy.active_max, max(policy.active_min, shortlist_size))
     meme_candidates = [candidate for candidate in candidate_pool if segment_tags.get(candidate.pair) == "meme"]
-    core_candidates = [candidate for candidate in candidate_pool if segment_tags.get(candidate.pair) != "meme"]
+    core_candidates = [candidate for candidate in candidate_pool if segment_tags.get(candidate.pair) == "core"]
+    momentum_candidates = [candidate for candidate in candidate_pool if segment_tags.get(candidate.pair) == "momentum"]
+    recovery_candidates = [candidate for candidate in candidate_pool if segment_tags.get(candidate.pair) == "recovery"]
     meme_cap = min(_meme_universe_cap(), target_total, len(meme_candidates)) if _meme_universe_enabled() else 0
-    core_target = max(policy.active_min, target_total - meme_cap)
+    non_meme_target = max(0, target_total - meme_cap)
+    core_target = min(len(core_candidates), max(1 if core_candidates else 0, int(round(non_meme_target * 0.45)))) if non_meme_target else 0
+    momentum_target = min(len(momentum_candidates), max(1 if momentum_candidates else 0, int(round(non_meme_target * 0.35)))) if non_meme_target else 0
+    recovery_target = min(len(recovery_candidates), max(1 if recovery_candidates else 0, non_meme_target - core_target - momentum_target)) if non_meme_target else 0
 
-    core_current = [pair for pair in active if segment_tags.get(pair, _segment_for_symbol(pair)) != "meme"]
+    assigned_non_meme = core_target + momentum_target + recovery_target
+    if assigned_non_meme < non_meme_target:
+        for layer_name, layer_candidates in (("momentum", momentum_candidates), ("recovery", recovery_candidates), ("core", core_candidates)):
+            if assigned_non_meme >= non_meme_target:
+                break
+            if layer_name == "momentum" and momentum_target < len(layer_candidates):
+                take = min(non_meme_target - assigned_non_meme, len(layer_candidates) - momentum_target)
+                momentum_target += take
+                assigned_non_meme += take
+            elif layer_name == "recovery" and recovery_target < len(layer_candidates):
+                take = min(non_meme_target - assigned_non_meme, len(layer_candidates) - recovery_target)
+                recovery_target += take
+                assigned_non_meme += take
+            elif layer_name == "core" and core_target < len(layer_candidates):
+                take = min(non_meme_target - assigned_non_meme, len(layer_candidates) - core_target)
+                core_target += take
+                assigned_non_meme += take
+
+    core_current = [pair for pair in active if segment_tags.get(pair, "core") == "core"]
+    momentum_current = [pair for pair in active if segment_tags.get(pair, "core") == "momentum"]
+    recovery_current = [pair for pair in active if segment_tags.get(pair, "core") == "recovery"]
     meme_current = [pair for pair in active if segment_tags.get(pair, _segment_for_symbol(pair)) == "meme"]
 
     core_next, core_adds, core_removes = _select_segment_active(
         segment_candidates=core_candidates,
         current_active=core_current,
         held_symbols=held_symbols,
-        target_size=min(core_target, max(len(core_candidates), min(policy.active_min, len(core_candidates)))),
+        target_size=core_target,
+        policy=policy,
+    )
+    momentum_next, momentum_adds, momentum_removes = _select_segment_active(
+        segment_candidates=momentum_candidates,
+        current_active=momentum_current,
+        held_symbols=held_symbols,
+        target_size=momentum_target,
+        policy=policy,
+    )
+    recovery_next, recovery_adds, recovery_removes = _select_segment_active(
+        segment_candidates=recovery_candidates,
+        current_active=recovery_current,
+        held_symbols=held_symbols,
+        target_size=recovery_target,
         policy=policy,
     )
     meme_next, meme_adds, meme_removes = _select_segment_active(
@@ -1775,7 +1882,7 @@ def rebalance_universe(candidates: list[Candidate], policy: UniversePolicy) -> d
         policy=policy,
     )
 
-    next_active = core_next + meme_next
+    next_active = core_next + momentum_next + recovery_next + meme_next
     if len(next_active) < target_total:
         for candidate in candidate_pool:
             if candidate.pair in next_active:
@@ -1789,23 +1896,30 @@ def rebalance_universe(candidates: list[Candidate], policy: UniversePolicy) -> d
     next_active = sorted(dict.fromkeys(next_active), key=lambda p: score_map.get(p, 0.0), reverse=True)
     next_active = clamp_active_size(next_active, policy.active_max)
 
-    adds = core_adds + meme_adds
-    removes = core_removes + meme_removes
+    adds = core_adds + momentum_adds + recovery_adds + meme_adds
+    removes = core_removes + momentum_removes + recovery_removes + meme_removes
     reason = f"adds={adds} removes={removes}"
     meta = asyncio.run(build_scan_meta(candidate_pool, lane_meta))
     meta["segment_tags"] = segment_tags
+    meta["base_segment_tags"] = base_segment_tags
     meta["pool_segments"] = {
         "core": [candidate.pair for candidate in core_candidates],
+        "momentum": [candidate.pair for candidate in momentum_candidates],
+        "recovery": [candidate.pair for candidate in recovery_candidates],
         "meme": [candidate.pair for candidate in meme_candidates],
-        "store_of_value": [candidate.pair for candidate in filtered if segment_tags.get(candidate.pair) == "store_of_value"],
-        "major": [candidate.pair for candidate in filtered if segment_tags.get(candidate.pair) == "major"],
-        "core_alt": [candidate.pair for candidate in filtered if segment_tags.get(candidate.pair) == "core_alt"],
+        "store_of_value": [candidate.pair for candidate in filtered if base_segment_tags.get(candidate.pair) == "store_of_value"],
+        "major": [candidate.pair for candidate in filtered if base_segment_tags.get(candidate.pair) == "major"],
+        "core_alt": [candidate.pair for candidate in filtered if base_segment_tags.get(candidate.pair) == "core_alt"],
     }
     meta["segment_counts"] = {
         "target_total": target_total,
         "core_target": core_target,
+        "momentum_target": momentum_target,
+        "recovery_target": recovery_target,
         "meme_cap": meme_cap,
-        "core_active": len([pair for pair in next_active if segment_tags.get(pair, _segment_for_symbol(pair)) != "meme"]),
+        "core_active": len([pair for pair in next_active if segment_tags.get(pair, "core") == "core"]),
+        "momentum_active": len([pair for pair in next_active if segment_tags.get(pair, "core") == "momentum"]),
+        "recovery_active": len([pair for pair in next_active if segment_tags.get(pair, "core") == "recovery"]),
         "meme_active": len([pair for pair in next_active if segment_tags.get(pair, _segment_for_symbol(pair)) == "meme"]),
         "held_symbols": sorted(held_symbols),
     }
