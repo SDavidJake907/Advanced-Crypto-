@@ -255,8 +255,9 @@ def _maybe_emit_alert_from_account_sync(payload: dict) -> None:
             },
             dedupe_key="account_sync_degraded",
         )
+    trades_history_source = str(diagnostics.get("trades_history_source", "") or "").strip().lower()
     trades_history_error = str(diagnostics.get("trades_history_error", "") or "").strip()
-    if trades_history_error:
+    if trades_history_error and trades_history_source != "disabled_ledger_only":
         invalid_key = "EAPI:Invalid key" in trades_history_error
         emit_alert(
             level="info" if invalid_key else "warning",

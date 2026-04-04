@@ -218,6 +218,7 @@ class LiveExitStateTests(unittest.TestCase):
         assert position.take_profit is not None
         self.assertLessEqual(position.take_profit, 105.0)
         self.assertGreaterEqual(position.take_profit, 101.0)
+        self.assertGreater(position.risk_reward_ratio, 0.0)
 
     def test_build_exit_plan_runner_has_no_fixed_take_profit(self) -> None:
         position = build_exit_plan(
@@ -232,6 +233,7 @@ class LiveExitStateTests(unittest.TestCase):
             expected_hold_style="rotation_runner",
         )
         self.assertIsNone(position.take_profit)
+        self.assertGreater(position.risk_reward_ratio, 0.0)
 
 
 if __name__ == "__main__":

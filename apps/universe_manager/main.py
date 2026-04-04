@@ -961,19 +961,40 @@ def _layer_for_candidate(candidate: Candidate) -> str:
         return "core"
 
     recommendation = str(candidate.candidate_recommendation or "WATCH").upper()
+    candidate_score = float(candidate.candidate_score or 0.0)
+    rank_score = float(candidate.rank_score or 0.0)
+    net_edge_pct = float(candidate.net_edge_pct or 0.0)
+    leader_urgency = float(candidate.leader_urgency or 0.0)
+    momentum_delta = float(candidate.momentum_delta or 0.0)
+    volume_ratio_delta = float(candidate.volume_ratio_delta or 0.0)
     if (
         recommendation in {"BUY", "STRONG_BUY"}
-        and candidate.momentum_5 > 0.0
-        and candidate.volume_ratio >= 0.95
-        and candidate.trade_quality >= 55.0
+        and candidate.trade_quality >= 50.0
+        and net_edge_pct > 0.5
+        and (
+            (
+                candidate.momentum_5 > 0.0
+                and candidate.volume_ratio >= 0.85
+            )
+            or candidate_score >= 60.0
+            or rank_score >= 65.0
+            or leader_urgency >= 1.5
+            or volume_ratio_delta >= 0.05
+        )
     ):
         return "momentum"
 
     if (
         recommendation in {"WATCH", "BUY", "STRONG_BUY"}
-        and candidate.momentum_14 >= 0.0
-        and candidate.structure_quality >= 55.0
-        and candidate.continuation_quality >= 55.0
+        and candidate.structure_quality >= 50.0
+        and candidate.continuation_quality >= 50.0
+        and net_edge_pct > 0.3
+        and (
+            candidate.momentum_14 >= 0.0
+            or momentum_delta > 0.0
+            or volume_ratio_delta > 0.0
+            or rank_score >= 55.0
+        )
     ):
         return "recovery"
 

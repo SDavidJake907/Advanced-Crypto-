@@ -1,0 +1,146 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
+from typing import Any
+
+
+@dataclass
+class AggressionRecommendation:
+    mode: str
+    confidence: float
+    score: float
+    summary: str
+    reasons: list[str]
+    current_mode: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _latest_market_trend(recent_decision_debug: list[dict[str, Any]]) -> tuple[str, int]:
+    for item in reversed(recent_decision_debug):
+        if not isinstance(item, dict):
+            continue
+        trend = str(item.get("market_trend", "") or "").strip().lower()
+        if trend:
+            return trend, _safe_int(item.get("market_trend_strength", 0), 0)
+    return "unknown", 0
+
+
+def _decision_activity(recent_decision_debug: list[dict[str, Any]]) -> tuple[float, float]:
+    decision_rows = [
+        item for item in recent_decision_debug
+        if isinstance(item, dict)
+        and str(item.get("symbol", "") or "").strip()
+        and str(item.get("loop", "") or "").strip() == ""
+    ]
+    if not decision_rows:
+        return 0.0, 0.0
+    flat_count = sum(1 for item in decision_rows if str(item.get("signal", "") or "").upper() == "FLAT")
+    live_open_count = sum(
+        1
+        for item in decision_rows
+        if str(item.get("execution_status", "") or "").lower() in {"submitted", "filled"}
+    )
+    total = float(len(decision_rows))
+    return flat_count / total, live_open_count / total
+
+
+def recommend_aggression_mode(
+    *,
+    runtime_values: dict[str, Any],
+    universe_meta: dict[str, Any],
+    recent_decision_debug: list[dict[str, Any]],
+) -> AggressionRecommendation:
+    current_mode = str(runtime_values.get("AGGRESSION_MODE", "NORMAL") or "NORMAL").upper()
+    news_context = universe_meta.get("news_context", {}) if isinstance(universe_meta.get("news_context", {}), dict) else {}
+    btc_dom = _safe_float(news_context.get("btc_dominance"), 0.0)
+    fng = _safe_int(news_context.get("fng_value"), 50)
+    market_cap_change = _safe_float(news_context.get("market_cap_change_24h"), 0.0)
+    market_trend, market_strength = _latest_market_trend(recent_decision_debug)
+    flat_rate, open_rate = _decision_activity(recent_decision_debug)
+
+    score = 0.0
+    reasons: list[str] = []
+
+    if market_trend == "bear":
+        score -= 2.0
+        reasons.append(f"btc_market_bear({market_strength:+d})")
+        if market_strength <= -3:
+            score -= 1.0
+            reasons.append("btc_market_bear_strong")
+    elif market_trend == "bull":
+        score += 2.0
+        reasons.append(f"btc_market_bull({market_strength:+d})")
+        if market_strength >= 3:
+            score += 1.0
+            reasons.append("btc_market_bull_strong")
+
+    if btc_dom >= 58.0:
+        score -= 1.5
+        reasons.append(f"btc_dom_high({btc_dom:.1f})")
+    elif btc_dom <= 54.0 and btc_dom > 0.0:
+        score += 1.0
+        reasons.append(f"btc_dom_easing({btc_dom:.1f})")
+
+    if fng <= 25:
+        score -= 1.0
+        reasons.append(f"fear_greed_fear({fng})")
+    elif 45 <= fng <= 75:
+        score += 0.5
+        reasons.append(f"fear_greed_constructive({fng})")
+    elif fng >= 85:
+        score -= 0.5
+        reasons.append(f"fear_greed_greedy({fng})")
+
+    if market_cap_change <= -1.0:
+        score -= 1.0
+        reasons.append(f"market_cap_down({market_cap_change:+.2f})")
+    elif market_cap_change >= 1.0:
+        score += 1.0
+        reasons.append(f"market_cap_up({market_cap_change:+.2f})")
+
+    if flat_rate >= 0.85 and market_trend != "bull":
+        score -= 0.5
+        reasons.append(f"high_flat_rate({flat_rate:.0%})")
+    if open_rate >= 0.20 and market_trend == "bull":
+        score += 0.5
+        reasons.append(f"healthy_open_rate({open_rate:.0%})")
+
+    if score <= -2.5:
+        mode = "DEFENSIVE"
+    elif score >= 3.5:
+        mode = "HIGH_OFFENSIVE"
+    elif score >= 1.5:
+        mode = "OFFENSIVE"
+    else:
+        mode = "NORMAL"
+
+    confidence = min(0.95, max(0.35, 0.45 + min(abs(score), 4.0) * 0.1))
+    summary = (
+        f"deterministic aggression review recommends {mode} "
+        f"(current={current_mode}, score={score:+.1f}, trend={market_trend}, "
+        f"btc_dom={btc_dom:.1f}, fng={fng}, mcap24h={market_cap_change:+.2f})"
+    )
+    return AggressionRecommendation(
+        mode=mode,
+        confidence=round(confidence, 2),
+        score=round(score, 2),
+        summary=summary,
+        reasons=reasons,
+        current_mode=current_mode,
+    )

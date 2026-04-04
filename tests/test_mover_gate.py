@@ -12,6 +12,8 @@ class MoverGateTests(unittest.TestCase):
             return_value={
                 "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
                 "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.0,
                 "STABILIZATION_STRICT_ENTRY_ENABLED": False,
             },
         ):
@@ -55,6 +57,8 @@ class MoverGateTests(unittest.TestCase):
             return_value={
                 "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
                 "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.0,
                 "STABILIZATION_STRICT_ENTRY_ENABLED": False,
             },
         ):
@@ -92,6 +96,8 @@ class MoverGateTests(unittest.TestCase):
             return_value={
                 "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
                 "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.0,
                 "STABILIZATION_STRICT_ENTRY_ENABLED": False,
             },
         ):
@@ -132,6 +138,8 @@ class MoverGateTests(unittest.TestCase):
             return_value={
                 "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
                 "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.0,
                 "STABILIZATION_STRICT_ENTRY_ENABLED": True,
                 "STABILIZATION_ALLOWED_LANES": "L2,L3",
                 "STABILIZATION_MIN_ENTRY_SCORE": 52.0,
@@ -173,6 +181,70 @@ class MoverGateTests(unittest.TestCase):
             )
         self.assertTrue(passed)
         self.assertEqual(reason, "passed")
+
+    def test_candidate_gate_blocks_low_net_edge_even_when_score_is_high(self) -> None:
+        with patch(
+            "core.config.runtime.load_runtime_overrides",
+            return_value={
+                "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
+                "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.35,
+                "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.0,
+                "STABILIZATION_STRICT_ENTRY_ENABLED": False,
+            },
+        ):
+            passed, reason = passes_deterministic_candidate_gate(
+                symbol="ALGO/USD",
+                positions_state=PositionState(),
+                universe_context={"current_symbol_is_top_candidate": False},
+                features={
+                    "symbol": "ALGO/USD",
+                    "lane": "L3",
+                    "indicators_ready": True,
+                    "entry_score": 88.0,
+                    "volume_ratio": 1.1,
+                    "trend_confirmed": True,
+                    "net_edge_pct": 0.12,
+                    "expected_move_pct": 3.0,
+                    "price": 1.0,
+                    "atr": 0.01,
+                },
+            )
+        self.assertFalse(passed)
+        self.assertEqual(reason, "net_edge_below_gate(0.12<0.35)")
+
+    def test_candidate_gate_blocks_low_risk_reward_even_when_net_edge_is_positive(self) -> None:
+        with patch(
+            "core.config.runtime.load_runtime_overrides",
+            return_value={
+                "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
+                "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.8,
+                "EXIT_ATR_STOP_MULT": 1.8,
+                "EXIT_MIN_STOP_PCT": 1.5,
+                "STABILIZATION_STRICT_ENTRY_ENABLED": False,
+            },
+        ):
+            passed, reason = passes_deterministic_candidate_gate(
+                symbol="DOT/USD",
+                positions_state=PositionState(),
+                universe_context={"current_symbol_is_top_candidate": False},
+                features={
+                    "symbol": "DOT/USD",
+                    "lane": "L3",
+                    "indicators_ready": True,
+                    "entry_score": 90.0,
+                    "volume_ratio": 1.2,
+                    "trend_confirmed": True,
+                    "net_edge_pct": 0.6,
+                    "expected_move_pct": 2.0,
+                    "price": 10.0,
+                    "atr": 0.10,
+                },
+            )
+        self.assertFalse(passed)
+        self.assertEqual(reason, "risk_reward_below_gate(1.11<1.80)")
 
     def test_strong_mover_can_bypass_top_candidate_filter(self) -> None:
         with patch("core.config.runtime.load_runtime_overrides", return_value={}):

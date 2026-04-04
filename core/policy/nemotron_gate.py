@@ -26,9 +26,9 @@ def _get_leader_metrics(symbol: str, universe_context: dict[str, Any]) -> tuple[
     return 0.0, False
 
 
-def load_universe_candidate_context(symbol: str) -> dict[str, Any]:
-    universe = load_universe()
-    meta = universe.get("meta", {}) if isinstance(universe.get("meta", {}), dict) else {}
+def build_universe_candidate_context(symbol: str, universe: dict[str, Any] | None) -> dict[str, Any]:
+    base = universe if isinstance(universe, dict) else {}
+    meta = base.get("meta", {}) if isinstance(base.get("meta", {}), dict) else base
     top_n = int(get_runtime_setting("NEMOTRON_TOP_CANDIDATE_COUNT"))
     top_scored = meta.get("top_scored", []) if isinstance(meta.get("top_scored", []), list) else []
     hot_candidates = meta.get("hot_candidates", []) if isinstance(meta.get("hot_candidates", []), list) else []
@@ -44,6 +44,10 @@ def load_universe_candidate_context(symbol: str) -> dict[str, Any]:
         "current_symbol_is_top_candidate": symbol in top_ranked[:top_n]
         or any(str(item.get("symbol")) == symbol for item in top_scored[:top_n]),
     }
+
+
+def load_universe_candidate_context(symbol: str) -> dict[str, Any]:
+    return build_universe_candidate_context(symbol, load_universe())
 
 
 def _is_strong_mover_candidate(features: dict[str, Any]) -> bool:
@@ -69,6 +73,34 @@ def _effective_net_edge_pct(features: dict[str, Any]) -> float:
     if isinstance(point_breakdown, dict):
         return float(point_breakdown.get("net_edge_pct", 0.0) or 0.0)
     return 0.0
+
+
+def _lane_stop_pct(features: dict[str, Any]) -> float:
+    lane = str(features.get("lane", "L3") or "L3").upper()
+    atr = float(features.get("atr", 0.0) or 0.0)
+    price = float(features.get("price", 0.0) or 0.0)
+    atr_norm_pct = ((atr / price) * 100.0) if price > 0.0 and atr > 0.0 else 0.0
+    if lane == "L1":
+        stop_mult = float(get_runtime_setting("L1_EXIT_ATR_STOP_MULT"))
+        min_stop_pct = float(get_runtime_setting("L1_EXIT_MIN_STOP_PCT"))
+    elif lane == "L2":
+        stop_mult = float(get_runtime_setting("L2_EXIT_ATR_STOP_MULT"))
+        min_stop_pct = float(get_runtime_setting("L2_EXIT_MIN_STOP_PCT"))
+    elif lane == "L4":
+        stop_mult = float(get_runtime_setting("MEME_EXIT_ATR_STOP_MULT"))
+        min_stop_pct = float(get_runtime_setting("MEME_EXIT_MIN_STOP_PCT"))
+    else:
+        stop_mult = float(get_runtime_setting("EXIT_ATR_STOP_MULT"))
+        min_stop_pct = float(get_runtime_setting("EXIT_MIN_STOP_PCT"))
+    return max(atr_norm_pct * stop_mult, min_stop_pct)
+
+
+def _planned_risk_reward_ratio(features: dict[str, Any]) -> float | None:
+    stop_pct = _lane_stop_pct(features)
+    expected_move_pct = float(features.get("expected_move_pct", 0.0) or 0.0)
+    if stop_pct <= 0.0 or expected_move_pct <= 0.0:
+        return None
+    return expected_move_pct / stop_pct
 
 
 def _is_range_safe_candidate(features: dict[str, Any]) -> bool:
@@ -329,7 +361,6 @@ def passes_deterministic_candidate_gate(
 
     _entry_score  = float(features.get("entry_score",  0.0) or 0.0)
     _volume_ratio = float(features.get("volume_ratio", 1.0) or 1.0)
-
     if _entry_score < _min_score:
         return False, f"entry_score_below_gate({_entry_score:.1f}<{_min_score:.1f})"
     if _volume_ratio < _min_vol:
@@ -337,6 +368,16 @@ def passes_deterministic_candidate_gate(
     market_state_ok, market_state_reason = _passes_market_state_entry_gate(features)
     if not market_state_ok:
         return False, market_state_reason
+
+    _net_edge_pct = _effective_net_edge_pct(features)
+    _min_net_edge = float(get_runtime_setting("NEMOTRON_GATE_MIN_NET_EDGE_PCT"))
+    if _net_edge_pct < _min_net_edge:
+        return False, f"net_edge_below_gate({_net_edge_pct:.2f}<{_min_net_edge:.2f})"
+
+    _risk_reward_ratio = _planned_risk_reward_ratio(features)
+    _min_risk_reward = float(get_runtime_setting("NEMOTRON_GATE_MIN_RISK_REWARD_RATIO"))
+    if _risk_reward_ratio is not None and _risk_reward_ratio < _min_risk_reward:
+        return False, f"risk_reward_below_gate({_risk_reward_ratio:.2f}<{_min_risk_reward:.2f})"
 
     stabilization_ok, stabilization_reason = _strict_stabilization_gate(features)
     if not stabilization_ok:

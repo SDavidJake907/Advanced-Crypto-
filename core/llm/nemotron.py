@@ -35,6 +35,7 @@ from core.llm.prompts import get_nemotron_batch_strategist_prompt, get_nemotron_
 from core.memory.trade_memory import TradeMemoryStore
 from core.policy.nemotron_gate import (
     _get_leader_metrics,
+    build_universe_candidate_context,
     load_universe_candidate_context,
     passes_deterministic_candidate_gate,
 )
@@ -96,6 +97,11 @@ class NemotronStrategist:
         for sym, qty in (portfolio_state.positions or {}).items():
             mark = (portfolio_state.position_marks or {}).get(sym, 0.0)
             equity += float(qty) * float(mark)
+        total_gross_exposure = float(positions_state.total_gross_exposure())
+        max_total_gross_exposure = float(self.portfolio_config.max_total_gross_exposure)
+        gross_exposure_headroom = max(0.0, max_total_gross_exposure - total_gross_exposure)
+        risk_per_trade_pct = float(get_runtime_setting("EXEC_RISK_PER_TRADE_PCT"))
+        risk_budget_usd = equity * (risk_per_trade_pct / 100.0)
 
         pos_details = []
         for p in positions_state.all():
@@ -132,7 +138,11 @@ class NemotronStrategist:
             "open_slots": max(0, max_positions - open_count),
             "equity_usd": round(equity, 2),
             "cash_usd": round(portfolio_state.cash, 2),
-            "risk_per_trade_pct": float(get_runtime_setting("EXEC_RISK_PER_TRADE_PCT")),
+            "risk_per_trade_pct": risk_per_trade_pct,
+            "risk_budget_usd": round(risk_budget_usd, 2),
+            "gross_exposure_pct": round(total_gross_exposure, 4),
+            "gross_exposure_headroom_pct": round(gross_exposure_headroom, 4),
+            "max_total_gross_exposure_pct": round(max_total_gross_exposure, 4),
             "positions": pos_details,
         }
 
@@ -409,7 +419,12 @@ class NemotronStrategist:
         current_reason: str = "",
     ) -> str:
         reason = str(current_reason or "").strip()
-        if reason and reason not in {"hold_unspecified", "reason_missing"}:
+        if reason and reason not in {"hold_unspecified", "reason_missing"} and not self._hold_reason_conflicts_with_packet(
+            reason=reason,
+            features=features,
+            market_state_review=market_state_review,
+            portfolio_decision=portfolio_decision,
+        ):
             return reason
         if isinstance(portfolio_decision, dict) and str(portfolio_decision.get("decision", "allow") or "allow") in {"block", "replace"}:
             return "portfolio_block"
@@ -425,27 +440,57 @@ class NemotronStrategist:
         if net_edge_pct <= 0.0:
             return "net_edge_too_low"
         volume_ratio = float(features.get("volume_ratio", 1.0) or 1.0)
+        lane = str(features.get("lane", "L3") or "L3").upper()
         volume_gate = float(
             get_runtime_setting("MEME_NEMOTRON_GATE_MIN_VOLUME_RATIO")
-            if str(features.get("lane", "L3") or "L3").upper() == "L4"
+            if lane == "L4"
             else get_runtime_setting("NEMOTRON_GATE_MIN_VOLUME_RATIO")
         )
-        if volume_ratio < max(volume_gate, 0.95):
+        # Keep meme names strict, but avoid re-blocking standard names with a hidden
+        # 0.95 participation floor after they already cleared the deterministic gate.
+        soft_volume_floor = volume_gate if lane == "L4" else max(volume_gate, 0.80)
+        if volume_ratio < soft_volume_floor:
             return "volume_too_light"
+        structure_phase = str(((market_state_review.get("pattern_explanation") or {}).get("structure_phase", "unclear")) or "unclear")
+        breakout_state = str(market_state_review.get("breakout_state", "unclear") or "unclear")
+        trend_stage = str(market_state_review.get("trend_stage", "unclear") or "unclear")
+        if structure_phase in {"unclear", "breakout_failure"} or breakout_state in {"unclear", "inside_range"}:
+            return "pattern_not_confirmed"
         if bool(features.get("ranging_market", False)):
             return "range_not_clean"
-        if not bool(features.get("trend_confirmed", False)):
+        if not bool(features.get("trend_confirmed", False)) or trend_stage in {"unclear", "mixed"}:
             return "trend_unconfirmed"
         if (
             float(features.get("momentum_5", 0.0) or 0.0) <= 0.0
             or not bool(features.get("short_tf_ready_15m", False))
         ):
             return "momentum_not_confirmed"
-        structure_phase = str(((market_state_review.get("pattern_explanation") or {}).get("structure_phase", "unclear")) or "unclear")
-        breakout_state = str(market_state_review.get("breakout_state", "unclear") or "unclear")
-        if structure_phase in {"unclear", "breakout_failure"} or breakout_state == "unclear":
-            return "pattern_not_confirmed"
         return "momentum_not_confirmed"
+
+    def _hold_reason_conflicts_with_packet(
+        self,
+        *,
+        reason: str,
+        features: dict[str, Any],
+        market_state_review: dict[str, Any],
+        portfolio_decision: dict[str, Any] | None = None,
+    ) -> bool:
+        normalized_reason = str(reason or "").strip()
+        if not normalized_reason:
+            return True
+        if normalized_reason == "portfolio_block":
+            return not (
+                isinstance(portfolio_decision, dict)
+                and str(portfolio_decision.get("decision", "allow") or "allow") in {"block", "replace"}
+            )
+        if normalized_reason == "trend_unconfirmed":
+            trend_stage = str(market_state_review.get("trend_stage", "unclear") or "unclear")
+            return bool(features.get("trend_confirmed", False)) and trend_stage not in {"mixed", "unclear"}
+        if normalized_reason == "range_not_clean":
+            return not bool(features.get("ranging_market", False))
+        if normalized_reason == "momentum_not_confirmed":
+            return bool(features.get("short_tf_ready_15m", False)) and float(features.get("momentum_5", 0.0) or 0.0) > 0.0
+        return False
 
     def _normalize_live_hold_reason(
         self,
@@ -652,15 +697,22 @@ class NemotronStrategist:
         positions_state: PositionState,
         symbols: list[str],
         proposed_weight: float,
+        universe_context: dict[str, Any] | None = None,
+        market_state_review: dict[str, Any] | None = None,
     ) -> NemotronDecision:
         from core.policy.candidate_packet import build_candidate_packet
 
         t_total_start = time.perf_counter()
-        universe_context = load_universe_candidate_context(symbol)
+        resolved_universe_context = (
+            build_universe_candidate_context(symbol, universe_context)
+            if isinstance(universe_context, dict)
+            else load_universe_candidate_context(symbol)
+        )
         advisory_bundle = build_advisory_bundle(
             symbol=symbol,
             features=features,
-            universe_context=universe_context,
+            universe_context=resolved_universe_context,
+            market_state_review=market_state_review,
         )
         reflex = advisory_bundle.reflex
         market_state_review = advisory_bundle.market_state_review
@@ -669,7 +721,7 @@ class NemotronStrategist:
         advisory_ms = float(advisory_bundle.timings.get("advisory_ms", 0.0))
         # All pre-gates disabled — once a symbol reaches single-symbol strategist review,
         # Nemo should make the call instead of being short-circuited by legacy advisory gating.
-        leader_urgency, leader_takeover = _get_leader_metrics(symbol, universe_context)
+        leader_urgency, leader_takeover = _get_leader_metrics(symbol, resolved_universe_context)
         lane = str(features.get("lane", "L3") or "L3").upper()
         fingerprint = self._decision_fingerprint(
             symbol=symbol,
@@ -695,7 +747,7 @@ class NemotronStrategist:
             portfolio_state=portfolio_state,
             positions_state=positions_state,
             market_state_review=market_state_review,
-            universe_context=universe_context,
+            universe_context=resolved_universe_context,
         )
         self._log_event(
             {
@@ -771,7 +823,7 @@ class NemotronStrategist:
                 symbol=symbol,
                 features=features,
                 positions_state=positions_state,
-                universe_context=universe_context,
+                universe_context=resolved_universe_context,
                 reflex=reflex,
             )
             filtered_visual_review = visual_review
@@ -947,8 +999,6 @@ class NemotronStrategist:
             phi3 = str(c.get("reflex", {}).get("reflex", "allow"))
             market_state_review = c.get("market_state_review", {}) if isinstance(c.get("market_state_review", {}), dict) else {}
             lane_supervision = c.get("lane_supervision", {}) if isinstance(c.get("lane_supervision", {}), dict) else {}
-            pattern_candidate = f.get("pattern_candidate", {}) if isinstance(f.get("pattern_candidate", {}), dict) else {}
-            pattern_verification = f.get("pattern_verification", {}) if isinstance(f.get("pattern_verification", {}), dict) else {}
             lane = str(f.get("lane", "L3") or "L3")
             score = float(f.get("entry_score", 0.0) or 0.0)
             rec = str(f.get("entry_recommendation", "WATCH") or "WATCH")[:10]
@@ -973,10 +1023,6 @@ class NemotronStrategist:
             _pb = f.get("point_breakdown") or {}
             net_edge = float(_pb.get("net_edge_pct", 0.0) or 0.0)
             cost_penalty = float(_pb.get("cost_penalty_pts", 0.0) or 0.0)
-            pattern_name = str(pattern_candidate.get("pattern", "none") or "none")
-            pattern_validity = str(pattern_verification.get("validity", "unclear") or "unclear")
-            pattern_quality = float(pattern_verification.get("pattern_quality_score", 0.0) or 0.0)
-            extension_risk = float(pattern_verification.get("extension_risk_score", 0.0) or 0.0)
             market_state = str(market_state_review.get("market_state", "transition") or "transition")
             lane_bias = str(market_state_review.get("lane_bias", "favor_selective") or "favor_selective")
             market_confidence = float(market_state_review.get("confidence", 0.0) or 0.0)
@@ -1019,7 +1065,6 @@ class NemotronStrategist:
                 f"|brk_state:{breakout_state}|trend_stage:{trend_stage}|pbq:{pullback_quality}|vol_cf:{volume_confirmation}|late:{late_move_risk}"
                 f"|candle:{primary_candle}|cbias:{candle_bias}|cstr:{candle_strength:>3.2f}|ccf:{candle_confirmation_score:>3.2f}"
                 f"|lane_sup:{lane_candidate or '-'}|lane_conflict:{'Y' if lane_conflict else 'N'}|univ_lane:{universe_lane or '-'}"
-                f"|pat:{pattern_name}|pver:{pattern_validity}|pqs:{pattern_quality:>3.2f}|ext:{extension_risk:>3.2f}"
                 f"|mem:{symbol_lesson_tag}"
             )
         table = "\n".join(rows)

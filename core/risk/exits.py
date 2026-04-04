@@ -273,6 +273,7 @@ def build_exit_plan(
     tp_mult = _lane_primary_tp_atr_mult(lane)
     min_tp_pct = _min_viable_take_profit_pct(lane) / 100.0
     tp_distance = max(atr * tp_mult, entry_price * min_tp_pct) if entry_price > 0.0 else 0.0
+    risk_reward_ratio = (tp_distance / risk_r) if (tp_distance > 0.0 and risk_r > 0.0) else 0.0
     runner_style = hold_style in {"leader_runner", "rotation_runner", "structured_runner"}
     if side == "LONG":
         stop_loss = entry_price - risk_r if risk_r > 0.0 else None
@@ -303,6 +304,7 @@ def build_exit_plan(
         etd_pct=0.0,
         etd_r=0.0,
         expected_edge_pct=expected_edge_pct,
+        risk_reward_ratio=round(risk_reward_ratio, 4),
     )
 
 

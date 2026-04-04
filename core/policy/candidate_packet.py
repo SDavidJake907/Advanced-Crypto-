@@ -12,53 +12,19 @@ LOCAL_NEMOTRON_CANDIDATE_FIELDS = (
     "price",
     "final_score",
     "net_edge_pct",
-    "fear_greed_bonus",
-    "reliability_bonus",
-    "basket_fit_bonus",
-    "spread_penalty",
-    "cost_penalty",
-    "correlation_penalty",
+    "avg_held_correlation",
+    "max_held_correlation",
     "entry_score",
     "entry_recommendation",
     "reversal_risk",
-    "promotion_tier",
     "promotion_reason",
     "momentum_5",
-    "momentum_14",
     "rotation_score",
     "volume_ratio",
-    "volume_surge",
-    "rsi",
-    "spread_pct",
-    "price_zscore",
-    "trend_1h",
-    "regime_7d",
-    "macro_30d",
-    "atr_pct",
-    "volatility_percentile",
-    "compression_score",
-    "expansion_score",
-    "volatility_state",
-    "trend_confirmed",
-    "ranging_market",
-    "short_tf_ready_5m",
-    "short_tf_ready_15m",
     "ema9_above_ema20",
     "range_breakout_1h",
     "pullback_hold",
-    "higher_low_count",
-    "bullish_divergence",
-    "bearish_divergence",
-    "divergence_strength",
-    "divergence_age_bars",
-    "overextended",
-    "range_pos_1h",
-    "book_imbalance",
-    "book_wall_pressure",
     "structure_quality",
-    "pattern_candidate",
-    "pattern_verification",
-    "phi3_veto_flag",
     "behavior_score",
     "lesson_summary",
 )
@@ -78,6 +44,15 @@ def _build_held_correlation_map(features: dict[str, Any], positions_state: Any) 
         if sym in held_set and idx < len(row) and np.isfinite(row[idx]):
             held_correlation_map[sym] = float(row[idx])
     return held_correlation_map
+
+
+def _held_correlation_stats(held_correlation_map: dict[str, float]) -> tuple[float, float]:
+    if not held_correlation_map:
+        return 0.0, 0.0
+    values = [abs(float(v)) for v in held_correlation_map.values() if np.isfinite(v)]
+    if not values:
+        return 0.0, 0.0
+    return float(np.mean(values)), float(max(values))
 
 
 def _load_reliability_dict() -> dict[str, Any]:
@@ -151,6 +126,7 @@ def build_candidate_packet(
         reliability_map=resolved_reliability_map,
         held_correlation_map=resolved_held_correlation_map,
     )
+    avg_held_correlation, max_held_correlation = _held_correlation_stats(resolved_held_correlation_map)
     return {
         "symbol": features.get("symbol"),
         "lane": features.get("lane"),
@@ -160,11 +136,14 @@ def build_candidate_packet(
         "score_breakdown": final.score_breakdown,
         "breakdown_notes": final.breakdown_notes,
         "fear_greed_bonus": final.fear_greed_bonus,
+        "btc_dominance_bonus": final.btc_dominance_bonus,
         "reliability_bonus": final.reliability_bonus,
         "basket_fit_bonus": final.basket_fit_bonus,
         "spread_penalty": final.spread_penalty,
         "cost_penalty": final.cost_penalty,
         "correlation_penalty": final.correlation_penalty,
+        "avg_held_correlation": round(avg_held_correlation, 4),
+        "max_held_correlation": round(max_held_correlation, 4),
         "entry_score": features.get("entry_score"),
         "entry_recommendation": features.get("entry_recommendation"),
         "reversal_risk": features.get("reversal_risk"),

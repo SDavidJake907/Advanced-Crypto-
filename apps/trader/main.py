@@ -83,6 +83,7 @@ from core.risk.portfolio import PortfolioConfig, Position, PositionState, build_
 from core.runtime.cleanup import cleanup_tasks
 from core.runtime.trader_lock import TraderAlreadyRunningError, TraderSingletonLock, build_trader_instance_id
 from core.policy.trade_plan import build_trade_plan_metadata
+from core.policy.nemotron_gate import build_universe_candidate_context, should_run_nemotron
 from core.policy.nemo_payload_merge import merge_candidate_with_phi3
 from core.state.portfolio import PortfolioState
 from core.state.position_state_store import load_position_state, merge_persisted_positions, save_position_state
@@ -164,6 +165,27 @@ def _entry_nemo_overflow_limit_for_cycle() -> int:
     return max(0, configured)
 
 
+def _should_force_nemo_review(
+    *,
+    symbol: str,
+    features: dict[str, object],
+    positions_state: PositionState,
+    universe_context: dict[str, object],
+) -> bool:
+    """Use the deterministic Nemo gate as a bypass when shortlist budgets are too small."""
+    try:
+        return bool(
+            should_run_nemotron(
+                symbol=symbol,
+                features=features,
+                positions_state=positions_state,
+                universe_context=universe_context,
+            )
+        )
+    except Exception:
+        return False
+
+
 
 
 
@@ -196,6 +218,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
 
     last_bar_keys: dict[str, str] = {}
     last_prices: dict[str, float] = {}
+    cycle_universe_contexts: dict[str, dict[str, object]] = {}
     last_exit_ts: dict[str, float] = {}
     last_ticker_snapshot: dict = {}
     last_ticker_ts: float = 0.0
@@ -344,6 +367,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                 pass
             # Cache universe once per loop — avoids 255 disk reads (load_universe called per symbol)
             _cached_universe = load_universe()
+            cycle_universe_contexts = {}
             prune_symbol_tracking_state(
                 current_symbols,
                 positions_state,
@@ -597,6 +621,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                 pass
             _score_rank: list[tuple[tuple[float, ...], str]] = []
             _structure_syms: set[str] = set()
+            _deterministic_gate_syms: set[str] = set()
             _warmup_syms: set[str] = set()
             for _ai, _sym in enumerate(features_batch["symbols"]):
                 if _sym not in _held_syms:
@@ -639,6 +664,15 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                     _promo = str(_sf.get("promotion_reason", "") or "")
                     if (_ema_ok and (_brk or _pb)) or _promo in {"channel_breakout", "channel_retest"}:
                         _structure_syms.add(_sym)
+                    _universe_context = build_universe_candidate_context(_sym, _cached_universe)
+                    cycle_universe_contexts[_sym] = _universe_context
+                    if _should_force_nemo_review(
+                        symbol=_sym,
+                        features=_sf,
+                        positions_state=positions_state,
+                        universe_context=_universe_context,
+                    ):
+                        _deterministic_gate_syms.add(_sym)
             _score_rank.sort(reverse=True)
             _entry_nemo_limit = _entry_nemo_limit_for_cycle()
             _ranked_entry_syms = {sym for _, sym in _score_rank[:_entry_nemo_limit]}
@@ -646,7 +680,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
             _overflow_entry_syms = {
                 sym for _, sym in _score_rank[_entry_nemo_limit : _entry_nemo_limit + _entry_overflow_limit]
             }
-            _nemo_allowed = _held_syms | _ranked_entry_syms | _overflow_entry_syms | _structure_syms
+            _nemo_allowed = _held_syms | _ranked_entry_syms | _overflow_entry_syms | _structure_syms | _deterministic_gate_syms
             _use_batch_nemo = effective_nemotron_batch_mode()
 
             # Batch mode: run ONE Nemo call for all top candidates instead of N serial calls
@@ -667,7 +701,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         continue
                     if _sym in _warmup_syms:
                         continue
-                    if _sym not in _ranked_entry_syms and _sym not in _overflow_entry_syms and _sym not in _structure_syms:
+                    if _sym not in _ranked_entry_syms and _sym not in _overflow_entry_syms and _sym not in _structure_syms and _sym not in _deterministic_gate_syms:
                         continue
                     _lane_supervision = lane_supervision_map.get(_sym)
                     _universe_lane = (_lane_supervision or {}).get("universe_lane")
@@ -786,7 +820,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         ),
                         reverse=True,
                     )
-                    _batch_candidates = _batch_candidates[: max(1, _entry_nemo_limit + _entry_overflow_limit + len(_structure_syms))]
+                    _batch_candidates = _batch_candidates[: max(1, _entry_nemo_limit + _entry_overflow_limit + len(_structure_syms) + len(_deterministic_gate_syms))]
                     # Deterministic market trend state using BTC as market-wide barometer.
                     # Advisory only — adjusts entry scores so Nemo has accurate context.
                     _mts = _compute_market_trend(
@@ -820,6 +854,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         "overflow_entry_limit": _entry_overflow_limit,
                         "overflow_entry_count": len(_overflow_entry_syms),
                         "structure_bypass_count": len(_structure_syms),
+                        "deterministic_gate_count": len(_deterministic_gate_syms),
                         "warmup_skip_count": len(_warmup_syms),
                         "phi3_cache_hits": _phi3_cache_hits,
                         "phi3_skipped_count": _phi3_skipped,
@@ -962,6 +997,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         "nemo_budget": NEMOTRON_MAX_PER_CYCLE,
                         "nemo_priority_budget": _entry_nemo_limit,
                         "nemo_overflow_budget": _entry_overflow_limit,
+                        "deterministic_gate_bypass": False,
                     })
                     last_prices[symbol] = float(features.get("price", 0.0) or 0.0)
                     continue
@@ -969,6 +1005,7 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                 if DECISION_ENGINE == "llm" and _use_batch_nemo and symbol in _batch_decisions:
                     nemotron_decision = _batch_decisions[symbol]
                 elif DECISION_ENGINE == "llm":
+                    market_state_review = deterministic_market_state_review(features).to_dict()
                     nemotron_decision = await run_blocking_decision(
                         nemotron.decide,
                         symbol=symbol,
@@ -977,6 +1014,8 @@ async def trader_loop(steps: int | None = None, *, instance_id: str | None = Non
                         positions_state=positions_state,
                         symbols=features_batch["symbols"],
                         proposed_weight=proposed_weight,
+                        universe_context=cycle_universe_contexts.get(symbol),
+                        market_state_review=market_state_review,
                     )
                 else:
                     nemotron_decision = None

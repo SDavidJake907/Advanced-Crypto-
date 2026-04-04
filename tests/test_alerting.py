@@ -91,6 +91,20 @@ class AlertingTests(unittest.TestCase):
         self.assertEqual(len(alerts_payload), 1)
         self.assertEqual(alerts_payload[0]["code"], "trades_history_invalid_key")
 
+    def test_account_sync_disabled_trades_history_emits_no_alert(self) -> None:
+        logging_sink.log_account_sync(
+            {
+                "ts": "2026-03-30T23:00:00Z",
+                "status": "synced",
+                "diagnostics": {
+                    "trades_history_source": "disabled_ledger_only",
+                    "trades_history_count": 0,
+                },
+            }
+        )
+        alerts_payload = self._read_alerts()
+        self.assertEqual(alerts_payload, [])
+
     def test_account_sync_degraded_emits_warning_alert(self) -> None:
         logging_sink.log_account_sync(
             {

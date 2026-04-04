@@ -160,18 +160,19 @@ class RuntimeImprovementTests(unittest.TestCase):
     def test_merge_persisted_positions_keeps_expected_edge_pct(self) -> None:
         synced = PositionState()
         synced.add_or_update(
-            Position(symbol="BTC/USD", side="LONG", weight=0.2, entry_price=None, lane="L3", expected_edge_pct=1.7)
+            Position(symbol="BTC/USD", side="LONG", weight=0.2, entry_price=None, lane="L3", expected_edge_pct=1.7, risk_reward_ratio=2.4)
         )
 
         persisted = PositionState()
         persisted.add_or_update(
-            Position(symbol="BTC/USD", side="LONG", weight=0.1, lane="L3", entry_price=95.0, expected_edge_pct=1.3)
+            Position(symbol="BTC/USD", side="LONG", weight=0.1, lane="L3", entry_price=95.0, expected_edge_pct=1.3, risk_reward_ratio=1.8)
         )
 
         merged = merge_persisted_positions(synced, persisted).get("BTC/USD")
         self.assertIsNotNone(merged)
         assert merged is not None
         self.assertEqual(merged.expected_edge_pct, 1.7)
+        self.assertEqual(merged.risk_reward_ratio, 2.4)
 
     def test_position_state_round_trip_preserves_expected_edge_pct(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -179,7 +180,7 @@ class RuntimeImprovementTests(unittest.TestCase):
             with patch.object(position_state_store, "POSITION_STATE_PATH", path):
                 state = PositionState()
                 state.add_or_update(
-                    Position(symbol="ETH/USD", side="LONG", weight=0.15, lane="L2", entry_price=2500.0, expected_edge_pct=0.82)
+                    Position(symbol="ETH/USD", side="LONG", weight=0.15, lane="L2", entry_price=2500.0, expected_edge_pct=0.82, risk_reward_ratio=2.15)
                 )
                 save_position_state(state)
 
@@ -189,6 +190,33 @@ class RuntimeImprovementTests(unittest.TestCase):
         self.assertIsNotNone(position)
         assert position is not None
         self.assertEqual(position.expected_edge_pct, 0.82)
+        self.assertEqual(position.risk_reward_ratio, 2.15)
+
+    def test_portfolio_clamps_proposed_weight_to_symbol_cap(self) -> None:
+        positions = PositionState()
+        decision = evaluate_trade(
+            config=PortfolioConfig(
+                max_weight_per_symbol=0.15,
+                max_total_gross_exposure=0.95,
+                max_open_positions=6,
+            ),
+            positions=positions,
+            symbol="LTC/USD",
+            side="LONG",
+            proposed_weight=0.20,
+            correlation_row=[],
+            symbols=[],
+            lane="L2",
+            features={
+                "entry_score": 100.0,
+                "entry_recommendation": "BUY",
+                "tp_after_cost_valid": True,
+                "net_edge_pct": 1.0,
+            },
+        )
+        self.assertEqual(decision["decision"], "scale_down")
+        self.assertAlmostEqual(decision["size_factor"], 0.75)
+        self.assertIn("proposed_weight_exceeds_per_symbol_cap", decision["reasons"])
 
     def test_expected_edge_round_trip_survives_entry_to_outcome_record(self) -> None:
         position = build_exit_plan(

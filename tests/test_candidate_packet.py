@@ -39,6 +39,7 @@ class CandidatePacketTests(unittest.TestCase):
             "divergence_strength": 0.5,
             "divergence_age_bars": 2,
             "sentiment_fng_value": 75,
+            "sentiment_btc_dominance": 58.0,
             "trend_confirmed": True,
             "ranging_market": False,
             "point_breakdown": {"cost_penalty_pts": 5.0, "net_edge_pct": 0.45},
@@ -64,12 +65,15 @@ class CandidatePacketTests(unittest.TestCase):
         self.assertEqual(packet["score_breakdown"], expected.score_breakdown)
         self.assertEqual(packet["net_edge_pct"], expected.net_edge_pct)
         self.assertEqual(packet["fear_greed_bonus"], expected.fear_greed_bonus)
+        self.assertEqual(packet["btc_dominance_bonus"], expected.btc_dominance_bonus)
         self.assertEqual(packet["reliability_bonus"], expected.reliability_bonus)
         self.assertEqual(packet["basket_fit_bonus"], expected.basket_fit_bonus)
         self.assertEqual(packet["breakdown_notes"], expected.breakdown_notes)
         self.assertEqual(packet["spread_penalty"], expected.spread_penalty)
         self.assertEqual(packet["cost_penalty"], expected.cost_penalty)
         self.assertEqual(packet["correlation_penalty"], expected.correlation_penalty)
+        self.assertEqual(packet["avg_held_correlation"], 0.3)
+        self.assertEqual(packet["max_held_correlation"], 0.35)
         self.assertEqual(packet["behavior_score"], {"score": 0.71})
         self.assertEqual(packet["lesson_summary"], ["avoid thin follow-through", "prefer clean pullback holds"])
         self.assertEqual(packet["held_correlation_map"], {"BTC/USD": 0.35, "SOL/USD": 0.25})
@@ -123,6 +127,8 @@ class CandidatePacketTests(unittest.TestCase):
         )
 
         self.assertEqual(packet["held_correlation_map"], {"BTC/USD": 0.91, "ADA/USD": 0.35})
+        self.assertEqual(packet["avg_held_correlation"], 0.63)
+        self.assertEqual(packet["max_held_correlation"], 0.91)
         self.assertEqual(packet["lesson_summary"], ["keep sizes smaller", "avoid late chase"])
         self.assertEqual(packet["behavior_score"], 0.63)
 
@@ -178,18 +184,22 @@ class CandidatePacketTests(unittest.TestCase):
             compact["behavior_score"],
             {"score": 0.74, "threshold_advice": "keep_threshold", "confidence": 0.61},
         )
-        self.assertEqual(compact["pattern_candidate"], {"pattern": "double_bottom", "confidence_raw": 0.79})
-        self.assertEqual(
-            compact["pattern_verification"],
-            {"validity": "valid", "pattern_quality_score": 0.81, "summary": "Clean breakout"},
-        )
-        self.assertEqual(compact["volatility_state"], "normal")
+        self.assertEqual(compact["final_score"], packet["final_score"])
+        self.assertEqual(compact["net_edge_pct"], 1.1)
+        self.assertEqual(compact["avg_held_correlation"], 0.5)
+        self.assertEqual(compact["max_held_correlation"], 0.5)
         self.assertNotIn("score_breakdown", compact)
         self.assertNotIn("breakdown_notes", compact)
         self.assertNotIn("held_correlation_map", compact)
         self.assertNotIn("trade_quality", compact)
         self.assertNotIn("risk_quality", compact)
         self.assertNotIn("continuation_quality", compact)
+        self.assertNotIn("pattern_candidate", compact)
+        self.assertNotIn("pattern_verification", compact)
+        self.assertNotIn("volatility_state", compact)
+        self.assertNotIn("trend_confirmed", compact)
+        self.assertNotIn("ranging_market", compact)
+        self.assertNotIn("book_imbalance", compact)
 
 
 if __name__ == "__main__":

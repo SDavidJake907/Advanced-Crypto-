@@ -1,11 +1,29 @@
 import unittest
 from unittest.mock import patch
 
-from core.policy.nemotron_gate import should_run_nemotron
+from core.policy.nemotron_gate import build_universe_candidate_context, should_run_nemotron
 from core.risk.portfolio import PositionState
 
 
 class NemotronPolicyTests(unittest.TestCase):
+    def test_build_universe_candidate_context_accepts_cached_universe_shape(self) -> None:
+        context = build_universe_candidate_context(
+            "FET/USD",
+            {
+                "meta": {
+                    "top_scored": [{"symbol": "FET/USD", "leader_urgency": 7.5}],
+                    "hot_candidates": [{"symbol": "DOGE/USD"}],
+                    "avoid_candidates": [{"symbol": "UNI/USD"}],
+                    "top_ranked": ["FET/USD", "DOGE/USD"],
+                    "lane_supervision": [{"symbol": "FET/USD", "lane": "meme"}],
+                }
+            },
+        )
+
+        self.assertTrue(context["current_symbol_is_top_candidate"])
+        self.assertEqual(context["top_scored"][0]["symbol"], "FET/USD")
+        self.assertEqual(context["top_ranked"][0], "FET/USD")
+
     def test_should_run_nemotron_blocks_ranging_market_under_stabilization_gate(self) -> None:
         with patch.dict(
             "os.environ",

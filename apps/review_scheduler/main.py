@@ -9,10 +9,11 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from core.config.runtime import get_runtime_snapshot, stage_runtime_override_proposal
+from core.config.runtime import get_runtime_snapshot, load_runtime_override_proposals, stage_runtime_override_proposal
 from core.llm.client import nvidia_nemotron_chat, parse_json_response
 from core.llm.contracts import normalize_runtime_advice
 from core.llm.prompts import NVIDIA_OPTIMIZER_SYSTEM_PROMPT
+from core.policy.aggression_recommendation import recommend_aggression_mode
 from core.memory.daily_review import build_daily_review_report_from_disk, write_daily_review_report
 from core.memory.kelly_sizer import run_kelly_update
 from core.memory.kraken_history import build_history_review_block
@@ -70,6 +71,41 @@ def _allowed_override_keys() -> set[str]:
     return set(get_runtime_snapshot()["values"].keys())
 
 
+def _maybe_stage_aggression_proposal(payload: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    runtime_values = payload.get("runtime", {}) if isinstance(payload.get("runtime", {}), dict) else {}
+    universe_meta = payload.get("universe", {}) if isinstance(payload.get("universe", {}), dict) else {}
+    recent_decisions = payload.get("recent_decision_debug", []) if isinstance(payload.get("recent_decision_debug", []), list) else []
+    recommendation = recommend_aggression_mode(
+        runtime_values=runtime_values,
+        universe_meta=universe_meta,
+        recent_decision_debug=recent_decisions,
+    )
+    current_mode = recommendation.current_mode
+    if recommendation.mode == current_mode:
+        return None, recommendation.to_dict()
+    for proposal in reversed(load_runtime_override_proposals()):
+        if not isinstance(proposal, dict):
+            continue
+        if proposal.get("status") != "pending":
+            continue
+        updates = proposal.get("updates", {}) if isinstance(proposal.get("updates", {}), dict) else {}
+        if str(updates.get("AGGRESSION_MODE", "")).upper() == recommendation.mode:
+            return None, recommendation.to_dict()
+    staged = stage_runtime_override_proposal(
+        {"AGGRESSION_MODE": recommendation.mode},
+        source="deterministic_aggression",
+        summary=recommendation.summary,
+        context={
+            "issues": recommendation.reasons,
+            "confidence": recommendation.confidence,
+            "current_mode": current_mode,
+            "recommended_mode": recommendation.mode,
+            "score": recommendation.score,
+        },
+    )
+    return staged, recommendation.to_dict()
+
+
 def _build_payload() -> dict[str, Any]:
     trade_zip = os.getenv("KRAKEN_TRADE_HISTORY_ZIP", "").strip()
     memory_block = TradeMemoryStore().build_memory_block()
@@ -116,52 +152,63 @@ def _write_feature_importance_report() -> None:
     FEATURE_IMPORTANCE_LOG.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
 
-def _run_once() -> None:
+def _run_once(*, use_nvidia: bool) -> None:
     _run_kelly()
     write_daily_review_report(build_daily_review_report_from_disk(root=ROOT))
     _write_feature_importance_report()
     payload = _build_payload()
-    raw = nvidia_nemotron_chat(
-        payload,
-        system=NVIDIA_OPTIMIZER_SYSTEM_PROMPT,
-        max_tokens=1200,
-        model=os.getenv("NVIDIA_OPTIMIZER_MODEL", os.getenv("NVIDIA_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1.5")),
-    )
-    allowed = _allowed_override_keys()
-    parsed = normalize_runtime_advice(parse_json_response(raw), allowed_keys=allowed)
-    filtered_updates = parsed.get("recommended_overrides", {})
+    staged_aggression, aggression_review = _maybe_stage_aggression_proposal(payload)
+    filtered_updates: dict[str, Any] = {}
     staged_proposal: dict[str, Any] | None = None
-    if filtered_updates:
-        staged_proposal = stage_runtime_override_proposal(
-            filtered_updates,
-            source="nvidia_optimizer",
-            summary=parsed.get("summary", ""),
-            context={"issues": parsed.get("issues", []), "confidence": parsed.get("confidence", 0.0)},
+    parsed: dict[str, Any] = {
+        "summary": "",
+        "issues": [],
+        "recommended_overrides": {},
+        "confidence": 0.0,
+    }
+    if use_nvidia:
+        raw = nvidia_nemotron_chat(
+            payload,
+            system=NVIDIA_OPTIMIZER_SYSTEM_PROMPT,
+            max_tokens=1200,
+            model=os.getenv("NVIDIA_OPTIMIZER_MODEL", os.getenv("NVIDIA_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1.5")),
         )
+        allowed = _allowed_override_keys()
+        parsed = normalize_runtime_advice(parse_json_response(raw), allowed_keys=allowed)
+        filtered_updates = parsed.get("recommended_overrides", {})
+        if filtered_updates:
+            staged_proposal = stage_runtime_override_proposal(
+                filtered_updates,
+                source="nvidia_optimizer",
+                summary=parsed.get("summary", ""),
+                context={"issues": parsed.get("issues", []), "confidence": parsed.get("confidence", 0.0)},
+            )
     _append_review(
         {
-            "summary": parsed.get("summary", ""),
-            "issues": parsed.get("issues", []),
+            "summary": parsed.get("summary", "") or aggression_review.get("summary", ""),
+            "issues": parsed.get("issues", []) or aggression_review.get("reasons", []),
             "recommended_overrides": filtered_updates,
             "applied_overrides": {},
             "staged_proposal": staged_proposal or {},
+            "aggression_review": aggression_review,
+            "staged_aggression_proposal": staged_aggression or {},
             "confidence": parsed.get("confidence", 0.0),
         }
     )
 
 
 def main() -> None:
-    if not _bool_env("NVIDIA_OPTIMIZER_ENABLED", True):
-        print("NVIDIA optimizer disabled.")
-        return
-    if not os.getenv("NVIDIA_API_KEY", "").strip():
-        print("NVIDIA optimizer skipped: NVIDIA_API_KEY not set.")
-        return
+    nvidia_enabled = _bool_env("NVIDIA_OPTIMIZER_ENABLED", True)
+    nvidia_available = nvidia_enabled and bool(os.getenv("NVIDIA_API_KEY", "").strip())
+    if not nvidia_enabled:
+        print("NVIDIA optimizer disabled. Running deterministic aggression review only.")
+    elif not nvidia_available:
+        print("NVIDIA optimizer skipped: NVIDIA_API_KEY not set. Running deterministic aggression review only.")
     interval_min = max(int(os.getenv("NVIDIA_OPTIMIZER_INTERVAL_MIN", "30")), 5)
     print(f"NVIDIA optimizer scheduler running every {interval_min} minutes.")
     while True:
         try:
-            _run_once()
+            _run_once(use_nvidia=nvidia_available)
         except Exception as exc:
             _append_review({"summary": "optimizer_error", "issues": [str(exc)], "recommended_overrides": {}, "applied_overrides": {}, "confidence": 0.0})
         time.sleep(interval_min * 60)

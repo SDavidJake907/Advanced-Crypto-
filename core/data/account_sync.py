@@ -311,6 +311,24 @@ def _compute_entry_basis(
         diagnostics["trades_history_source"] = "not_needed"
         diagnostics["trades_history_count"] = 0
         return {}
+    if not bool(get_runtime_setting("ACCOUNT_SYNC_USE_TRADES_HISTORY")):
+        diagnostics["trades_history_source"] = "disabled_ledger_only"
+        diagnostics["trades_history_count"] = 0
+        ledgers_fallback = _compute_entry_basis_from_ledgers(
+            client=client,
+            symbols=target_symbols,
+            asset_pairs=asset_pairs,
+            diagnostics=diagnostics,
+        )
+        if ledgers_fallback:
+            return ledgers_fallback
+        fallback = _compute_entry_basis_from_zip(
+            symbols=target_symbols,
+            diagnostics=diagnostics,
+        )
+        if fallback:
+            diagnostics["trades_history_source"] = "zip_fallback"
+        return fallback
     try:
         history = client.get_trades_history().get("result", {})
     except Exception as exc:

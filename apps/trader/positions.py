@@ -184,6 +184,7 @@ def _build_position_debug_fields(
         "hold_minutes": hold_minutes,
         "stop_loss": position.stop_loss,
         "take_profit": position.take_profit,
+        "risk_reward_ratio": position.risk_reward_ratio,
         "trail_stop": position.trail_stop,
         "exit_posture": position.exit_posture,
         "exit_posture_reason": position.exit_posture_reason,
@@ -233,6 +234,7 @@ def _build_outcome_fields(
         "mae_r": position.mae_r,
         "etd_pct": position.etd_pct,
         "etd_r": position.etd_r,
+        "risk_reward_ratio": position.risk_reward_ratio,
     }
 
 

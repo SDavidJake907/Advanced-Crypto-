@@ -10,14 +10,32 @@ from core.data.account_sync import _compute_entry_basis, _normalize_entry_ts
 
 
 class AccountSyncHistoryFallbackTests(unittest.TestCase):
+    def test_entry_basis_uses_ledgers_directly_when_trades_history_disabled(self) -> None:
+        diagnostics: dict[str, object] = {}
+        with patch("core.data.account_sync.get_runtime_setting") as mock_setting:
+            mock_setting.side_effect = lambda key, default=None: False if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else default
+            entry_meta = _compute_entry_basis(
+                client=_FailingTradesLedgerClient(),
+                symbols=["NIGHT/USD"],
+                asset_pairs={"NIGHTUSD": {"wsname": "NIGHT/USD", "altname": "NIGHTUSD", "base": "NIGHT", "quote": "ZUSD"}},
+                diagnostics=diagnostics,
+            )
+
+        self.assertIn("NIGHT/USD", entry_meta)
+        self.assertEqual(entry_meta["NIGHT/USD"]["source"], "kraken_ledgers")
+        self.assertEqual(diagnostics.get("trades_history_source"), "ledgers_fallback")
+        self.assertNotIn("trades_history_error", diagnostics)
+
     def test_entry_basis_falls_back_to_ledgers_before_zip(self) -> None:
         diagnostics: dict[str, object] = {}
-        entry_meta = _compute_entry_basis(
-            client=_FailingTradesLedgerClient(),
-            symbols=["NIGHT/USD"],
-            asset_pairs={"NIGHTUSD": {"wsname": "NIGHT/USD", "altname": "NIGHTUSD", "base": "NIGHT", "quote": "ZUSD"}},
-            diagnostics=diagnostics,
-        )
+        with patch("core.data.account_sync.get_runtime_setting") as mock_setting:
+            mock_setting.side_effect = lambda key, default=None: True if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else default
+            entry_meta = _compute_entry_basis(
+                client=_FailingTradesLedgerClient(),
+                symbols=["NIGHT/USD"],
+                asset_pairs={"NIGHTUSD": {"wsname": "NIGHT/USD", "altname": "NIGHTUSD", "base": "NIGHT", "quote": "ZUSD"}},
+                diagnostics=diagnostics,
+            )
 
         self.assertIn("NIGHT/USD", entry_meta)
         self.assertEqual(entry_meta["NIGHT/USD"]["source"], "kraken_ledgers")
@@ -40,12 +58,14 @@ class AccountSyncHistoryFallbackTests(unittest.TestCase):
 
             diagnostics: dict[str, object] = {}
             with patch.dict(os.environ, {"KRAKEN_TRADE_HISTORY_ZIP": zip_path}, clear=False):
-                entry_meta = _compute_entry_basis(
-                    client=_FailingTradesClient(),
-                    symbols=["ADA/USD"],
-                    asset_pairs={},
-                    diagnostics=diagnostics,
-                )
+                with patch("core.data.account_sync.get_runtime_setting") as mock_setting:
+                    mock_setting.side_effect = lambda key, default=None: True if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else default
+                    entry_meta = _compute_entry_basis(
+                        client=_FailingTradesClient(),
+                        symbols=["ADA/USD"],
+                        asset_pairs={},
+                        diagnostics=diagnostics,
+                    )
 
         self.assertIn("ADA/USD", entry_meta)
         self.assertEqual(entry_meta["ADA/USD"]["source"], "kraken_trade_history_zip")

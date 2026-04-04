@@ -82,6 +82,7 @@ class Position:
     etd_pct: float = 0.0
     etd_r: float = 0.0
     expected_edge_pct: float = 0.0
+    risk_reward_ratio: float = 0.0
 
 
 class PositionState:
@@ -259,10 +260,12 @@ def evaluate_trade(
 ) -> PortfolioDecision:
     reasons: List[str] = []
     lane = lane or get_symbol_lane(symbol)
+    size_factor = 1.0
 
     if proposed_weight > config.max_weight_per_symbol:
         reasons.append("proposed_weight_exceeds_per_symbol_cap")
-        return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
+        if proposed_weight > 0.0:
+            size_factor = min(size_factor, config.max_weight_per_symbol / proposed_weight)
 
     if lane == "L4":
         max_meme_positions = int(get_runtime_setting("MEME_MAX_OPEN_POSITIONS"))
@@ -300,7 +303,8 @@ def evaluate_trade(
         return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
 
     total_gross = positions.total_gross_exposure()
-    if total_gross + abs(proposed_weight) > config.max_total_gross_exposure:
+    effective_proposed_weight = abs(proposed_weight) * size_factor
+    if total_gross + effective_proposed_weight > config.max_total_gross_exposure:
         replacement = _select_replacement_candidate(
             positions=positions,
             incoming_symbol=symbol,
@@ -318,7 +322,6 @@ def evaluate_trade(
         reasons.append("total_gross_exposure_limit")
         return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
 
-    size_factor = 1.0
     if lane == "L4" and trend_conflict:
         reasons.append("meme_trend_conflict_scale_down")
         size_factor = min(size_factor, float(get_runtime_setting("MEME_TREND_CONFLICT_SCALE")))

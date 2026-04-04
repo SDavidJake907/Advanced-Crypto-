@@ -285,6 +285,45 @@ class UniverseSelectionTests(unittest.TestCase):
         )
         self.assertEqual(_layer_for_candidate(candidate), "momentum")
 
+    def test_layer_for_candidate_can_promote_live_like_alt_into_momentum_layer(self) -> None:
+        os.environ["CORE_ACTIVE_UNIVERSE"] = "BTC/USD,ETH/USD,SEI/USD"
+        candidate = Candidate(
+            pair="SEI/USD",
+            score=0.02,
+            volume_usd=500_000,
+            last=0.055,
+            lane="L3",
+            candidate_score=55.84,
+            rank_score=66.32,
+            candidate_recommendation="STRONG_BUY",
+            momentum_5=0.0096,
+            volume_ratio=0.15,
+            volume_ratio_delta=0.0,
+            trade_quality=50.0,
+            net_edge_pct=3.15,
+        )
+        self.assertEqual(_layer_for_candidate(candidate), "momentum")
+
+    def test_layer_for_candidate_can_promote_live_like_alt_into_recovery_layer(self) -> None:
+        os.environ["CORE_ACTIVE_UNIVERSE"] = "BTC/USD,ETH/USD,TIA/USD"
+        candidate = Candidate(
+            pair="TIA/USD",
+            score=0.02,
+            volume_usd=450_000,
+            last=0.29,
+            lane="L3",
+            candidate_score=32.84,
+            rank_score=37.97,
+            candidate_recommendation="WATCH",
+            momentum_5=-0.013,
+            momentum_14=0.002,
+            momentum_delta=0.001,
+            structure_quality=50.0,
+            continuation_quality=50.0,
+            net_edge_pct=1.84,
+        )
+        self.assertEqual(_layer_for_candidate(candidate), "recovery")
+
     @patch("apps.universe_manager.main.build_scan_meta", side_effect=_fake_build_scan_meta)
     @patch("apps.universe_manager.main.load_synced_position_symbols", return_value=[])
     @patch("apps.universe_manager.main.load_universe", return_value={"active_pairs": ["ADA/USD"], "meta": {}})

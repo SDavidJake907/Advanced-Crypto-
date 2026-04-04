@@ -11,6 +11,7 @@ from apps.trader.main import (
     _entry_nemo_limit_for_cycle,
     _entry_nemo_overflow_limit_for_cycle,
     _format_decision_timings,
+    _should_force_nemo_review,
 )
 from core.features.batch import slice_features_for_asset
 
@@ -25,6 +26,16 @@ class TraderTimingsTests(unittest.TestCase):
     def test_entry_nemo_overflow_limit_uses_runtime_setting(self) -> None:
         with patch("apps.trader.main.get_runtime_setting", return_value=6):
             self.assertEqual(_entry_nemo_overflow_limit_for_cycle(), 6)
+
+    def test_should_force_nemo_review_uses_deterministic_gate(self) -> None:
+        with patch("apps.trader.main.should_run_nemotron", return_value=True):
+            result = _should_force_nemo_review(
+                symbol="FET/USD",
+                features={"entry_score": 80.0},
+                positions_state=type("P", (), {"get": lambda self, symbol: None})(),
+                universe_context={},
+            )
+        self.assertTrue(result)
 
     def test_format_decision_timings_separates_decision_and_cycle_total(self) -> None:
         payload = _format_decision_timings(

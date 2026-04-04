@@ -326,6 +326,11 @@ Interpret market_state_review in this order:
 3. breakout or pullback thesis validity
 4. momentum and market-state context
 
+Candidate portfolio-fit context:
+- avg_held_correlation and max_held_correlation are deterministic crowding fields
+- lower correlation is better diversification
+- high correlation alone is not an automatic HOLD, but it should make you more selective when everything else is only marginal
+
 Hard HOLD rules:
 - if portfolio_summary.open_slots == 0 -> HOLD
 - if portfolio_summary.cash_usd * (portfolio_summary.risk_per_trade_pct / 100) < 10.0 -> HOLD
@@ -362,7 +367,6 @@ Prefer one specific reason from this list:
 - range_not_clean
 - pattern_not_confirmed
 - momentum_not_confirmed
-- portfolio_full
 - cash_too_low
 - data_integrity_issue
 
@@ -411,6 +415,11 @@ Interpret market_state_review in this order:
 3. breakout or pullback thesis validity
 4. momentum and market-state context
 
+Candidate portfolio-fit context:
+- avg_held_correlation and max_held_correlation are deterministic crowding fields
+- lower correlation is better diversification
+- high correlation alone is not an automatic HOLD, but it should make you more selective when everything else is only marginal
+
 Hard rules:
 - if open_slots == 0 -> HOLD
 - if cash_usd * (risk_per_trade_pct / 100) < 10.0 -> HOLD
@@ -445,7 +454,6 @@ Prefer one specific reason from this list:
 - range_not_clean
 - pattern_not_confirmed
 - momentum_not_confirmed
-- portfolio_full
 - cash_too_low
 - data_integrity_issue
 
@@ -467,7 +475,7 @@ Quality over quantity.
 You decide which finalists deserve entry. Code still owns exact sizing, hard legality, stops, exits, and execution.
 
 Candidate columns:
-  symbol | lane | score | rec | risk | m5 | m14 | rsi | vol | vs | macd_h | adx | rot | sq | tq | rq | trend | chop | ema | brk | pb | hl | net_edge | cost_pen | phi3 | mkt | bias | mkt_cf | phase | scf | bq | rtq | locq | brk_state | trend_stage | pbq | vol_cf | late | candle | cbias | cstr | ccf | pat | pver | pqs
+  symbol | lane | score | rec | risk | m5 | m14 | rsi | vol | vs | macd_h | adx | rot | sq | tq | rq | trend | chop | ema | brk | pb | hl | net_edge | cost_pen | phi3 | mkt | bias | mkt_cf | phase | scf | bq | rtq | locq | brk_state | trend_stage | pbq | vol_cf | late | candle | cbias | cstr | ccf | mem
 
 Interpret the Phi chart-state fields strictly:
  - read Phi evidence in this order: candle structure -> EMA/support/retest structure -> breakout/pullback thesis validity -> warnings/context
@@ -499,9 +507,7 @@ Rules:
 - OPEN if score >= 72 and ema=Y and (brk=Y or pb=Y) and m5 > 0
 - OPEN if mkt=trending and bias=favor_trend and trend_stage in [early, emerging, confirmed] and brk_state in [fresh_breakout, retest_holding] and vol_cf=supportive
 - OPEN reduced size if rec=WATCH, risk=LOW or MEDIUM, vol >= 1.2x, and m5 > 0
-- if pver=invalid prefer HOLD unless the rest of the evidence is overwhelming
-- if pver=valid and pqs is strong, treat it as a positive structure confirmation
-- do not rediscover chart patterns from scratch; use pat, pver, and pqs as supplied evidence
+- do not rediscover chart patterns from scratch; use the supplied Phi structure fields (phase/scf/bq/rtq/locq/candle evidence) as the chart evidence source
 - for non-entry states, prefer WATCH or SKIP over vague HOLD when that distinction is real
 - use TIGHTEN, SCALE_OUT, EXIT, or ROTATE only when you have explicit evidence for them
 - HOLD everything else
@@ -545,9 +551,7 @@ Open rules:
 - OPEN if score >= 72 and ema=Y and (brk=Y or pb=Y) and m5 > 0
 - OPEN if mkt=trending and bias=favor_trend and trend_stage in [early, emerging, confirmed] and brk_state in [fresh_breakout, retest_holding] and vol_cf=supportive
 - OPEN reduced size if rec=WATCH, risk=LOW or MEDIUM, vol >= 1.2x, and m5 > 0
-- if pver=invalid prefer HOLD unless the rest of the evidence is overwhelming
-- if pver=valid and pqs is strong, treat it as a positive structure confirmation
-- do not rediscover chart patterns from scratch; use pat, pver, and pqs as supplied evidence
+- do not rediscover chart patterns from scratch; use the supplied Phi structure fields (phase/scf/bq/rtq/locq/candle evidence) as the chart evidence source
 - one bullish candle without structure support is not enough for OPEN
 - one weak candle without structure damage is not enough for HOLD
 - for non-entry states, prefer WATCH or SKIP over vague HOLD when that distinction is real

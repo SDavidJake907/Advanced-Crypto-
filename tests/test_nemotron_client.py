@@ -1237,6 +1237,74 @@ class NemotronBatchParsingTests(unittest.TestCase):
         self.assertEqual(result.execution["nemotron"]["reason"], "trend_unconfirmed")
         self.assertEqual(result.execution["nemotron"]["debug"]["normalized_hold_reason"], "trend_unconfirmed")
 
+    def test_single_decide_rewrites_conflicting_hold_reason_from_chart_packet(self) -> None:
+        strategist = self._make_strategist()
+        portfolio_state = PortfolioState(cash=100.0)
+        positions_state = PositionState()
+        candidate = self._strong_buy_candidate()
+        candidate["features"]["trend_confirmed"] = True
+        candidate["features"]["ranging_market"] = True
+        candidate["features"]["momentum_5"] = 0.01
+        candidate["features"]["short_tf_ready_15m"] = True
+        candidate["features"]["net_edge_pct"] = 0.2
+        candidate["features"]["point_breakdown"] = {"net_edge_pct": 0.2}
+
+        parsed = {
+            "final_decision": {
+                "symbol": "BTC/USD",
+                "action": "HOLD",
+                "side": None,
+                "size": 0,
+                "reason": "trend_unconfirmed",
+                "debug": {},
+            }
+        }
+
+        with patch("core.llm.nemotron.nemotron_chat", return_value=json.dumps(parsed)):
+            with patch("core.llm.nemotron.build_advisory_bundle") as advisory_mock:
+                advisory_mock.return_value = type(
+                    "Bundle",
+                    (),
+                    {
+                        "reflex": {"reflex": "allow", "micro_state": "stable", "reason": "test"},
+                        "market_state_review": {
+                            "market_state": "ranging",
+                            "lane_bias": "favor_selective",
+                            "reason": "range_breakout_attempt_with_volume_support",
+                            "breakout_state": "inside_range",
+                            "trend_stage": "confirmed",
+                            "volume_confirmation": "supportive",
+                            "pullback_quality": "loose_retest",
+                            "late_move_risk": "contained",
+                            "pattern_explanation": {
+                                "structure_phase": "attempting_breakout",
+                                "structure_confidence": 0.57,
+                                "pattern_quality": {},
+                            },
+                            "candle_evidence": {"candle_bias": "neutral", "confirmation_score": 0.86},
+                        },
+                        "visual_review": {},
+                        "timings": {"phi3_ms": 0.0, "advisory_ms": 0.0},
+                    },
+                )()
+                with patch("core.llm.nemotron.strategy_decision", return_value="FLAT"):
+                    with patch("core.llm.nemotron.risk_adjust", return_value=[]):
+                        with patch(
+                            "core.llm.nemotron.portfolio_evaluate",
+                            return_value={"decision": "allow", "size_factor": 1.0, "reasons": []},
+                        ):
+                            result = strategist.decide(
+                                symbol="BTC/USD",
+                                features=candidate["features"],
+                                portfolio_state=portfolio_state,
+                                positions_state=positions_state,
+                                symbols=["BTC/USD"],
+                                proposed_weight=0.1,
+                            )
+
+        self.assertEqual(result.execution["nemotron"]["reason"], "pattern_not_confirmed")
+        self.assertEqual(result.execution["nemotron"]["debug"]["normalized_hold_reason"], "pattern_not_confirmed")
+
     def test_single_fallback_logging_dedupes_repeated_identical_errors(self) -> None:
         strategist = self._make_strategist()
         with tempfile.TemporaryDirectory() as tmpdir:

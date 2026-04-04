@@ -56,6 +56,7 @@ def _sanitize_excursion_state(position: Position) -> Position:
         etd_pct=0.0,
         etd_r=0.0,
         expected_edge_pct=position.expected_edge_pct,
+        risk_reward_ratio=position.risk_reward_ratio,
     )
 
 
@@ -189,6 +190,11 @@ def merge_persisted_positions(synced: PositionState, persisted: PositionState) -
                     synced_position.expected_edge_pct
                     if float(synced_position.expected_edge_pct or 0.0) != 0.0
                     else persisted_position.expected_edge_pct
+                ),
+                risk_reward_ratio=(
+                    synced_position.risk_reward_ratio
+                    if float(synced_position.risk_reward_ratio or 0.0) != 0.0
+                    else persisted_position.risk_reward_ratio
                 ),
                 )
             )

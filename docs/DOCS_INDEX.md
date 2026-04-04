@@ -21,6 +21,7 @@ This file is the complete documentation front door for the repository.
 
 - [trading_playbook.md](trading_playbook.md): practical trading behavior and expectations
 - [entry_exit_research.md](entry_exit_research.md): where entry and exit behavior live in code and config
+- [open_position_flow.md](open_position_flow.md): ordered lifecycle for managing an already-open position
 - [exchange_fee_policy_refs.md](exchange_fee_policy_refs.md): official exchange fee and subscription-policy references for live cost assumptions
 - [symbol_classification.md](symbol_classification.md): current tracked-symbol reference, including majors, core alts, and meme/research-disabled names
 - [coin_profile_design.md](coin_profile_design.md): coin profile and feature design notes

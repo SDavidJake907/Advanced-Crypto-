@@ -35,6 +35,7 @@ class FinalTradeScore:
     reflex_bonus: float         # Phi-3 reflex signal adjustment
     divergence_bonus: float     # RSI divergence adjustment
     fear_greed_bonus: float     # macro sentiment context adjustment
+    btc_dominance_bonus: float  # BTC dominance context adjustment
     reliability_bonus: float    # per-symbol win-rate adjustment
     basket_fit_bonus: float     # low correlation to held positions
     spread_penalty: float       # spread cost penalty
@@ -69,11 +70,12 @@ class _SetupContribution:
     reflex_bonus: float
     divergence_bonus: float
     fear_greed_bonus: float
+    btc_dominance_bonus: float
     notes: tuple[str, ...]
 
     @property
     def total(self) -> float:
-        return self.entry_score + self.reflex_bonus + self.divergence_bonus + self.fear_greed_bonus
+        return self.entry_score + self.reflex_bonus + self.divergence_bonus + self.fear_greed_bonus + self.btc_dominance_bonus
 
 
 @dataclass(frozen=True)
@@ -213,6 +215,45 @@ def _fear_greed_bonus(features: dict[str, Any]) -> tuple[float, str]:
     return 0.0, ""
 
 
+def _btc_dominance_bonus(features: dict[str, Any]) -> tuple[float, str]:
+    raw = features.get("sentiment_btc_dominance")
+    try:
+        btc_dominance = float(raw)
+    except (TypeError, ValueError):
+        return 0.0, ""
+
+    btc_dominance = _clamp(btc_dominance, 0.0, 100.0)
+    symbol = str(features.get("symbol", "") or "").upper()
+    trend_confirmed = bool(features.get("trend_confirmed", False))
+    ranging_market = bool(features.get("ranging_market", False))
+    lane = str(features.get("lane", "L3") or "L3").upper()
+    is_btc = symbol == "BTC/USD"
+    is_eth = symbol == "ETH/USD"
+    is_major = is_btc or is_eth
+
+    if btc_dominance < 55.0:
+        return 0.0, ""
+
+    pressure = _clamp((btc_dominance - 55.0) / 10.0, 0.0, 1.0)
+    if is_btc:
+        bonus = round(pressure * 1.2, 2)
+        return bonus, f"btc_dom_btc_tailwind({btc_dominance:.1f},+{bonus:.1f})" if bonus >= 0.5 else ""
+    if is_eth:
+        bonus = round(pressure * 0.5, 2)
+        return bonus, f"btc_dom_eth_support({btc_dominance:.1f},+{bonus:.1f})" if bonus >= 0.5 else ""
+
+    # Alts are more fragile when BTC dominance is elevated, especially in range/mixed tape.
+    penalty_mult = 1.0
+    if ranging_market:
+        penalty_mult += 0.25
+    if not trend_confirmed:
+        penalty_mult += 0.35
+    if lane == "L4":
+        penalty_mult += 0.25
+    penalty = round(_clamp(pressure * penalty_mult * 1.2, 0.0, 2.0), 2)
+    return -penalty, f"btc_dom_alt_caution({btc_dominance:.1f},-{penalty:.1f})" if penalty >= 0.5 else ""
+
+
 def _basket_fit_bonus(features: dict[str, Any], held_correlation_map: dict[str, float]) -> tuple[float, str]:
     """
     Bonus for symbols that are uncorrelated with what's currently held.
@@ -272,12 +313,14 @@ def _setup_contribution(features: dict[str, Any]) -> _SetupContribution:
     reflex_bonus, reflex_note = _reflex_bonus(features)
     divergence_bonus, divergence_note = _divergence_bonus(features)
     fear_greed_bonus, fear_greed_note = _fear_greed_bonus(features)
-    notes = tuple(note for note in (reflex_note, divergence_note, fear_greed_note) if note)
+    btc_dominance_bonus, btc_dominance_note = _btc_dominance_bonus(features)
+    notes = tuple(note for note in (reflex_note, divergence_note, fear_greed_note, btc_dominance_note) if note)
     return _SetupContribution(
         entry_score=entry_score,
         reflex_bonus=reflex_bonus,
         divergence_bonus=divergence_bonus,
         fear_greed_bonus=fear_greed_bonus,
+        btc_dominance_bonus=btc_dominance_bonus,
         notes=notes,
     )
 
@@ -326,6 +369,7 @@ def _build_score_breakdown(
         "reflex_bonus": round(setup.reflex_bonus, 1),
         "divergence_bonus": round(setup.divergence_bonus, 1),
         "fear_greed_bonus": round(setup.fear_greed_bonus, 1),
+        "btc_dominance_bonus": round(setup.btc_dominance_bonus, 1),
         "reliability_bonus": round(reliability.value, 1),
         "basket_fit": round(basket.basket_fit_bonus, 1),
         "spread_penalty": -round(cost.spread_penalty, 1),
@@ -390,6 +434,7 @@ def compute_final_score(
         reflex_bonus=setup.reflex_bonus,
         divergence_bonus=setup.divergence_bonus,
         fear_greed_bonus=setup.fear_greed_bonus,
+        btc_dominance_bonus=setup.btc_dominance_bonus,
         reliability_bonus=reliability.value,
         basket_fit_bonus=basket.basket_fit_bonus,
         spread_penalty=cost.spread_penalty,
