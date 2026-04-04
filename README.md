@@ -1,10 +1,18 @@
 # KrakenSK / Advanced-Crypto
 
-KrakenSK is a live crypto trading system built around a deterministic execution core, structured AI-assisted review, hard risk controls, and replay/shadow validation before live change. The current shipped live adapter is Kraken-first, but the architecture is intended to support API-key exchange integrations more generally.
+KrakenSK is a deterministic-first crypto trading system with structured model assistance, hard risk controls, and staged runtime changes. The live adapter is Kraken-first, but the architecture is meant to support exchange integrations more generally.
 
-Operating objective: maximize high-quality wins while protecting capital. The target is not "always win" because no live market system can guarantee that; the target is disciplined execution with a validated path toward winning a high share of selected trades, aiming for 80%+ only when supported by replay, shadow, and live evidence. The system should also learn the way a strong human operator does: review outcomes, keep what works, cut what fails, and tighten behavior over time without moving deterministic truth into prompts.
+This repo is built around one core idea: if something can be computed in code, it should be computed in code before any model sees it. Features, score math, sizing, cost floors, portfolio limits, and live exits stay deterministic. Models are used for compact chart/context review and finalist judgment, not for hidden arithmetic or unrestricted trade authority.
 
-LLMs are present, but constrained. The intended direction is not "AI decides everything." The intended direction is a measurable leader-rotation engine with deterministic code owning arithmetic, legality, sizing, and hard vetoes, while local models provide structured review and final candidate judgment.
+The operating objective is simple: protect capital, take high-quality opportunities, and improve through replay, shadow validation, and outcome review. It is not presented as "always win" or as a finished autonomous money machine.
+
+## At A Glance
+
+- Deterministic scoring, portfolio gating, and execution core
+- Compact strategist layer on finalists only
+- Replay and shadow validation before live runtime changes
+- Staged runtime override proposals instead of blind self-modification
+- Live logs, trade memory, and system-record audit trail
 
 ## What This Project Is
 
@@ -22,17 +30,17 @@ This repository exists to run a real trading stack without moving the core busin
 
 1. Market data collection
 2. Symbol-local feature extraction
-3. Deterministic scoring and lane selection
-4. Phi-3 pattern / market-state review
-5. Nemotron finalist judgment
+3. Deterministic scoring, lane selection, and candidate shaping
+4. Deterministic market-state and chart-context review
+5. Nemotron finalist judgment on a compact candidate set
 6. Hard risk, portfolio, and cost gating
 7. Execution and fill tracking
-8. Exit management, trade memory, and review feedback
+8. Deterministic exit management, trade memory, and review feedback
 
-Exit ownership note:
-- Phi-3 advises live exit posture from chart/state data
-- deterministic code decides the actual exit through stop, trail, stale, and protection rules
-- Nemotron is not used for live exits
+Current ownership note:
+- deterministic code owns arithmetic, legality, sizing, and live exits
+- advisory/chart review is structured context, not final authority
+- Nemotron is used for finalist entry judgment, not live exit control
 
 ## Current Decision Rules
 
@@ -60,14 +68,13 @@ Owns:
 - execution
 - exit management
 
-### Phi-3
+### Advisory / Chart Review
 
 Owns:
 - pattern verification
 - candle-context review
-- market-state and posture review from structured packets
+- market-state review from structured packets
 - structured chart-evidence translation for Nemo, not free-form trade narration
-- exit-posture guidance for already-open positions
 
 ### Nemotron
 
@@ -86,6 +93,28 @@ Owns:
 - portfolio replacement rules
 - hard vetoes over any model output
 - final stop, trail, stale-timer, and forced-exit authority
+
+## Feedback Wanted
+
+This repository is active and opinionated. The most useful outside feedback is not generic praise or generic skepticism. The highest-value review areas are:
+
+- deterministic vs model role boundaries
+- portfolio/risk controls
+- replay and shadow validation flow
+- staged runtime override design
+- candidate-packet clarity and auditability
+- whether the entry/exit ownership split is easy to reason about
+
+Less useful feedback:
+- "just let the AI decide more"
+- vague requests to redesign everything
+- style-only commentary without runtime reasoning
+
+If you review the repo, the best starting docs are:
+- [Runtime cycle](docs/runtime_cycle.md)
+- [LLM operating model](docs/llm_operating_model.md)
+- [Open position flow](docs/open_position_flow.md)
+- [Full docs index](docs/DOCS_INDEX.md)
 
 ## Repository Layout
 
@@ -138,6 +167,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1
 Current state:
 - active development
 - live-trading capable with operator control
+- deterministic-first architecture with staged runtime changes
 - architecture and docs public
 - not presented as finished or automatically capital-ready
 - intended to be validated through replay, shadow, and measured live behavior
@@ -415,22 +445,19 @@ Hot path for a tradable symbol:
 
 LLM usage:
 Current runtime note:
-- advisory model: lightweight data-integrity and market-state review
-- local `Nemo 9B` is the recommended advisory + strategist path during stabilization
+- advisory/chart review is lightweight context, not trade authority
+- local `Nemo 9B` is the current strategist path during stabilization
 - local strategist runs in compact finalist batch mode
 - recommended local batch shape is top-5 finalists, not full-universe batch and not serial full-universe local calls
 - local strategist receives a compact canonical candidate packet instead of the full wide packet
 - `lesson_summary` is preferred over long lesson dumps
 - `behavior_score` can still be provided, but local payloads should stay compact
-- `Phi-3` should translate chart data into machine-readable evidence, not vague prose or trade advice
-- current Phi handoff includes:
+- chart evidence should be machine-readable, not vague prose or trade advice
+- current chart handoff includes:
   - `pattern_explanation`: structure phase, confidence, quality/context, warnings, and missing confirmation
   - `candle_evidence`: primary candle, bias, strength, location context, confirmation score, and warning flags
-- `Phi-3` (NPU): market-state scan, posture review, watchlist flagging — boosts entry_score for flagged symbols
-- `Phi-3` pattern verifier: chart-structure and candle-context verification only; it helps Nemo judge finalists, but it does not make the final trade decision
-- `Nemotron` / OpenAI: batch comparative strategist using full candidate table (score, lane, RSI, MACD, ADX, VWIO, net_edge, cost_pen, Phi-3 signal)
-- `Nemotron` remains the final LLM trade judge on finalists, while deterministic code still owns legality, sizing, cost floors, and execution vetoes
-- Nemo receives `learned_lessons` (per-symbol outcome history) and `behavior_score` (self-calibration data) each cycle
+- deterministic code computes the market facts first, then the strategist judges finalists
+- deterministic code still owns legality, sizing, cost floors, and execution vetoes
 - no LLM is allowed to override hard risk
 - runtime adjustment advice is staged for replay/shadow/human review
 
