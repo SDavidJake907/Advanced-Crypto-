@@ -68,7 +68,7 @@ class LaneScannerTests(unittest.TestCase):
                     "entry_score": 61.0,
                     "rotation_score": 0.12,
                     "momentum_5": 0.01,
-                    "volume_ratio": 1.1,
+                    "volume_ratio": 1.5,
                     "volume_surge": 0.2,
                     "trend_confirmed": True,
                     "ranging_market": False,

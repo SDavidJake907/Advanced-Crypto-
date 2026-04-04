@@ -142,7 +142,11 @@ _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "EXEC_MAX_SPREAD_PCT": {"type": float, "default": 1.0},
     "MEME_EXEC_MAX_SPREAD_PCT": {"type": float, "default": 1.8},
     "EXEC_MIN_NOTIONAL_USD": {"type": float, "default": 15.0},
+    "L1_EXEC_MIN_NOTIONAL_PCT_EQUITY": {"type": float, "default": 0.0},
+    "L2_EXEC_MIN_NOTIONAL_PCT_EQUITY": {"type": float, "default": 0.0},
+    "L3_EXEC_MIN_NOTIONAL_PCT_EQUITY": {"type": float, "default": 0.0},
     "MEME_EXEC_MIN_NOTIONAL_USD": {"type": float, "default": 15.0},
+    "MEME_EXEC_MIN_NOTIONAL_PCT_EQUITY": {"type": float, "default": 0.0},
     "EXEC_MIN_TRADE_RISK_BUDGET_MULT": {"type": float, "default": 1.5},
     "EXEC_RISK_PER_TRADE_PCT": {"type": float, "default": 20.0},
     "L1_EXEC_RISK_PER_TRADE_PCT": {"type": float, "default": 30.0},
@@ -173,7 +177,27 @@ _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO": {"type": float, "default": 1.05},
     "NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 52.0},
     "NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.0},
+    "L1_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 52.0},
+    "L2_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 48.0},
+    "L3_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 48.0},
+    "L4_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 45.0},
+    "L1_NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.05},
+    "L2_NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.1},
+    "L3_NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.15},
+    "L4_NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.5},
+    "L1_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 38.0},
+    "L2_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 35.0},
+    "L3_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 35.0},
+    "L4_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 35.0},
+    "L1_NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO": {"type": float, "default": 1.05},
+    "L2_NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO": {"type": float, "default": 1.10},
+    "L3_NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO": {"type": float, "default": 1.15},
+    "L4_NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO": {"type": float, "default": 1.50},
     "NEMOTRON_GATE_MIN_NET_EDGE_PCT": {"type": float, "default": 0.0},
+    "L1_NEMOTRON_GATE_MIN_NET_EDGE_PCT": {"type": float, "default": 0.20},
+    "L2_NEMOTRON_GATE_MIN_NET_EDGE_PCT": {"type": float, "default": 0.30},
+    "L3_NEMOTRON_GATE_MIN_NET_EDGE_PCT": {"type": float, "default": 0.35},
+    "L4_NEMOTRON_GATE_MIN_NET_EDGE_PCT": {"type": float, "default": 0.45},
     "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": {"type": float, "default": 1.0},
     "MEME_NEMOTRON_WATCH_MIN_ENTRY_SCORE": {"type": float, "default": 38.0},
     "MEME_NEMOTRON_WATCH_MIN_VOLUME_RATIO": {"type": float, "default": 1.0},
@@ -204,6 +228,14 @@ _AGGRESSION_ALLOWED_KEYS = {
     "NEMOTRON_GATE_MIN_ENTRY_SCORE",
     "MEME_NEMOTRON_WATCH_MIN_ENTRY_SCORE",
     "MEME_NEMOTRON_GATE_MIN_ENTRY_SCORE",
+    "L1_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE",
+    "L2_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE",
+    "L3_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE",
+    "L4_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE",
+    "L1_NEMOTRON_GATE_MIN_ENTRY_SCORE",
+    "L2_NEMOTRON_GATE_MIN_ENTRY_SCORE",
+    "L3_NEMOTRON_GATE_MIN_ENTRY_SCORE",
+    "L4_NEMOTRON_GATE_MIN_ENTRY_SCORE",
     "TRADER_COOLDOWN_BARS",
     "TRADER_PROPOSED_WEIGHT",
     "MEME_PROPOSED_WEIGHT",
@@ -214,6 +246,14 @@ _AGGRESSION_PROFILES: dict[str, dict[str, Any]] = {
         "NEMOTRON_TOP_CANDIDATE_COUNT": ("add", -4, 5, 40),
         "ADVISORY_MIN_ENTRY_SCORE": ("add", 4.0, 40.0, 95.0),
         "ADVISORY_MIN_VOLUME_RATIO": ("add", 0.05, 1.0, 2.0),
+        "L1_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", 4.0, 30.0, 95.0),
+        "L2_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", 4.0, 30.0, 95.0),
+        "L3_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", 4.0, 30.0, 95.0),
+        "L4_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", 4.0, 25.0, 95.0),
+        "L1_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", 4.0, 30.0, 95.0),
+        "L2_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", 4.0, 30.0, 95.0),
+        "L3_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", 4.0, 30.0, 95.0),
+        "L4_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", 4.0, 25.0, 95.0),
         "NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", 4.0, 30.0, 95.0),
         "NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", 4.0, 30.0, 95.0),
         "MEME_NEMOTRON_WATCH_MIN_ENTRY_SCORE": ("add", 4.0, 25.0, 95.0),
@@ -227,6 +267,14 @@ _AGGRESSION_PROFILES: dict[str, dict[str, Any]] = {
         "NEMOTRON_TOP_CANDIDATE_COUNT": ("add", 4, 5, 40),
         "ADVISORY_MIN_ENTRY_SCORE": ("add", -3.0, 40.0, 95.0),
         "ADVISORY_MIN_VOLUME_RATIO": ("add", -0.05, 1.0, 2.0),
+        "L1_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", -3.0, 30.0, 95.0),
+        "L2_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", -3.0, 30.0, 95.0),
+        "L3_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", -3.0, 30.0, 95.0),
+        "L4_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", -3.0, 25.0, 95.0),
+        "L1_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", -2.0, 30.0, 95.0),
+        "L2_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", -2.0, 30.0, 95.0),
+        "L3_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", -2.0, 30.0, 95.0),
+        "L4_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", -2.0, 25.0, 95.0),
         "NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", -3.0, 30.0, 95.0),
         "NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", -2.0, 30.0, 95.0),
         "MEME_NEMOTRON_WATCH_MIN_ENTRY_SCORE": ("add", -3.0, 25.0, 95.0),
@@ -239,6 +287,14 @@ _AGGRESSION_PROFILES: dict[str, dict[str, Any]] = {
         "NEMOTRON_TOP_CANDIDATE_COUNT": ("add", 8, 5, 40),
         "ADVISORY_MIN_ENTRY_SCORE": ("add", -5.0, 40.0, 95.0),
         "ADVISORY_MIN_VOLUME_RATIO": ("add", -0.1, 1.0, 2.0),
+        "L1_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", -5.0, 30.0, 95.0),
+        "L2_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", -5.0, 30.0, 95.0),
+        "L3_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", -5.0, 30.0, 95.0),
+        "L4_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", -4.0, 25.0, 95.0),
+        "L1_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", -4.0, 30.0, 95.0),
+        "L2_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", -4.0, 30.0, 95.0),
+        "L3_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", -4.0, 30.0, 95.0),
+        "L4_NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", -4.0, 25.0, 95.0),
         "NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": ("add", -5.0, 30.0, 95.0),
         "NEMOTRON_GATE_MIN_ENTRY_SCORE": ("add", -4.0, 30.0, 95.0),
         "MEME_NEMOTRON_WATCH_MIN_ENTRY_SCORE": ("add", -4.0, 25.0, 95.0),
@@ -479,22 +535,107 @@ def is_meme_lane(lane: str | None) -> bool:
     return str(lane or "").upper() == "L4"
 
 
+def _get_lane_fallback_setting(lane_key: str, legacy_key: str) -> float:
+    overrides = load_runtime_overrides()
+    if lane_key in overrides:
+        return float(get_runtime_setting(lane_key))
+    if legacy_key in overrides:
+        return float(get_runtime_setting(legacy_key))
+    return float(get_runtime_setting(lane_key))
+
+def get_lane_min_entry_score(lane: str | None = None, symbol: str | None = None) -> float:
+    resolved_lane = str(lane or (get_symbol_lane(symbol) if symbol is not None else "L3")).upper()
+    lane_key = f"{'L4' if is_meme_lane(resolved_lane) else resolved_lane}_NEMOTRON_GATE_MIN_ENTRY_SCORE"
+    legacy_key = "MEME_NEMOTRON_GATE_MIN_ENTRY_SCORE" if is_meme_lane(resolved_lane) else "NEMOTRON_GATE_MIN_ENTRY_SCORE"
+    return _get_lane_fallback_setting(lane_key, legacy_key)
+
+def get_lane_min_volume_ratio(lane: str | None = None, symbol: str | None = None) -> float:
+    resolved_lane = str(lane or (get_symbol_lane(symbol) if symbol is not None else "L3")).upper()
+    lane_key = f"{'L4' if is_meme_lane(resolved_lane) else resolved_lane}_NEMOTRON_GATE_MIN_VOLUME_RATIO"
+    legacy_key = "MEME_NEMOTRON_GATE_MIN_VOLUME_RATIO" if is_meme_lane(resolved_lane) else "NEMOTRON_GATE_MIN_VOLUME_RATIO"
+    return _get_lane_fallback_setting(lane_key, legacy_key)
+
+def get_lane_watch_low_score(lane: str | None = None, symbol: str | None = None) -> float:
+    resolved_lane = str(lane or (get_symbol_lane(symbol) if symbol is not None else "L3")).upper()
+    lane_key = f"{'L4' if is_meme_lane(resolved_lane) else resolved_lane}_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE"
+    legacy_key = "MEME_NEMOTRON_WATCH_MIN_ENTRY_SCORE" if is_meme_lane(resolved_lane) else "NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE"
+    return _get_lane_fallback_setting(lane_key, legacy_key)
+
+def get_lane_watch_low_volume_ratio(lane: str | None = None, symbol: str | None = None) -> float:
+    resolved_lane = str(lane or (get_symbol_lane(symbol) if symbol is not None else "L3")).upper()
+    lane_key = f"{'L4' if is_meme_lane(resolved_lane) else resolved_lane}_NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO"
+    legacy_key = "MEME_NEMOTRON_WATCH_MIN_VOLUME_RATIO" if is_meme_lane(resolved_lane) else "NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO"
+    return _get_lane_fallback_setting(lane_key, legacy_key)
+
+def get_lane_risk_per_trade_pct(lane: str | None = None, symbol: str | None = None) -> float:
+    resolved_lane = str(lane or (get_symbol_lane(symbol) if symbol is not None else "L3")).upper()
+    if resolved_lane == "L1":
+        key = "L1_EXEC_RISK_PER_TRADE_PCT"
+    elif resolved_lane == "L2":
+        key = "L2_EXEC_RISK_PER_TRADE_PCT"
+    elif is_meme_lane(resolved_lane):
+        key = "MEME_EXEC_RISK_PER_TRADE_PCT"
+    else:
+        key = "EXEC_RISK_PER_TRADE_PCT"
+    return float(get_runtime_setting(key))
+
+
+def get_lane_min_net_edge_pct(lane: str | None = None, symbol: str | None = None) -> float:
+    resolved_lane = str(lane or (get_symbol_lane(symbol) if symbol is not None else "L3")).upper()
+    if resolved_lane == "L1":
+        key = "L1_NEMOTRON_GATE_MIN_NET_EDGE_PCT"
+    elif resolved_lane == "L2":
+        key = "L2_NEMOTRON_GATE_MIN_NET_EDGE_PCT"
+    elif is_meme_lane(resolved_lane):
+        key = "L4_NEMOTRON_GATE_MIN_NET_EDGE_PCT"
+    else:
+        key = "L3_NEMOTRON_GATE_MIN_NET_EDGE_PCT"
+
+    lane_threshold = float(get_runtime_setting(key))
+    global_floor = float(get_runtime_setting("NEMOTRON_GATE_MIN_NET_EDGE_PCT"))
+    return max(lane_threshold, global_floor)
+
+
+def get_effective_min_notional_usd(
+    *,
+    equity_usd: float,
+    lane: str | None = None,
+    symbol: str | None = None,
+    explicit_min_notional_usd: float = 0.0,
+) -> float:
+    resolved_lane = str(lane or (get_symbol_lane(symbol) if symbol is not None else "L3")).upper()
+    explicit_floor = max(float(explicit_min_notional_usd or 0.0), 0.0)
+    if resolved_lane == "L1":
+        base_floor = float(get_runtime_setting("EXEC_MIN_NOTIONAL_USD"))
+        pct_floor = float(get_runtime_setting("L1_EXEC_MIN_NOTIONAL_PCT_EQUITY"))
+    elif resolved_lane == "L2":
+        base_floor = float(get_runtime_setting("EXEC_MIN_NOTIONAL_USD"))
+        pct_floor = float(get_runtime_setting("L2_EXEC_MIN_NOTIONAL_PCT_EQUITY"))
+    elif is_meme_lane(resolved_lane):
+        base_floor = float(get_runtime_setting("MEME_EXEC_MIN_NOTIONAL_USD"))
+        pct_floor = float(get_runtime_setting("MEME_EXEC_MIN_NOTIONAL_PCT_EQUITY"))
+    else:
+        base_floor = float(get_runtime_setting("EXEC_MIN_NOTIONAL_USD"))
+        pct_floor = float(get_runtime_setting("L3_EXEC_MIN_NOTIONAL_PCT_EQUITY"))
+    scaled_floor = max(float(equity_usd or 0.0), 0.0) * max(pct_floor, 0.0)
+    return max(base_floor, scaled_floor, explicit_floor)
+
+
 def get_proposed_weight(symbol: str | None = None, lane: str | None = None, atr_pct: float | None = None) -> float:
     resolved_lane = lane or (get_symbol_lane(symbol) if symbol is not None else None)
     is_meme = is_meme_lane(resolved_lane)
-    
-    # Base weight uses Kelly fractions (EXEC_RISK_PER_TRADE_PCT)
-    kelly_key = "MEME_EXEC_RISK_PER_TRADE_PCT" if is_meme else "EXEC_RISK_PER_TRADE_PCT"
-    base_weight = float(get_runtime_setting(kelly_key)) / 100.0
-    
-    # Fallback to hardcoded fallback defaults if Kelly disabled
+
+    # Base weight uses lane-aware Kelly fractions when enabled.
+    base_weight = get_lane_risk_per_trade_pct(lane=resolved_lane, symbol=symbol) / 100.0
+
+    # Fallback to headline proposed weight if Kelly sizing is disabled or unreasonable.
     if base_weight <= 0.0 or base_weight > 0.50:
         base_weight = float(get_runtime_setting("MEME_PROPOSED_WEIGHT" if is_meme else "TRADER_PROPOSED_WEIGHT"))
-        
+
     # Dynamic ATR Volatility Scaling
     if atr_pct and atr_pct > 0.0:
         # Target nominal move around 5%. If highly volatile (e.g., 10%), halve size. If low volatility (e.g., 2.5%), double it.
         vol_scalar = 5.0 / atr_pct
         base_weight *= max(0.5, min(vol_scalar, 2.0))
-        
+
     return base_weight

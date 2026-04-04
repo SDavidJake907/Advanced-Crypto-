@@ -4,7 +4,7 @@ import os
 from typing import Any, Dict
 
 from core.execution.base import Executor
-from core.config.runtime import get_proposed_weight, get_runtime_setting
+from core.config.runtime import get_effective_min_notional_usd, get_lane_risk_per_trade_pct, get_proposed_weight, get_runtime_setting
 from core.execution.order_policy import build_order_plan
 from core.execution.risk_budget import estimate_entry_risk_fraction
 from core.risk.fee_filter import evaluate_trade_cost
@@ -51,8 +51,13 @@ class MockExecutor(Executor):
         if trade_notional <= 0 or price <= 0:
             return {"status": "rejected", "reason": "invalid_notional_or_price"}
 
-        min_notional_usd = max(float(features.get("min_notional_usd", 0.0) or 0.0), float(get_runtime_setting("EXEC_MIN_NOTIONAL_USD")))
-        risk_budget_usd = cash * (float(get_runtime_setting("EXEC_RISK_PER_TRADE_PCT")) / 100.0)
+        min_notional_usd = get_effective_min_notional_usd(
+            equity_usd=cash,
+            lane=lane,
+            symbol=symbol,
+            explicit_min_notional_usd=float(features.get("min_notional_usd", 0.0) or 0.0),
+        )
+        risk_budget_usd = cash * (get_lane_risk_per_trade_pct(lane=lane, symbol=symbol) / 100.0)
         risk_fraction_of_notional = estimate_entry_risk_fraction(
             price=price,
             atr=float(features.get("atr", 0.0) or 0.0),

@@ -230,6 +230,9 @@ def apply_lane_supervision(
     if "leader_takeover" in lane_supervision:
         merged["leader_takeover"] = bool(lane_supervision.get("leader_takeover", False))
 
+    # Keep universe/leader metrics as advisory context only.
+    # Live per-cycle economics must come from the current feature/scoring pipeline,
+    # not from cached universe overlays.
     for key in (
         "expected_move_pct",
         "total_cost_pct",
@@ -240,10 +243,10 @@ def apply_lane_supervision(
         "realized_follow_through_pct",
     ):
         if key in lane_supervision:
-            merged[key] = float(lane_supervision.get(key, 0.0) or 0.0)
+            merged[f"universe_{key}"] = float(lane_supervision.get(key, 0.0) or 0.0)
 
     if "tp_after_cost_valid" in lane_supervision:
-        merged["tp_after_cost_valid"] = bool(lane_supervision.get("tp_after_cost_valid", False))
+        merged["universe_tp_after_cost_valid"] = bool(lane_supervision.get("tp_after_cost_valid", False))
 
     return merged
 

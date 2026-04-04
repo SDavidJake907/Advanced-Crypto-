@@ -98,17 +98,16 @@ def _scan_quality_ok(candidate: Candidate) -> bool:
     risk = str(candidate.candidate_risk or "MEDIUM").upper()
     if recommendation == "AVOID" or risk == "HIGH":
         return False
-    if candidate.candidate_score < 52.0:
+    if candidate.candidate_score < 45.0: # Lowered from 52.0
         return False
-    if candidate.volume_ratio < 0.75:
+    if candidate.volume_ratio < 0.60: # Lowered from 0.75
         return False
-    if candidate.spread_bps > 20.0:
+    if candidate.spread_bps > 25.0: # Increased from 20.0
         return False
-    if candidate.trade_quality < 52.0 or candidate.risk_quality < 50.0:
+    if candidate.trade_quality < 45.0 or candidate.risk_quality < 45.0: # Lowered from 52/50
         return False
-    if not candidate.tp_after_cost_valid:
-        return False
-    if candidate.net_edge_pct < 0.35:
+    # Allow coins even if tp_after_cost is slightly invalid at the shortlist level
+    if candidate.net_edge_pct < 0.0: # Lowered from 0.35
         return False
     return True
 
@@ -615,11 +614,11 @@ def scan_l3_candidates(candidates: list[Candidate]) -> list[Candidate]:
         if (
             c.lane == "L3"
             and _scan_quality_ok(c)
-            and c.volume_ratio >= 0.75
-            and c.spread_bps <= 20.0
-            and c.trade_quality >= 55.0
-            and c.risk_quality >= 52.0
-            and c.momentum_5 <= 0.010  # exclude hot movers — they belong in L2 or L4
+            and c.volume_ratio >= 0.65 # Lowered from 0.75
+            and c.spread_bps <= 25.0   # Increased from 20.0
+            and c.trade_quality >= 45.0 # Lowered from 55.0
+            and c.risk_quality >= 45.0  # Lowered from 52.0
+            and c.momentum_5 <= 0.015  # Increased from 0.010
         )
     ]
     return _lane_sort(scoped)
@@ -840,12 +839,12 @@ def _stabilization_universe() -> set[str]:
     return _core_active_universe() | _conditional_universe()
 
 
-def _xrp_min_structure_quality() -> float:
+def _conditional_min_structure_quality() -> float:
     raw = float(get_runtime_setting("XRP_MIN_STRUCTURE_QUALITY"))
     return raw * 100.0 if raw <= 1.0 else raw
 
 
-def _xrp_cleanliness_score(candidate: Candidate) -> tuple[int, float, float]:
+def _conditional_cleanliness_score(candidate: Candidate) -> tuple[int, float, float]:
     return (
         int(round(float(candidate.structure_quality))),
         float(candidate.net_edge_pct),
@@ -879,12 +878,12 @@ def _cleaner_than_core_candidate(candidate: Candidate, core_candidate: Candidate
     return wins >= 2
 
 
-def _xrp_candidate_allowed(candidate: Candidate, core_candidates: list[Candidate]) -> bool:
+def _conditional_candidate_quality_allowed(candidate: Candidate, core_candidates: list[Candidate]) -> bool:
     if float(candidate.spread_bps / 100.0) > float(get_runtime_setting("XRP_MAX_SPREAD_PCT")):
         return False
     if float(candidate.net_edge_pct) < float(get_runtime_setting("XRP_MIN_NET_EDGE_PCT")):
         return False
-    if float(candidate.structure_quality) < _xrp_min_structure_quality():
+    if float(candidate.structure_quality) < _conditional_min_structure_quality():
         return False
     if not bool(candidate.tp_after_cost_valid):
         return False
@@ -902,9 +901,7 @@ def _conditional_candidate_allowed(candidate: Candidate, core_candidates: list[C
         return True
     if normalized not in _conditional_universe():
         return False
-    if normalized == "XRP/USD":
-        return _xrp_candidate_allowed(candidate, core_candidates)
-    return False
+    return _conditional_candidate_quality_allowed(candidate, core_candidates)
 
 
 def _broad_candidate_allowed(candidate: Candidate) -> bool:

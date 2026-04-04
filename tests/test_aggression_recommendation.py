@@ -23,6 +23,8 @@ class AggressionRecommendationTests(unittest.TestCase):
         )
         self.assertEqual(result.mode, "DEFENSIVE")
         self.assertGreaterEqual(result.confidence, 0.65)
+        self.assertEqual(result.btc_dominance_level, "alt_high_caution")
+        self.assertEqual(result.alt_market_posture, "fragile_alts")
 
     def test_recommends_offensive_in_constructive_bull_market(self) -> None:
         result = recommend_aggression_mode(
@@ -43,6 +45,8 @@ class AggressionRecommendationTests(unittest.TestCase):
         )
         self.assertIn(result.mode, {"OFFENSIVE", "HIGH_OFFENSIVE"})
         self.assertGreaterEqual(result.score, 1.5)
+        self.assertEqual(result.btc_dominance_level, "neutral")
+        self.assertEqual(result.alt_market_posture, "constructive_alts")
 
     def test_recommends_normal_when_inputs_are_mixed(self) -> None:
         result = recommend_aggression_mode(
@@ -62,6 +66,8 @@ class AggressionRecommendationTests(unittest.TestCase):
             ],
         )
         self.assertEqual(result.mode, "NORMAL")
+        self.assertEqual(result.btc_dominance_level, "alt_caution")
+        self.assertEqual(result.alt_market_posture, "cautious_alts")
 
 
 if __name__ == "__main__":

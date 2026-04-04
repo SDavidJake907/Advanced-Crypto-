@@ -8,7 +8,7 @@ import os
 from core.data.kraken_rest import KrakenRestClient
 from core.execution.clamp import clamp_order_size
 from core.execution.kraken_rules import load_rules
-from core.config.runtime import get_proposed_weight, get_runtime_setting, is_meme_lane
+from core.config.runtime import get_effective_min_notional_usd, get_lane_risk_per_trade_pct, get_proposed_weight
 from core.execution.kraken_live import KrakenLiveExecutor
 from core.execution.mock_exec import MockExecutor
 from core.execution.order_policy import build_order_plan
@@ -71,20 +71,14 @@ class CppExecutor:
         if notional <= 0 or price <= 0:
             return {"status": "rejected", "reason": "invalid_notional_or_price"}
 
-        min_notional_usd = float(
-            get_runtime_setting("MEME_EXEC_MIN_NOTIONAL_USD")
-            if is_meme_lane(lane)
-            else get_runtime_setting("EXEC_MIN_NOTIONAL_USD")
+        min_notional_usd = get_effective_min_notional_usd(
+            equity_usd=cash,
+            lane=lane,
+            symbol=symbol,
+            explicit_min_notional_usd=float(features.get("min_notional_usd", 0.0) or 0.0),
         )
 
-        if lane == "L1":
-            risk_per_trade_pct = float(get_runtime_setting("L1_EXEC_RISK_PER_TRADE_PCT"))
-        elif lane == "L2":
-            risk_per_trade_pct = float(get_runtime_setting("L2_EXEC_RISK_PER_TRADE_PCT"))
-        elif lane == "L4" or is_meme_lane(lane):
-            risk_per_trade_pct = float(get_runtime_setting("MEME_EXEC_RISK_PER_TRADE_PCT"))
-        else:
-            risk_per_trade_pct = float(get_runtime_setting("EXEC_RISK_PER_TRADE_PCT"))
+        risk_per_trade_pct = get_lane_risk_per_trade_pct(lane=lane, symbol=symbol)
 
         atr_pct = float(features.get("atr", 0.0)) / max(float(features.get("price", 1.0) or 1.0), 1e-10) * 100.0
         risk_per_trade_pct = calculate_dynamic_risk_pct(
@@ -113,7 +107,7 @@ class CppExecutor:
             equity_usd=cash,
             max_position_usd=max(cash, notional),
             risk_per_trade_pct=risk_per_trade_pct,
-            min_notional_usd=max(float(features.get("min_notional_usd", 0.0) or 0.0), min_notional_usd),
+            min_notional_usd=min_notional_usd,
             max_min_trade_risk_mult=float(get_runtime_setting("EXEC_MIN_TRADE_RISK_BUDGET_MULT")),
             clamp_up=True,
             kelly_fraction=float(features.get("kelly_fraction", 1.0) or 1.0),

@@ -92,6 +92,35 @@ class FeeFilterTests(unittest.TestCase):
         self.assertTrue(assessment.actionable)
         self.assertGreater(assessment.expected_edge_pct, assessment.required_edge_pct)
 
+    def test_trade_cost_can_allow_near_floor_candidate_when_runtime_floor_is_slightly_lowered(self) -> None:
+        with patch(
+            "core.config.runtime.load_runtime_overrides",
+            return_value={
+                "TRADE_COST_MIN_EDGE_MULT": 0.05,
+                "TRADE_COST_MIN_EXPECTED_EDGE_PCT": 0.025,
+                "TRADE_COST_SAFETY_BUFFER_PCT": 0.0,
+                "TRADE_COST_ASSUME_AGGRESSIVE_ENTRY_TAKER": False,
+            },
+        ):
+            assessment = evaluate_trade_cost(
+                {
+                    "lane": "L2",
+                    "price": 0.317244,
+                    "atr": 0.000243,
+                    "spread_pct": 0.00725,
+                    "structure_quality": 54.48,
+                    "continuation_quality": 54.5,
+                    "momentum_quality": 90.34,
+                    "trade_quality": 99.95,
+                    "promotion_tier": "promote",
+                    "entry_recommendation": "BUY",
+                },
+                "LONG",
+            )
+
+        self.assertTrue(assessment.actionable)
+        self.assertGreater(assessment.expected_edge_pct, assessment.required_edge_pct)
+
 
 if __name__ == "__main__":
     unittest.main()

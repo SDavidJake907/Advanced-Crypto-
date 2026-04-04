@@ -7,13 +7,14 @@ import zipfile
 from unittest.mock import patch
 
 from core.data.account_sync import _compute_entry_basis, _normalize_entry_ts
+from core.config.runtime import get_runtime_setting as _real_get_runtime_setting
 
 
 class AccountSyncHistoryFallbackTests(unittest.TestCase):
     def test_entry_basis_uses_ledgers_directly_when_trades_history_disabled(self) -> None:
         diagnostics: dict[str, object] = {}
         with patch("core.data.account_sync.get_runtime_setting") as mock_setting:
-            mock_setting.side_effect = lambda key, default=None: False if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else default
+            mock_setting.side_effect = lambda key, default=None: False if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else _real_get_runtime_setting(key, default)
             entry_meta = _compute_entry_basis(
                 client=_FailingTradesLedgerClient(),
                 symbols=["NIGHT/USD"],
@@ -29,7 +30,7 @@ class AccountSyncHistoryFallbackTests(unittest.TestCase):
     def test_entry_basis_falls_back_to_ledgers_before_zip(self) -> None:
         diagnostics: dict[str, object] = {}
         with patch("core.data.account_sync.get_runtime_setting") as mock_setting:
-            mock_setting.side_effect = lambda key, default=None: True if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else default
+            mock_setting.side_effect = lambda key, default=None: True if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else _real_get_runtime_setting(key, default)
             entry_meta = _compute_entry_basis(
                 client=_FailingTradesLedgerClient(),
                 symbols=["NIGHT/USD"],
@@ -59,7 +60,7 @@ class AccountSyncHistoryFallbackTests(unittest.TestCase):
             diagnostics: dict[str, object] = {}
             with patch.dict(os.environ, {"KRAKEN_TRADE_HISTORY_ZIP": zip_path}, clear=False):
                 with patch("core.data.account_sync.get_runtime_setting") as mock_setting:
-                    mock_setting.side_effect = lambda key, default=None: True if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else default
+                    mock_setting.side_effect = lambda key, default=None: True if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else _real_get_runtime_setting(key, default)
                     entry_meta = _compute_entry_basis(
                         client=_FailingTradesClient(),
                         symbols=["ADA/USD"],

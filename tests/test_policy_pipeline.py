@@ -327,7 +327,10 @@ class PolicyPipelineTests(unittest.TestCase):
     def test_deterministic_gate_no_longer_blocks_only_on_non_positive_net_edge(self) -> None:
         with patch(
             "core.config.runtime.load_runtime_overrides",
-            return_value={"STABILIZATION_STRICT_ENTRY_ENABLED": False},
+            return_value={
+                "STABILIZATION_STRICT_ENTRY_ENABLED": False,
+                "L3_NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+            },
         ):
             passed, reason = passes_deterministic_candidate_gate(
                 symbol="TEST/USD",

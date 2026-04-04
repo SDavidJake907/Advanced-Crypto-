@@ -223,26 +223,15 @@ def _btc_dominance_bonus(features: dict[str, Any]) -> tuple[float, str]:
         return 0.0, ""
 
     btc_dominance = _clamp(btc_dominance, 0.0, 100.0)
-    symbol = str(features.get("symbol", "") or "").upper()
     trend_confirmed = bool(features.get("trend_confirmed", False))
     ranging_market = bool(features.get("ranging_market", False))
     lane = str(features.get("lane", "L3") or "L3").upper()
-    is_btc = symbol == "BTC/USD"
-    is_eth = symbol == "ETH/USD"
-    is_major = is_btc or is_eth
 
     if btc_dominance < 55.0:
         return 0.0, ""
 
     pressure = _clamp((btc_dominance - 55.0) / 10.0, 0.0, 1.0)
-    if is_btc:
-        bonus = round(pressure * 1.2, 2)
-        return bonus, f"btc_dom_btc_tailwind({btc_dominance:.1f},+{bonus:.1f})" if bonus >= 0.5 else ""
-    if is_eth:
-        bonus = round(pressure * 0.5, 2)
-        return bonus, f"btc_dom_eth_support({btc_dominance:.1f},+{bonus:.1f})" if bonus >= 0.5 else ""
-
-    # Alts are more fragile when BTC dominance is elevated, especially in range/mixed tape.
+    # Elevated BTC dominance is treated as a generic caution layer, not a symbol-specific preference.
     penalty_mult = 1.0
     if ranging_market:
         penalty_mult += 0.25

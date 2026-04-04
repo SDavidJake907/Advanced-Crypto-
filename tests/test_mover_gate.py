@@ -13,6 +13,7 @@ class MoverGateTests(unittest.TestCase):
                 "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
                 "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
                 "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "L2_NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
                 "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.0,
                 "STABILIZATION_STRICT_ENTRY_ENABLED": False,
             },
@@ -58,6 +59,7 @@ class MoverGateTests(unittest.TestCase):
                 "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
                 "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
                 "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "L2_NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
                 "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.0,
                 "STABILIZATION_STRICT_ENTRY_ENABLED": False,
             },
@@ -97,6 +99,7 @@ class MoverGateTests(unittest.TestCase):
                 "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
                 "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
                 "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "L2_NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
                 "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.0,
                 "STABILIZATION_STRICT_ENTRY_ENABLED": False,
             },
@@ -139,6 +142,7 @@ class MoverGateTests(unittest.TestCase):
                 "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
                 "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
                 "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "L3_NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
                 "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.0,
                 "STABILIZATION_STRICT_ENTRY_ENABLED": True,
                 "STABILIZATION_ALLOWED_LANES": "L2,L3",
@@ -213,6 +217,62 @@ class MoverGateTests(unittest.TestCase):
         self.assertFalse(passed)
         self.assertEqual(reason, "net_edge_below_gate(0.12<0.35)")
 
+    def test_candidate_gate_uses_lane_specific_net_edge_threshold(self) -> None:
+        with patch(
+            "core.config.runtime.load_runtime_overrides",
+            return_value={
+                "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
+                "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
+                "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "L1_NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.20,
+                "L2_NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.30,
+                "L3_NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.35,
+                "L4_NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.45,
+                "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.0,
+                "STABILIZATION_STRICT_ENTRY_ENABLED": False,
+            },
+        ):
+            passed_l1, reason_l1 = passes_deterministic_candidate_gate(
+                symbol="LTC/USD",
+                positions_state=PositionState(),
+                universe_context={"current_symbol_is_top_candidate": False},
+                features={
+                    "symbol": "LTC/USD",
+                    "lane": "L1",
+                    "indicators_ready": True,
+                    "entry_score": 88.0,
+                    "volume_ratio": 1.2,
+                    "trend_confirmed": True,
+                    "net_edge_pct": 0.22,
+                    "expected_move_pct": 3.0,
+                    "price": 1.0,
+                    "atr": 0.01,
+                    "promotion_tier": "promote",
+                    "promotion_reason": "strong_buy_low_risk",
+                },
+            )
+            passed_l3, reason_l3 = passes_deterministic_candidate_gate(
+                symbol="ALGO/USD",
+                positions_state=PositionState(),
+                universe_context={"current_symbol_is_top_candidate": False},
+                features={
+                    "symbol": "ALGO/USD",
+                    "lane": "L3",
+                    "indicators_ready": True,
+                    "entry_score": 88.0,
+                    "volume_ratio": 1.2,
+                    "trend_confirmed": True,
+                    "net_edge_pct": 0.22,
+                    "expected_move_pct": 3.0,
+                    "price": 1.0,
+                    "atr": 0.01,
+                },
+            )
+        self.assertTrue(passed_l1)
+        self.assertEqual(reason_l1, "passed")
+        self.assertFalse(passed_l3)
+        self.assertEqual(reason_l3, "net_edge_below_gate(0.22<0.35)")
+
     def test_candidate_gate_blocks_low_risk_reward_even_when_net_edge_is_positive(self) -> None:
         with patch(
             "core.config.runtime.load_runtime_overrides",
@@ -220,6 +280,7 @@ class MoverGateTests(unittest.TestCase):
                 "NEMOTRON_GATE_MIN_ENTRY_SCORE": 48.0,
                 "NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7,
                 "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
+                "L3_NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.0,
                 "NEMOTRON_GATE_MIN_RISK_REWARD_RATIO": 1.8,
                 "EXIT_ATR_STOP_MULT": 1.8,
                 "EXIT_MIN_STOP_PCT": 1.5,

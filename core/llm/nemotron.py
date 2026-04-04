@@ -352,6 +352,21 @@ class NemotronStrategist:
         volume_confirmation = str(market_state_review.get("volume_confirmation", "neutral") or "neutral")
         pullback_quality = str(market_state_review.get("pullback_quality", "unclear") or "unclear")
         score = float(features.get("entry_score", 0.0) or 0.0)
+        volume_quality = float(features.get("volume_quality", 0.0) or 0.0)
+
+        # Some steady standard-lane retests degrade to a "weak" volume tag even when
+        # the broader structure is clean enough to deserve an explicit override check.
+        # Keep this narrow: only allow it for strong retest/breakout structures with
+        # high deterministic volume quality and a real BUY score.
+        volume_override_ok = volume_confirmation in {"supportive", "neutral"} or (
+            volume_confirmation == "weak"
+            and structure_phase in {"retest_holding", "confirmed_breakout"}
+            and structure_confidence >= 0.65
+            and breakout_state in {"fresh_breakout", "retest_holding"}
+            and pullback_quality in {"clean_retest", "higher_low_support"}
+            and volume_quality >= 70.0
+            and score >= 62.0
+        )
 
         return (
             recommendation in {"BUY", "STRONG_BUY"}
@@ -365,7 +380,7 @@ class NemotronStrategist:
             and candle_bias != "bearish"
             and late_move_risk != "extended"
             and breakout_state in {"fresh_breakout", "retest_holding", "breakout_attempt"}
-            and volume_confirmation in {"supportive", "neutral"}
+            and volume_override_ok
             and pullback_quality in {"clean_retest", "higher_low_support", "loose_retest"}
             and score >= 58.0
         )
@@ -447,8 +462,10 @@ class NemotronStrategist:
             else get_runtime_setting("NEMOTRON_GATE_MIN_VOLUME_RATIO")
         )
         # Keep meme names strict, but avoid re-blocking standard names with a hidden
-        # 0.95 participation floor after they already cleared the deterministic gate.
-        soft_volume_floor = volume_gate if lane == "L4" else max(volume_gate, 0.80)
+        # participation floor after they already cleared the deterministic gate.
+        # Standard lanes still need some participation, just not enough to kill
+        # every developing breakout that already cleared the hard gate.
+        soft_volume_floor = volume_gate if lane == "L4" else max(volume_gate, 0.75)
         if volume_ratio < soft_volume_floor:
             return "volume_too_light"
         structure_phase = str(((market_state_review.get("pattern_explanation") or {}).get("structure_phase", "unclear")) or "unclear")

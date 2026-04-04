@@ -68,6 +68,78 @@ class NemotronSummaryTests(unittest.TestCase):
         self.assertNotEqual(reason, "volume_too_light")
         self.assertEqual(reason, "pattern_not_confirmed")
 
+    def test_specific_hold_reason_no_longer_flags_standard_lane_volume_too_light_at_point76x(self) -> None:
+        strategist = NemotronStrategist(
+            strategy=SimpleMomentumStrategy(),
+            risk_engine=BasicRiskEngine(max_position_notional=1_000_000.0, max_leverage=10.0, cooldown_bars=0),
+            portfolio_config=PortfolioConfig(max_open_positions=6, max_total_gross_exposure=0.95),
+            executor=object(),  # type: ignore[arg-type]
+        )
+        with patch("core.config.runtime.load_runtime_overrides", return_value={"NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.7}):
+            reason = strategist._specific_hold_reason(
+                features={
+                    "symbol": "TRX/USD",
+                    "lane": "L2",
+                    "reversal_risk": "MEDIUM",
+                    "net_edge_pct": 0.43,
+                    "volume_ratio": 0.76,
+                    "ranging_market": True,
+                    "trend_confirmed": True,
+                    "momentum_5": 0.003,
+                    "short_tf_ready_15m": True,
+                },
+                market_state_review={
+                    "breakout_state": "breakout_attempt",
+                    "trend_stage": "mixed",
+                    "pattern_explanation": {"structure_phase": "attempting_breakout"},
+                },
+                portfolio_decision={"decision": "allow"},
+                current_reason="reason_missing",
+            )
+        self.assertNotEqual(reason, "volume_too_light")
+        self.assertEqual(reason, "range_not_clean")
+
+    def test_phi_explicit_override_allows_strong_ltc_style_retest_even_with_weak_volume_tag(self) -> None:
+        strategist = NemotronStrategist(
+            strategy=SimpleMomentumStrategy(),
+            risk_engine=BasicRiskEngine(max_position_notional=1_000_000.0, max_leverage=10.0, cooldown_bars=0),
+            portfolio_config=PortfolioConfig(max_open_positions=6, max_total_gross_exposure=0.95),
+            executor=object(),  # type: ignore[arg-type]
+        )
+
+        allowed = strategist._phi_requires_explicit_override(
+            features={
+                "symbol": "LTC/USD",
+                "lane": "L2",
+                "entry_recommendation": "BUY",
+                "reversal_risk": "MEDIUM",
+                "entry_score": 64.89,
+                "volume_quality": 74.56,
+            },
+            market_state_review={
+                "breakout_state": "retest_holding",
+                "trend_stage": "confirmed",
+                "volume_confirmation": "weak",
+                "pullback_quality": "clean_retest",
+                "late_move_risk": "contained",
+                "pattern_explanation": {
+                    "structure_phase": "retest_holding",
+                    "structure_confidence": 0.68,
+                    "pattern_quality": {
+                        "breakout_quality_score": 0.57,
+                        "retest_quality_score": 0.70,
+                        "location_quality_score": 0.71,
+                    },
+                },
+                "candle_evidence": {
+                    "candle_bias": "bullish",
+                    "confirmation_score": 0.77,
+                },
+            },
+        )
+
+        self.assertTrue(allowed)
+
 
 if __name__ == "__main__":
     unittest.main()

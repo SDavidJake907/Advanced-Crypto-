@@ -90,7 +90,27 @@ def _ollama_generate_endpoint(base_url: str) -> str:
     return f"{base}/api/generate"
 
 
-def _completion_prompt(*, system: str, user_payload: dict[str, Any]) -> str:
+def _completion_prompt(*, system: str, user_payload: dict[str, Any], model: str = "") -> str:
+    provider = _nemotron_provider()
+    is_nemotron = (provider in {"local", "nvidia"})
+    is_phi3 = "phi3" in model.lower()
+    
+    if is_nemotron:
+        return (
+            f"<|im_start|>system\n{system.strip()}\n"
+            "Return only the final JSON object. No markdown. No prose.<|im_end|>\n"
+            f"<|im_start|>user\nInput JSON:\n{json.dumps(sanitize_for_json(user_payload), separators=(',', ':'))}<|im_end|>\n"
+            "<|im_start|>assistant\n<think>"
+        )
+    
+    if is_phi3:
+        return (
+            f"<|system|>\n{system.strip()}\n"
+            "Return only the final JSON object. No markdown. No prose.<|end|>\n"
+            f"<|user|>\nInput JSON:\n{json.dumps(sanitize_for_json(user_payload), separators=(',', ':'))}<|end|>\n"
+            "<|assistant|>"
+        )
+    
     return (
         f"{system.strip()}\n\n"
         "Input JSON:\n"
@@ -111,12 +131,29 @@ def _chat_completion(
     timeout_s: float = 30.0,
     extra_body: dict[str, Any] | None = None,
 ) -> str:
-    payload = {
-        "model": model,
-        "messages": [
+    provider = _nemotron_provider()
+    is_nemotron = (provider in {"local", "nvidia"})
+    is_phi3 = "phi3" in model.lower()
+    
+    if is_nemotron:
+        messages = [
+            {"role": "system", "content": f"<|im_start|>system\n{system}<|im_end|>"},
+            {"role": "user", "content": f"<|im_start|>user\n{json.dumps(sanitize_for_json(user_payload))}<|im_end|>\n<|im_start|>assistant\n<think>"},
+        ]
+    elif is_phi3:
+        messages = [
+            {"role": "system", "content": f"<|system|>\n{system}<|end|>"},
+            {"role": "user", "content": f"<|user|>\n{json.dumps(sanitize_for_json(user_payload))}<|end|>\n<|assistant|>"},
+        ]
+    else:
+        messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": json.dumps(sanitize_for_json(user_payload))},
-        ],
+        ]
+
+    payload = {
+        "model": model,
+        "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
@@ -238,7 +275,7 @@ def _completion_completion(
 ) -> str:
     payload = {
         "model": model,
-        "prompt": _completion_prompt(system=system, user_payload=user_payload),
+        "prompt": _completion_prompt(system=system, user_payload=user_payload, model=model),
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
@@ -267,16 +304,51 @@ def _ollama_generate_completion(
     timeout_s: float = 30.0,
     extra_body: dict[str, Any] | None = None,
 ) -> str:
-    payload = {
-        "model": model,
-        "system": system,
-        "prompt": json.dumps(sanitize_for_json(user_payload)),
-        "stream": False,
-        "options": {
-            "temperature": temperature,
-            "num_predict": max_tokens,
-        },
-    }
+    provider = _nemotron_provider()
+    is_nemotron = (provider in {"local", "nvidia"})
+    is_phi3 = "phi3" in model.lower()
+    
+    if is_nemotron:
+        full_prompt = (
+            f"<|im_start|>system\n{system}<|im_end|>\n"
+            f"<|im_start|>user\n{json.dumps(sanitize_for_json(user_payload))}<|im_end|>\n"
+            f"<|im_start|>assistant\n<think>"
+        )
+        payload = {
+            "model": model,
+            "prompt": full_prompt,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens,
+            },
+        }
+    elif is_phi3:
+        full_prompt = (
+            f"<|system|>\n{system}<|end|>\n"
+            f"<|user|>\n{json.dumps(sanitize_for_json(user_payload))}<|end|>\n"
+            f"<|assistant|>"
+        )
+        payload = {
+            "model": model,
+            "prompt": full_prompt,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens,
+            },
+        }
+    else:
+        payload = {
+            "model": model,
+            "system": system,
+            "prompt": json.dumps(sanitize_for_json(user_payload)),
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens,
+            },
+        }
     if extra_body:
         options = payload.get("options", {})
         extra_options = extra_body.get("options", {}) if isinstance(extra_body, dict) else {}

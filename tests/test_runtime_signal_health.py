@@ -115,6 +115,38 @@ class RuntimeSignalHealthTests(unittest.TestCase):
         self.assertEqual(merged["universe_lane"], "L4")
         self.assertTrue(merged["lane_conflict"])
 
+    def test_apply_lane_supervision_does_not_override_live_economics(self) -> None:
+        features = {
+            "symbol": "TRX/USD",
+            "lane": "L2",
+            "net_edge_pct": -0.02,
+            "required_edge_pct": 0.025,
+            "expected_move_pct": 0.09,
+            "total_cost_pct": 0.095,
+            "tp_after_cost_valid": False,
+        }
+        merged = apply_lane_supervision(
+            features,
+            {
+                "universe_lane": "L2",
+                "net_edge_pct": 0.45,
+                "required_edge_pct": 0.03,
+                "expected_move_pct": 1.07,
+                "total_cost_pct": 0.08,
+                "tp_after_cost_valid": True,
+            },
+        )
+        self.assertEqual(merged["net_edge_pct"], -0.02)
+        self.assertEqual(merged["required_edge_pct"], 0.025)
+        self.assertEqual(merged["expected_move_pct"], 0.09)
+        self.assertEqual(merged["total_cost_pct"], 0.095)
+        self.assertFalse(merged["tp_after_cost_valid"])
+        self.assertEqual(merged["universe_net_edge_pct"], 0.45)
+        self.assertEqual(merged["universe_required_edge_pct"], 0.03)
+        self.assertEqual(merged["universe_expected_move_pct"], 1.07)
+        self.assertEqual(merged["universe_total_cost_pct"], 0.08)
+        self.assertTrue(merged["universe_tp_after_cost_valid"])
+
     def test_prune_symbol_tracking_state_removes_rotated_out_symbols(self) -> None:
         positions_state = PositionState()
         positions_state.add_or_update(Position(symbol="BTC/USD", side="LONG", weight=0.1))

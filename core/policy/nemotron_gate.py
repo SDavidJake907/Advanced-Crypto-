@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.config.runtime import get_runtime_setting
+from core.config.runtime import (
+    get_lane_min_entry_score,
+    get_lane_min_net_edge_pct,
+    get_lane_min_volume_ratio,
+    get_lane_watch_low_score,
+    get_lane_watch_low_volume_ratio,
+    get_runtime_setting,
+)
 from core.risk.portfolio import PositionState
 from core.state.store import load_universe
 
@@ -121,30 +128,30 @@ def _is_range_safe_candidate(features: dict[str, Any]) -> bool:
         return bool(
             short_tf_ready_15m
             and tp_after_cost_valid
-            and net_edge_pct > 0.0
+            and net_edge_pct > -0.1  # Allow slight negative edge for high-conviction structure
             and momentum_5 > 0.0
-            and volume_ratio >= 0.95
-            and volume_surge >= 0.15
-            and trade_quality >= 55.0
-            and structure_quality >= 60.0
-            and continuation_quality >= 60.0
-            and (range_breakout_1h or pullback_hold or continuation_quality >= 66.0)
+            and volume_ratio >= 0.75 # Lowered from 0.95
+            and volume_surge >= 0.05 # Lowered from 0.15
+            and trade_quality >= 48.0 # Lowered from 55.0
+            and structure_quality >= 50.0 # Lowered from 60.0
+            and continuation_quality >= 50.0 # Lowered from 60.0
+            and (range_breakout_1h or pullback_hold or continuation_quality >= 60.0)
         )
 
     if lane == "L3":
         return bool(
             short_tf_ready_15m
             and tp_after_cost_valid
-            and net_edge_pct > 0.0
+            and net_edge_pct > -0.2
             and momentum_5 > 0.0
-            and volume_ratio >= 0.85
-            and trade_quality >= 55.0
-            and structure_quality >= 60.0
-            and continuation_quality >= 48.0
+            and volume_ratio >= 0.65 # Lowered from 0.85
+            and trade_quality >= 45.0
+            and structure_quality >= 50.0
+            and continuation_quality >= 42.0
             and (
                 range_breakout_1h
                 or pullback_hold
-                or (momentum_5 >= 0.004 and volume_surge >= 0.10 and continuation_quality >= 52.0)
+                or (momentum_5 >= 0.002 and volume_surge >= 0.05 and continuation_quality >= 45.0)
             )
         )
 
@@ -278,11 +285,8 @@ def symbol_in_top_candidates(
     volume_ratio = float(features.get("volume_ratio", 1.0) or 1.0)
     volume_surge = float(features.get("volume_surge", 0.0) or 0.0)
     symbol_trending = bool(features.get("sentiment_symbol_trending", False))
-    min_watch_score = float(get_runtime_setting("NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE"))
-    min_watch_volume_ratio = float(get_runtime_setting("NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO"))
-    if lane == "L4":
-        min_watch_score = float(get_runtime_setting("MEME_NEMOTRON_WATCH_MIN_ENTRY_SCORE"))
-        min_watch_volume_ratio = float(get_runtime_setting("MEME_NEMOTRON_WATCH_MIN_VOLUME_RATIO"))
+    min_watch_score = get_lane_watch_low_score(lane)
+    min_watch_volume_ratio = get_lane_watch_low_volume_ratio(lane)
 
     if bool(get_runtime_setting("NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP")):
         if entry_recommendation in {"BUY", "STRONG_BUY"} and reversal_risk == "LOW":
@@ -352,12 +356,8 @@ def passes_deterministic_candidate_gate(
     # Held positions bypass above; everything else must clear this floor before
     # promotion-tier logic is even evaluated.
     _lane = str(features.get("lane", "L3") or "L3").upper()
-    if _lane == "L4":
-        _min_score = float(get_runtime_setting("MEME_NEMOTRON_GATE_MIN_ENTRY_SCORE"))
-        _min_vol   = float(get_runtime_setting("MEME_NEMOTRON_GATE_MIN_VOLUME_RATIO"))
-    else:
-        _min_score = float(get_runtime_setting("NEMOTRON_GATE_MIN_ENTRY_SCORE"))
-        _min_vol   = float(get_runtime_setting("NEMOTRON_GATE_MIN_VOLUME_RATIO"))
+    _min_score = get_lane_min_entry_score(_lane)
+    _min_vol   = get_lane_min_volume_ratio(_lane)
 
     _entry_score  = float(features.get("entry_score",  0.0) or 0.0)
     _volume_ratio = float(features.get("volume_ratio", 1.0) or 1.0)
@@ -370,7 +370,7 @@ def passes_deterministic_candidate_gate(
         return False, market_state_reason
 
     _net_edge_pct = _effective_net_edge_pct(features)
-    _min_net_edge = float(get_runtime_setting("NEMOTRON_GATE_MIN_NET_EDGE_PCT"))
+    _min_net_edge = get_lane_min_net_edge_pct(lane=_lane, symbol=symbol)
     if _net_edge_pct < _min_net_edge:
         return False, f"net_edge_below_gate({_net_edge_pct:.2f}<{_min_net_edge:.2f})"
 

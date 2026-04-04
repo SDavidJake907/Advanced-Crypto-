@@ -1180,6 +1180,8 @@ class NemotronBatchParsingTests(unittest.TestCase):
         candidate["features"]["momentum_5"] = 0.0
         candidate["features"]["net_edge_pct"] = 0.2
         candidate["features"]["point_breakdown"] = {"net_edge_pct": 0.2}
+        candidate["features"]["volume_ratio"] = 1.5
+        candidate["features"]["entry_score"] = 65.0
 
         parsed = {
             "final_decision": {

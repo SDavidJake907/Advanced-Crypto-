@@ -136,7 +136,7 @@ class NemotronPolicyTests(unittest.TestCase):
         self.assertFalse(allowed)
 
     def test_should_run_nemotron_respects_promote_tier(self) -> None:
-        with patch("core.config.runtime.load_runtime_overrides", return_value={}):
+        with patch("core.config.runtime.load_runtime_overrides", return_value={"NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.0, "L3_NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.0, "L2_NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.0}):
             allowed = should_run_nemotron(
                 symbol="TEST/USD",
                 features={
@@ -148,6 +148,7 @@ class NemotronPolicyTests(unittest.TestCase):
                     "momentum_5": 0.01,
                     "trend_confirmed": True,
                     "net_edge_pct": 0.5,
+                    "volume_ratio": 1.5,
                 },
                 positions_state=PositionState(),
                 universe_context={"current_symbol_is_top_candidate": False},
@@ -155,7 +156,7 @@ class NemotronPolicyTests(unittest.TestCase):
         self.assertTrue(allowed)
 
     def test_should_run_nemotron_no_longer_blocks_only_on_non_positive_net_edge(self) -> None:
-        with patch("core.config.runtime.load_runtime_overrides", return_value={}):
+        with patch("core.config.runtime.load_runtime_overrides", return_value={"NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.0, "L3_NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.0}):
             allowed = should_run_nemotron(
                 symbol="TEST/USD",
                 features={
@@ -176,7 +177,7 @@ class NemotronPolicyTests(unittest.TestCase):
         self.assertTrue(allowed)
 
     def test_should_run_nemotron_allows_buy_candidate_with_positive_technicals(self) -> None:
-        with patch("core.config.runtime.load_runtime_overrides", return_value={}):
+        with patch("core.config.runtime.load_runtime_overrides", return_value={"NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.0, "L3_NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.0, "L2_NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.0}):
             allowed = should_run_nemotron(
                 symbol="TEST/USD",
                 features={
@@ -187,6 +188,7 @@ class NemotronPolicyTests(unittest.TestCase):
                     "momentum_5": 0.01,
                     "trend_confirmed": True,
                     "net_edge_pct": 0.5,
+                    "volume_ratio": 1.5,
                 },
                 positions_state=PositionState(),
                 universe_context={"current_symbol_is_top_candidate": False},
@@ -194,7 +196,7 @@ class NemotronPolicyTests(unittest.TestCase):
         self.assertTrue(allowed)
 
     def test_should_run_nemotron_allows_probe_when_candidate_review_promotes(self) -> None:
-        with patch("core.config.runtime.load_runtime_overrides", return_value={}):
+        with patch("core.config.runtime.load_runtime_overrides", return_value={"NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.0, "L3_NEMOTRON_GATE_MIN_VOLUME_RATIO": 0.0}):
             allowed = should_run_nemotron(
                 symbol="TEST/USD",
                 features={
@@ -206,6 +208,7 @@ class NemotronPolicyTests(unittest.TestCase):
                     "momentum_5": 0.01,
                     "trend_confirmed": True,
                     "net_edge_pct": 0.5,
+                    "volume_ratio": 1.5,
                 },
                 positions_state=PositionState(),
                 universe_context={"current_symbol_is_top_candidate": False},

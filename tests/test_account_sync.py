@@ -1,7 +1,9 @@
+import os
 import unittest
 from unittest.mock import patch
 
 from core.data.account_sync import bootstrap_account_state
+from core.config.runtime import get_runtime_setting as _real_get_runtime_setting
 
 
 class _FakeKrakenRestClient:
@@ -54,9 +56,10 @@ class _FakeKrakenRestClient:
 
 
 class AccountSyncTests(unittest.TestCase):
+    @patch.dict(os.environ, {"KRAKEN_TRADE_HISTORY_ZIP": ""})
     def test_bootstrap_prefers_spot_equity_and_seeds_position_marks(self) -> None:
         with patch("core.data.account_sync.get_runtime_setting") as mock_setting:
-            mock_setting.side_effect = lambda key, default=None: True if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else default
+            mock_setting.side_effect = lambda key, default=None: True if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else _real_get_runtime_setting(key, default)
             bootstrap = bootstrap_account_state(
                 client=_FakeKrakenRestClient(),
                 symbols=["BTC/USD", "ETH/USD"],
@@ -73,9 +76,10 @@ class AccountSyncTests(unittest.TestCase):
         self.assertEqual(bootstrap.diagnostics["spot_equity_usd"], 60.0)
         self.assertIn("trades_history_error", bootstrap.diagnostics)
 
+    @patch.dict(os.environ, {"KRAKEN_TRADE_HISTORY_ZIP": ""})
     def test_bootstrap_can_run_in_ledger_only_mode_without_trades_history_error(self) -> None:
         with patch("core.data.account_sync.get_runtime_setting") as mock_setting:
-            mock_setting.side_effect = lambda key, default=None: False if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else default
+            mock_setting.side_effect = lambda key, default=None: False if key == "ACCOUNT_SYNC_USE_TRADES_HISTORY" else _real_get_runtime_setting(key, default)
             bootstrap = bootstrap_account_state(
                 client=_FakeKrakenRestClient(),
                 symbols=["BTC/USD", "ETH/USD"],

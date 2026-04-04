@@ -35,28 +35,30 @@ def calculate_dynamic_risk_pct(
     max_capital_loss_pct = 2.0 
     
     # Estimate typical stop distance in percentage using 1.8 ATR global standard
-    stop_distance_pct = atr_pct * 1.8 * 100.0
+    # NOTE: atr_pct is already multiplied by 100 (e.g., 2.0 for 2%)
+    stop_distance_pct = atr_pct * 1.8
     
     if stop_distance_pct > 0.0:
-        position_size_pct = max_capital_loss_pct / stop_distance_pct * 100.0
+        position_size_pct = (max_capital_loss_pct / stop_distance_pct) * 100.0
     else:
         position_size_pct = 10.0
         
     # Scale down maximum position exposure as account equity grows
-    if cash >= 2000.0:
+    if cash >= 5000.0:
         position_size_pct = min(position_size_pct, 5.0)
-    elif cash >= 500.0:
+    elif cash >= 1500.0:
         position_size_pct = min(position_size_pct, 10.0)
-    elif cash >= 200.0:
-        position_size_pct = min(position_size_pct, 15.0)
+    elif cash >= 500.0:
+        position_size_pct = min(position_size_pct, 20.0) # Loosened for your $654 account
     else:
-        position_size_pct = min(position_size_pct, 25.0)
+        position_size_pct = min(position_size_pct, 30.0)
         
     # Structural volatility penalty: extreme relative swings reduce maximum exposure
-    if atr_pct > 0.05:
-        position_size_pct *= 0.50
-    elif atr_pct > 0.03:
-        position_size_pct *= 0.75
+    # Units are in percentage (e.g. 5.0 = 5% ATR)
+    if atr_pct > 8.0:
+        position_size_pct *= 0.60 # Loosened from 0.50 @ 5.0
+    elif atr_pct > 5.0:
+        position_size_pct *= 0.85 # Loosened from 0.75 @ 3.0
         
     # Trade quality: thin/poor execution orderbooks downscale execution sizes
     position_size_pct *= trade_quality_scale

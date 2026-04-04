@@ -143,7 +143,7 @@ class FinalScoreRefactorTests(unittest.TestCase):
             },
         )
 
-        self.assertGreater(result.btc_dominance_bonus, 0.0)
+        self.assertEqual(result.btc_dominance_bonus, -0.6)
         self.assertEqual(result.score_breakdown["btc_dominance_bonus"], round(result.btc_dominance_bonus, 1))
 
 
