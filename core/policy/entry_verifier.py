@@ -156,6 +156,7 @@ def compute_entry_verification(
 
     score = 48.0
     reasons: list[str] = []
+    reversal_risk = "LOW"
     structure_confirmation_scale = _structure_confirmation_scale(
         structure_profile_present=structure_profile_present,
         structure_quality=structure_quality,
@@ -202,6 +203,15 @@ def compute_entry_verification(
         score += 1.0
     if not ema9_above_ema20 and not price_above_ema20:
         score -= 2.0
+        # Price below both EMAs with bearish cross — escalate reversal risk
+        if trend_1h <= 0:
+            if reversal_risk == "LOW":
+                reversal_risk = "MEDIUM"
+            elif reversal_risk == "MEDIUM":
+                reversal_risk = "HIGH"
+        else:
+            if reversal_risk == "LOW":
+                reversal_risk = "MEDIUM"
 
     score += _clamp(ema_slope_9 * 500.0, -2.0, 4.0)
 
@@ -373,7 +383,6 @@ def compute_entry_verification(
     if sentiment_symbol_trending:
         reasons.append("symbol_trending")
 
-    reversal_risk = "LOW"
     high_reversal_zscore = 3.1 if lane == "L4" else 2.4
     medium_reversal_zscore = 1.9 if lane == "L4" else 1.5
     if (
@@ -382,8 +391,13 @@ def compute_entry_verification(
         or crowding >= 0.92
     ):
         reversal_risk = "HIGH"
-    elif price_zscore >= medium_reversal_zscore or regime_7d == "choppy" or momentum_5 < -0.005:
-        reversal_risk = "MEDIUM"
+    elif (
+        price_zscore >= medium_reversal_zscore
+        or regime_7d == "choppy"
+        or momentum_5 < -0.005
+    ):
+        if reversal_risk == "LOW":
+            reversal_risk = "MEDIUM"
 
     if pullback_hold and reversal_risk == "HIGH":
         reversal_risk = "MEDIUM"

@@ -6,6 +6,8 @@ from core.config.runtime import is_meme_symbol
 
 
 def classify_lane(symbol: str, features: dict[str, Any]) -> str:
+    if symbol in {"BTC/USD", "XBTUSD", "XXBTZUSD", "XBT/USD"}:
+        return "L1"
     if is_meme_symbol(symbol):
         return "L4"
 

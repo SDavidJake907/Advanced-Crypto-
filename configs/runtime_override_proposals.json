@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-04-03T17:20:21+00:00",
+  "updated_at": "2026-04-07T21:10:48+00:00",
   "proposals": [
     {
       "id": "rtovr-20260319151135890085",
@@ -7481,6 +7481,1789 @@
           "Nemotron fallback errors indicating potential data quality issues"
         ],
         "confidence": 0.35
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403202016827182",
+      "created_at": "2026-04-03T20:20:16+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Portfolio is overly concentrated in meme assets with deferred opportunities due to batch priority constraints. Trade memory shows mixed results with low-volume symbols underperforming.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_PROPOSED_WEIGHT": 0.03
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive deferrals due to batch priority locking (DOGE/USD dominance)",
+          "Meme proposed weight exceeding per-symbol cap (PORTFOLIO_MAX_WEIGHT_PER_SYMBOL)",
+          "Low-volume candidates (e.g., KAS/USD) with weak structure quality",
+          "Stale trend confirmations in ranging markets across multiple lanes"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403212211567243",
+      "created_at": "2026-04-03T21:22:11+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging state with weak volume confirmation; batch priority causing deferrals despite strong candidates. Adjustments to candidate selection and momentum thresholds may improve responsiveness.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Batch priority lower causing deferrals for strong candidates (e.g., ALGO/USD)",
+          "Ranging market with insufficient volume confirmation for breakouts",
+          "Low lane confidence in key symbols (e.g., ETH/USD at 0.55)",
+          "Meme universe (DOGE/USD) in L4 with limited active slots (max 2)"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403222127427084",
+      "created_at": "2026-04-03T22:21:27+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Adjustments to address low volume deferrals, strict momentum thresholds, and meme coin entry barriers",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_NEMOTRON_WATCH_MIN_ENTRY_SCORE": 30.0,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent deferrals due to 'volume_too_light' in meme coins",
+          "Strict momentum thresholds causing missed opportunities in ranging markets",
+          "High entry score requirements preventing meme coin engagement",
+          "Lane supervision not promoting candidates effectively"
+        ],
+        "confidence": 0.7
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260403225215689591",
+      "created_at": "2026-04-03T22:52:15+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Volume constraints and nemotron fallback errors are primary blockers. Universe selection is broad but lane assignments show mixed signals. Trade memory indicates small gains but low volume execution issues.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "EXEC_MIN_NOTIONAL_USD": 10.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'volume_too_light' rejections across multiple lanes",
+          "Nemotron JSON parsing fallback errors in recent debug logs",
+          "Low volume ratio in many candidates (e.g., DOGE/USD at 0.118)",
+          "Mixed lane assignments with conflicting recommendations (e.g., ALGO in L2 with BUY vs MON in L2 with STRONG_BUY)",
+          "Historical trades show low volume execution success (e.g., MIR/USD with only 4 closed trades)"
+        ],
+        "confidence": 0.7
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404002504771155",
+      "created_at": "2026-04-04T00:25:04+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Stale holds, low volume in meme lane, and range-bound market dynamics are limiting opportunities. Adjustments to candidate selection, momentum thresholds, and meme volume parameters may improve engagement.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003,
+        "MEME_LANE_MIN_VOLUME_SURGE": 0.3,
+        "MEME_PROPOSED_WEIGHT": 0.05
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Multiple symbols (e.g., SEI/USD) in STALE exit posture with broken structure",
+          "Frequent 'volume_too_light' rejections in meme and core alt pairs",
+          "Range-bound market state causing 'net_edge_too_low' and 'range_not_clean' deferrals",
+          "Low candidate conversion rate with NEMOTRON_TOP_CANDIDATE_COUNT=20"
+        ],
+        "confidence": 0.7
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404013035374811",
+      "created_at": "2026-04-04T01:30:35+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging regime with low volume and unclear trends; many candidates held due to insufficient edge or volume, and portfolio holds underperforming symbols.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'net_edge_too_low' and 'volume_too_light' holds across multiple symbols",
+          "Ranging market state with weak volume confirmation leading to regime mismatches",
+          "Portfolio holds symbols with 'broken' structure state (e.g., SEI/USD)",
+          "Low candidate conversion due to strict top-candidate filtering"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404020131359521",
+      "created_at": "2026-04-04T02:01:31+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Markets are range-bound with low volume confirmation, leading to frequent deferrals. High-risk ratings and nemotron fallbacks indicate structural and data quality issues.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003,
+        "MEME_LANE_MIN_VOLUME_SURGE": 0.3
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive deferrals due to 'volume_too_light' and 'trend_unconfirmed' across multiple lanes",
+          "Frequent nemotron JSON parsing fallbacks suggesting data formatting issues",
+          "High-risk classifications (HIGH) preventing trades despite positive entry scores",
+          "Range-bound market conditions causing 'range_signals_detected' rejections",
+          "Portfolio stagnation with SEI/USD marked as 'FAIL' monitor state"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404040515421607",
+      "created_at": "2026-04-04T04:05:15+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Low volume and insufficient edge causing frequent defers; meme sector underperformance",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003,
+        "MEME_PROPOSED_WEIGHT": 0.03
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive candidates (NEMOTRON_TOP_CANDIDATE_COUNT=20) diluting focus",
+          "Volume too light across multiple symbols triggering defers",
+          "Meme universe (MEME_UNIVERSE_ENABLED=true) showing weak performance",
+          "Net edge requirements causing missed opportunities in ranging market"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404043604134663",
+      "created_at": "2026-04-04T04:36:04+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging state with low volume confirmation; many candidates deferred due to insufficient edge or unconfirmed trends. Nemotron fallbacks indicate potential JSON parsing issues.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "MEME_BASE_MOMO_THRESHOLD": -0.0025,
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Ranging market conditions with weak volume confirmation across multiple candidates",
+          "Frequent 'net_edge_too_low' and 'pattern_not_confirmed' rejections",
+          "Nemotron JSON parsing fallbacks suggesting data integrity issues",
+          "Portfolio holding underperforming FET/USD without replacement candidates"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404050653220148",
+      "created_at": "2026-04-04T05:06:53+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging state with low volume and deferred trades; lane supervision shows limited L1 candidates and high avoidance due to regime mismatch.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'range_signals_detected' causing deferred trades and limited L1 lane assignments",
+          "Low volume issues ('volume_too_light') preventing entries despite positive signals",
+          "High number of 'AVOID' recommendations (15/26 symbols) reducing opportunity capture",
+          "Nemotron fallback errors indicating potential JSON parsing issues in decision pipeline"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404053731362455",
+      "created_at": "2026-04-04T05:37:31+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Recent trading shows frequent deferrals due to low volume and range-bound market conditions. Universe selection is broad but may include low-liquidity symbols. Lane supervision indicates mixed signals with many 'WATCH' recommendations.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "TRADER_RSI_OVERBOUGHT": 82.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive deferrals due to 'volume_too_light' across multiple symbols",
+          "Range-bound market conditions causing 'range_signals_detected' rejections",
+          "Low NEMOTRON candidate conversion rate with 20 top candidates but few active trades",
+          "Meme/universe segments showing mixed performance with high avoidance rates",
+          "Trade memory shows low win rate (25%) for MIR/USD dragging overall performance"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404063930773820",
+      "created_at": "2026-04-04T06:39:30+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Recent trading shows excessive deferrals due to low net edge, volume concerns, and range-bound market detection. Universe selection is broad with many L3 candidates lacking conviction. Trade memory indicates mixed performance with small losses in some positions.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003,
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'net_edge_too_low' and 'volume_too_light' rejections indicating weak opportunity quality",
+          "Overrepresentation of L3 lane candidates with low confidence scores",
+          "Excessive deferrals (18/20 recent decisions) suggesting overly restrictive entry criteria",
+          "Range-bound market detection causing 'range_signals_detected' rejections",
+          "Trade memory shows small losses in EGLD/USD and POL/USD requiring risk parameter review"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404073651491827",
+      "created_at": "2026-04-04T07:36:51+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging regime with weak volume confirmation and mixed structure. High candidate count diluting focus. Meme universe active but low volume in meme symbols. Low net edge causing holds.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003,
+        "MEME_EXEC_MIN_NOTIONAL_USD": 20.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Market regime mismatch (ranging with weak volume confirmation)",
+          "Excessive candidate count (NEMOTRON_TOP_CANDIDATE_COUNT=20) diluting focus",
+          "Meme universe enabled but low volume in meme symbols (DOGE/USD in L4)",
+          "Low net edge causing holds across multiple candidates"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404083837349308",
+      "created_at": "2026-04-04T08:38:37+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Ranging market with selective opportunities; volume and trend confirmation issues causing deferrals",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "MEME_NEMOTRON_WATCH_MIN_VOLUME_RATIO": 0.8,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive deferrals due to volume thresholds (volume_too_light)",
+          "Trend confirmation requirements missing opportunities in ranging markets",
+          "Nemotron JSON parsing errors in recent debug logs",
+          "Low candidate conversion rate from watch to buy"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404094034865628",
+      "created_at": "2026-04-04T09:40:34+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "System is experiencing low volume and net edge issues across multiple symbols, leading to frequent holds. Range-bound market conditions and strict pattern confirmation criteria are limiting trade opportunities. Meme universe parameters may require tuning.",
+      "updates": {
+        "EXEC_MIN_NOTIONAL_USD": 10.0,
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "TRADER_RSI_OVERBOUGHT": 75.0,
+        "MEME_PROPOSED_WEIGHT": 0.06
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'volume_too_light' and 'net_edge_too_low' rejections across multiple symbols",
+          "Strict pattern confirmation requirements causing missed opportunities in ranging markets",
+          "Potential under-allocation to meme universe despite MEME_UNIVERSE_ENABLED",
+          "Nemotron JSON parsing errors indicating technical reliability issues"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404101133367021",
+      "created_at": "2026-04-04T10:11:33+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Adjusting momentum thresholds and meme parameters to address deferrals due to low net edge and volume issues",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "MEME_PROPOSED_WEIGHT": 0.06,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent deferrals due to 'net_edge_too_low' and 'volume_too_light' across multiple candidates",
+          "Meme candidates (ZEC/USD, DOGE/USD) showing potential but not being acted upon",
+          "High nemotron fallback error rate suggesting potential configuration mismatches"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404104229800102",
+      "created_at": "2026-04-04T10:42:29+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Recent trading behavior shows frequent deferrals due to low volume, insufficient net edge, and ranging market conditions without clear trend confirmation. Universe selection is diverse but lane supervision remains cautious, with many candidates not meeting entry criteria.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.02,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Deferred trades due to 'volume_too_light' and 'net_edge_too_low' across multiple symbols",
+          "Ranging market state with breakout attempts lacking volume confirmation",
+          "Conservative lane supervision leading to missed opportunities in L2/L3 candidates",
+          "Mixed trade memory with low win rates on certain symbols (e.g., MIR/USD)"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404111320720812",
+      "created_at": "2026-04-04T11:13:20+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging regime with low volume confirmation and deferred trades due to regime mismatches and low net edge. Nemotron parsing issues observed.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_RSI_OVERBOUGHT": 75.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'range_signals_detected' causing deferred trades despite bullish patterns",
+          "Low volume confirmation across multiple candidates (e.g., ETH/USD, AAVE/USD)",
+          "Nemotron JSON parsing fallbacks indicating potential configuration or data quality issues",
+          "Strict entry thresholds filtering out potential opportunities in meme/universe segments",
+          "Portfolio inactivity with 'no_action' risk checks dominating decisions"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404121509877628",
+      "created_at": "2026-04-04T12:15:09+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Limited candidate consideration and restrictive meme thresholds causing missed opportunities",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_BASE_MOMO_THRESHOLD": -0.001
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'batch_priority_lower' deferrals indicate insufficient candidate evaluation capacity",
+          "Meme symbols constrained by negative momentum threshold (-0.003) despite positive signals",
+          "Low volume candidates (e.g., ALGO/USD) being overlooked despite strong net edge (5.52%)"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404141843107467",
+      "created_at": "2026-04-04T14:18:43+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "System is deferring trades due to volume, edge, and slot constraints in a ranging market. Adjustments to momentum thresholds and candidate selection rules may improve engagement.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "MEME_BASE_MOMO_THRESHOLD": -0.004,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'volume_too_light' deferrals indicating strict volume requirements",
+          "Multiple 'net_edge_too_low' rejections suggesting tight momentum thresholds",
+          "Open slots zero causing missed opportunities despite replacement candidates",
+          "Ranging market conditions reducing tradeable candidates",
+          "Lane supervision showing many WATCH/AVOID ratings due to regime mismatches"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404144938557989",
+      "created_at": "2026-04-04T14:49:38+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Low volume and insufficient pattern confirmation are limiting trade opportunities. Adjustments to notional minimums and momentum thresholds may improve engagement.",
+      "updates": {
+        "EXEC_MIN_NOTIONAL_USD": 10.0,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'volume_too_light' rejections across multiple symbols",
+          "Pattern confirmation gaps in ranging market conditions",
+          "Net edge requirements preventing BTC/USD and others from being actionable",
+          "Meme coin (DOGE/USD) opportunities being missed due to volume checks"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404181729197002",
+      "created_at": "2026-04-04T18:17:29+00:00",
+      "source": "deterministic_aggression",
+      "summary": "deterministic aggression review recommends DEFENSIVE (current=NORMAL, score=-2.8, trend=unknown, btc_dom=56.2/alt_caution, alts=cautious_alts, fng=11, mcap24h=+0.59)",
+      "updates": {
+        "AGGRESSION_MODE": "DEFENSIVE"
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "btc_dom_caution(56.2)",
+          "fear_greed_fear(11)",
+          "high_flat_rate(88%)",
+          "alt_market_cautious"
+        ],
+        "confidence": 0.73,
+        "current_mode": "NORMAL",
+        "recommended_mode": "DEFENSIVE",
+        "score": -2.75
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404181813748728",
+      "created_at": "2026-04-04T18:18:13+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Recent trading shows excessive holds due to volume concerns and range-bound markets. Lane drift and high candidate counts may be causing inefficiencies.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'volume_too_light' holds across multiple symbols",
+          "Lane drift detected (e.g., TIA/USD in L3 vs universe L2)",
+          "High NEMOTRON_TOP_CANDIDATE_COUNT (20) leading to diluted focus",
+          "Meme symbols (e.g., DOGE) in lower-priority L4 despite MEME_UNIVERSE_ENABLED"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404194523817256",
+      "created_at": "2026-04-04T19:45:23+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Recent trading shows frequent holds due to insufficient net edge and volume, with nemotron fallback errors indicating potential configuration or data issues. Universe selection is broad but lane supervision lacks L3 activity. Trade memory indicates mixed performance with small gains and losses.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "MEME_BASE_MOMO_THRESHOLD": -0.0025
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive 'net_edge_too_low' holds across multiple symbols",
+          "Nemotron JSON parsing fallback errors affecting decision reliability",
+          "Low volume confirmation in ranging market conditions",
+          "L3 lane remains unpopulated despite available candidates",
+          "Meme universe candidates (e.g., DOGE) show strong signals but limited execution"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404204704340728",
+      "created_at": "2026-04-04T20:47:04+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Portfolio weight limits and candidate prioritization are primary blockers. Adjust proposed weight to avoid per-symbol cap overflows and increase candidate consideration.",
+      "updates": {
+        "TRADER_PROPOSED_WEIGHT": 0.12,
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent deferrals due to 'proposed_weight_exceeds_per_symbol_cap' (HBAR/USD)",
+          "Batch priority lower causing deferred candidates despite positive signals",
+          "Nemotron JSON parsing fallbacks indicating potential tool reliability issues"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404214858082727",
+      "created_at": "2026-04-04T21:48:58+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Recent trading shows frequent holds due to low net edge and regime mismatches (ranging markets). Universe selection is broad with potential overlap, and lane supervision indicates minor conflicts. Trade memory reveals mixed performance with small losses in some positions.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Low net edge causing frequent holds across multiple symbols",
+          "Regime mismatch (ranging markets without clear trend confirmation)",
+          "Potential universe bloat with 28 active symbols diluting focus",
+          "Minor lane drift and conflicts in lane supervision",
+          "Mixed trade memory with small losses in TAO/USD and EGLD/USD"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404220211533175",
+      "created_at": "2026-04-04T22:02:11+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Insufficient edge and ranging market conditions causing deferred trades; suggest lowering momentum threshold and increasing candidate consideration.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "EXEC_MIN_NOTIONAL_USD": 10.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Net edge consistently too low across multiple candidates (e.g., LTC/USD, BTC/USD, LINK/USD)",
+          "Ranging market state with 'favor_selective' lane bias limiting trade execution",
+          "High defer rates due to regime mismatches and insufficient structural confirmation"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260404234022074054",
+      "created_at": "2026-04-04T23:40:22+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Recent decisions show frequent deferrals due to low net edge and regime mismatches (ranging markets). Adjustments focus on expanding candidate consideration and tweaking momentum/volatility thresholds.",
+      "updates": {
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.02
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "High incidence of 'net_edge_too_low' in nemotron decisions",
+          "Regime mismatches (e.g., 'range_signals_detected') preventing entries",
+          "Meme symbols (e.g., DOGE/USD) in lower lanes with unacted BUY recommendations"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260405010250079499",
+      "created_at": "2026-04-05T01:02:50+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Recent trading shows deferrals due to low net edge, stalling trends, and weak volume. Held position ZEC/USD is weakening with broken structure.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_PROPOSED_WEIGHT": 0.06
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Low net edge percentages across multiple candidates causing 'net_edge_too_low' rejections",
+          "Ranging market with stalling trends and weak volume confirmation hindering entries",
+          "ZEC/USD held position showing broken structure and requiring tight exit posture",
+          "Meme candidates (e.g., QNT/USD) showing strong signals but limited by top candidate constraints"
+        ],
+        "confidence": 0.7
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260405043949762924",
+      "created_at": "2026-04-05T04:39:49+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market ranging with low volume confirmation and insufficient edge; overly restrictive candidate selection and momentum thresholds.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.012
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'net_edge_too_low' and 'trend_unconfirmed' rejections due to low volume and unclear trends",
+          "Excessive candidate consideration (NEMOTRON_TOP_CANDIDATE_COUNT=20) diluting focus",
+          "Strict momentum thresholds (TRADER_BASE_MOMO_THRESHOLD=0.002) missing low-volatility opportunities",
+          "Restrictive lane selection (NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP=false) ignoring potential outside top candidates"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260405051042449280",
+      "created_at": "2026-04-05T05:10:42+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market is ranging with weak volume and low net edge, leading to deferred entries. Adjustments to momentum thresholds and candidate selection may improve engagement.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.02
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'net_edge_too_low' rejections indicating strict momentum thresholds",
+          "Ranging market with weak volume confirmation causing deferred decisions",
+          "High number of AVOID recommendations due to structural weaknesses",
+          "Nemotron fallback errors suggesting potential data parsing issues"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260405054126212123",
+      "created_at": "2026-04-05T05:41:26+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging regime with weak trend confirmation; high defer rates due to insufficient edge and structural ambiguity.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "MEME_BASE_MOMO_THRESHOLD": -0.0025,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.018,
+        "MEME_ATR_VOLATILITY_SCALE": 0.018,
+        "EXEC_MIN_NOTIONAL_USD": 10.0,
+        "MEME_EXEC_MIN_NOTIONAL_USD": 5.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive deferrals from 'trend_unconfirmed' and 'range_state_without_trend_support' patterns",
+          "Low volume validation across multiple candidates (volume_too_light, weak volume confirmation)",
+          "High avoidance rates despite strong net edge in some candidates (e.g., ATOM/USD at 102.5% net edge)",
+          "Meme universe underutilized despite enabled status",
+          "Portfolio holding stale positions (HBAR/USD held for 324 minutes) without active exit posture"
+        ],
+        "confidence": 0.72
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260405061213395632",
+      "created_at": "2026-04-05T06:12:13+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in transition/ranging phase with weak structure and momentum. Many candidates deferred due to unconfirmed trends and insufficient edge. Nemotron fallback errors observed, suggesting potential decision-making inefficiencies.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "TRADER_RSI_OVERBOUGHT": 82.0,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.018
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Market structure weakening with mixed candle evidence and lack of volume confirmation",
+          "Excessive deferrals due to 'batch_priority_lower' and 'trend_unconfirmed' blockers",
+          "Nemotron JSON parsing errors indicating potential reliability issues",
+          "Low trade memory performance with mixed PnL outcomes",
+          "Overly restrictive lane classification (L3 dominance with balanced setups)"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260405064309776762",
+      "created_at": "2026-04-05T06:43:09+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging/transition phase with low trend confirmation and insufficient net edge for entries. Adjustments to momentum threshold and volatility scaling may improve opportunity capture.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.02,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'trend_unconfirmed' and 'net_edge_too_low' deferrals indicating strict entry criteria",
+          "Dominant L3 lane assignments showing balanced but non-committal setups",
+          "Volume confirmation gaps weakening candle pattern reliability",
+          "Ranging market dynamics reducing trade signal clarity"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260405081610829123",
+      "created_at": "2026-04-05T08:16:10+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market conditions show ranging behavior with unclear trends and insufficient net edge, leading to frequent deferrals. High reversal risk and low volume confirmation across multiple candidates.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'net_edge_too_low' rejections indicating insufficient momentum/edge thresholds",
+          "Persistent 'trend_unconfirmed' and 'range_state_without_trend_support' across multiple lanes",
+          "High reversal risk and weak RSI profiles in candidate analysis",
+          "Low volume confirmation failing to validate candle patterns"
+        ],
+        "confidence": 0.75
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260405094901162446",
+      "created_at": "2026-04-05T09:49:01+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging/transition phase with low trend confirmation; many candidates deferred due to insufficient net edge and mixed structure. High reversal risk and weak volume confirmation across lanes.",
+      "updates": {
+        "TRADER_RSI_OVERBOUGHT": 75.0,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.018
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Market structure fragmented (ranging/transition state) with no clear trend confirmation",
+          "Low net edge across candidates triggering 'net_edge_too_low' rejections",
+          "Weak volume confirmation failing to validate candle patterns",
+          "High reversal risk and mixed momentum signals (bearish MACD divergence)"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406070610443158",
+      "created_at": "2026-04-06T07:06:10+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Low momentum in L3 candidates, Nemotron parsing issues, and underutilized meme universe.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_PROPOSED_WEIGHT": 0.06
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "L3 candidates (AVAX/USD, ALGO/USD, ZEC/USD) show low momentum and balanced setups, leading to passive 'WATCH' recommendations.",
+          "Recurring Nemotron fallback errors indicate potential JSON parsing issues in strategy decisions.",
+          "Meme universe symbols (e.g., DOGE/USD, PEPE/USD) are enabled but not actively traded despite market volatility.",
+          "High entry thresholds (NEMOTRON_GATE_MIN_ENTRY_SCORE=55) may restrict trading activity in neutral markets."
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406080718070592",
+      "created_at": "2026-04-06T08:07:18+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Ranging market with low structure confidence in top candidates; Nemotron fallback errors detected",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_ATR_VOLATILITY_SCALE": 0.02
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Top candidates (AVAX/ZEC) show breakout failure and weakening structure",
+          "Nemotron processing errors indicate potential configuration or data quality issues",
+          "Meme universe active but no strong opportunities detected",
+          "Ranging market conditions reducing trade quality"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406083752038142",
+      "created_at": "2026-04-06T08:37:52+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Lane classification too conservative, missed trending symbols, Nemotron JSON parsing issues, and potential overholding in neutral setups.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_RSI_OVERBOUGHT": 75.0,
+        "MEME_PROPOSED_WEIGHT": 0.05
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "All top candidates classified as L3 (balanced) with no breakout/reversion signals, indicating potential missed opportunities.",
+          "Trending symbols (e.g., PENGU, TRU) absent from active universe despite high 24h gains.",
+          "Nemotron fallback errors due to JSON parsing issues affecting decision reliability.",
+          "Overholding in neutral setups (ALGO/USD, AVAX/USD) with no take-profit triggers."
+        ],
+        "confidence": 0.5
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406090826131901",
+      "created_at": "2026-04-06T09:08:26+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Over-concentration in L3 lane, underutilized meme universe, and potential missed opportunities outside top candidates.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true,
+        "MEME_PROPOSED_WEIGHT": 0.06,
+        "EXIT_ATR_TAKE_PROFIT_MULT": 4.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "All top candidates and active positions are in L3 lane with no L1/L2/L4 representation, indicating potential lane classification stagnation.",
+          "Meme universe symbols (e.g., DOGE/USD, SHIB/USD) are enabled but absent from active positions despite MEME_UNIVERSE_ENABLED=true.",
+          "Nemotron fallback errors suggest JSON parsing instability in strategy decisions.",
+          "Take-profit levels are null in recent holds, risking unrealized gains."
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406104041906660",
+      "created_at": "2026-04-06T10:40:41+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Concentration in L3 lane with balanced setups, potential overfitting to recovery/meme sectors, and Nemotron JSON parsing errors impacting decision reliability.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "MEME_BASE_MOMO_THRESHOLD": -0.0025
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive L3 lane concentration (12/12 top candidates) suggesting poor lane differentiation",
+          "Nemotron fallback errors due to malformed JSON responses affecting strategy decisions",
+          "Recovery/meme sector overrepresentation (11/12 active symbols) increasing portfolio correlation risk",
+          "Inefficient exit posture management (null take-profit levels in active positions)",
+          "Momentum thresholds potentially misaligned with current market conditions"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406111119685981",
+      "created_at": "2026-04-06T11:11:19+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Over-reliance on L3 lane with neutral setups, potential Nemotron parsing issues, and suboptimal exit configurations",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.02
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "All top candidates clustered in L3 with 'balanced' profiles indicating lack of strong trends",
+          "Nemotron fallback errors suggest JSON parsing issues in strategy decisions",
+          "Null take-profit levels in active positions (ALGO/USD, AVAX/USD, ZEC/USD) risking missed exits",
+          "Meme universe enabled but no active meme positions despite available candidates"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406121242531402",
+      "created_at": "2026-04-06T12:12:42+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Lane distribution skewed towards L3 with no L1/L2/L4 candidates; Nemotron JSON parsing errors detected; mixed trade memory with low-conviction entries.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003,
+        "MEME_BASE_MOMO_THRESHOLD": -0.002
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Overconcentration in L3 lane with no active higher-opportunity candidates (L1/L2/L4 empty)",
+          "Nemotron fallback errors due to malformed JSON responses affecting decision reliability",
+          "Low momentum thresholds allowing weak entries (TRADER_BASE_MOMO_THRESHOLD=0.2%, MEME_BASE_MOMO_THRESHOLD=-0.3%)",
+          "Mixed PnL performance in trade history with several negative outliers"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406131349702786",
+      "created_at": "2026-04-06T13:13:49+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Lane stagnation in L3 with no L1/L2 candidates; Nemotron fallback errors impacting decision quality; meme universe underutilized despite enablement.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_EXEC_MIN_NOTIONAL_USD": 10.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "All active candidates stuck in L3 (balanced setups) with no higher-opportunity L1/L2 lanes identified",
+          "Recurring Nemotron JSON parsing errors causing fallbacks (15+ occurrences in recent logs)",
+          "Meme universe enabled but zero active meme candidates despite 22 meme symbols in universe",
+          "Overly restrictive buying rules (NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP and NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP both disabled)"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406134414885812",
+      "created_at": "2026-04-06T13:44:14+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Lane supervision shows balanced setups with no conflicts; recent trades have mixed results with low win rates on some symbols. Meme universe is enabled but underutilized.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Lane classification (L3 dominance) may be missing trend confirmation opportunities",
+          "Meme symbols show high volatility (PENGU +8.46%, TRU +131%) but not actively traded",
+          "Recent history shows small losses on EGLD/POL/TAO suggesting potential overtrading",
+          "Nemotron fallback errors indicate potential configuration issues"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406161820691217",
+      "created_at": "2026-04-06T16:18:20+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Meme universe underutilized; static positions in AVAX/ZEC dominate with low active turnover. Lane supervision shows balanced setups but no strong momentum.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 15,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_BASE_MOMO_THRESHOLD": -0.001,
+        "MEME_EXEC_MIN_NOTIONAL_USD": 10.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Meme symbols (e.g., BONK/USD) show profit potential in history but aren't activating in current cycle",
+          "Nemotron fallback errors suggest JSON parsing instability in strategy decisions",
+          "Static symbols (AVAX/ZEC) held without active trading despite balanced lane classifications",
+          "Low trade memory utilization - recent closed positions not influencing current decisions"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406171946066088",
+      "created_at": "2026-04-06T17:19:46+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Balanced setups in L3 lane with no active take profit on held positions. Nemotron fallback errors detected. Meme universe enabled but inactive.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Nemotron JSON parsing errors causing fallbacks",
+          "ZEC/USD held without take profit (null TP)",
+          "Meme universe symbols inactive despite MEME_UNIVERSE_ENABLED=true",
+          "Conservative momentum thresholds potentially missing opportunities"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406175014262391",
+      "created_at": "2026-04-06T17:50:14+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Lane L3 symbols show balanced setups with no clear exits; Nemotron fallback errors detected; meme universe underutilized despite positive history",
+      "updates": {
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "ZEC/USD holding without take profit (default exit posture)",
+          "Recurring Nemotron JSON parsing errors in decision pipeline",
+          "Meme symbols (BONK/USD +4.5% pnl) not being actively traded despite positive history",
+          "L3 lane candidates showing neutral momentum (0.0) with tight ranges"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406182103275669",
+      "created_at": "2026-04-06T18:21:03+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Ranging market with weak volume confirmation and strict entry criteria limiting opportunities. Meme universe enabled but underutilized. Lane supervision shows balanced setups lacking breakout confirmation.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 25,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "EXEC_MIN_NOTIONAL_USD": 10.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Trend unconfirmed in key candidates (e.g., AVAX/USD) due to mixed structure and weak volume",
+          "Empty L1/L2/L4 shortlists indicating missed opportunities in higher lanes",
+          "Meme symbols not activating despite MEME_UNIVERSE_ENABLED=true",
+          "Strict entry thresholds (NEMOTRON_TOP_CANDIDATE_COUNT=20) potentially filtering viable candidates",
+          "Low MEME_PROPOSED_WEIGHT (0.04) limiting meme exposure"
+        ],
+        "confidence": 0.72
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406192224884444",
+      "created_at": "2026-04-06T19:22:24+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging mode with unconfirmed trends; deferred decisions due to lack of structure and volume confirmation. Meme universe active but no candidates surfaced.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.02
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Trend confirmation missing across candidates (repeated 'trend_unconfirmed' deferrals)",
+          "Low volume confirmation in ranging markets reducing entry signals",
+          "Meme universe enabled but no active meme candidates despite 20+ symbols",
+          "Balanced setups dominating lane assignments without clear breakout potential"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406195253164301",
+      "created_at": "2026-04-06T19:52:53+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Lane concentration in L3 with neutral setups; low meme participation despite enabled universe. Recent holds show mixed performance with drawdowns.",
+      "updates": {
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_PROPOSED_WEIGHT": 0.05,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Over-concentration in L3 lane with balanced setups limiting opportunity capture",
+          "Meme universe enabled but low proposed weight (0.04) and no active meme positions",
+          "Recent trades show negative MAE/ETD indicating slippage or poor entry timing",
+          "Nemotron fallback errors suggest potential configuration or integration issues"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406202326097270",
+      "created_at": "2026-04-06T20:23:26+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Low activity with all candidates in L3 balanced setups; potential missed opportunities in lower lanes and meme universe.",
+      "updates": {
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "No active trades despite static symbols being monitored (active_symbols=0)",
+          "All lane candidates classified as L3 (balanced) with no higher-lane opportunities",
+          "Meme universe enabled but no meme symbols in active consideration",
+          "Potential over-restriction in buying outside top candidates (NEMOTRON_ALLOW_BUY_* flags disabled)"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406222625861345",
+      "created_at": "2026-04-06T22:26:25+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Low trading activity with static symbols in L3 recovery segment. NEMOTRON fallback errors and restrictive buying parameters may limit engagement.",
+      "updates": {
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.001,
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 30
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "NEMOTRON fallback parsing errors indicate potential configuration mismatches",
+          "Both ZEC/USD and FIL/USD show 'WATCH' recommendations despite recovery tags",
+          "Zero active symbols in recent cycles suggest overly restrictive entry criteria",
+          "Meme universe enabled but no meme symbols actively traded",
+          "NEMOTRON top candidate count (20) exceeds available opportunities in current market"
+        ],
+        "confidence": 0.6
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260406225704210293",
+      "created_at": "2026-04-06T22:57:04+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Low lane activity and nemotron parsing issues detected. Adjust candidate selection and execution parameters.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 10,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "EXEC_MIN_NOTIONAL_USD": 50.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Nemotron JSON parsing errors causing fallbacks",
+          "Only L3 lane active with minimal movement",
+          "Meme universe enabled but no active meme symbols",
+          "Small trade sizes with minimal PnL impact"
+        ],
+        "confidence": 0.75
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407005940942560",
+      "created_at": "2026-04-07T00:59:40+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "No active symbols detected; strict entry criteria likely preventing trades. Nemotron fallback errors and empty universe ranking indicate selection issues.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 30,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Active symbols consistently 0; no positions being opened",
+          "Empty 'top_ranked' universe list suggesting candidate selection failure",
+          "Nemotron JSON parsing errors causing fallbacks",
+          "Overly restrictive buying rules (no outside-top purchases allowed)"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407043955948362",
+      "created_at": "2026-04-07T04:39:55+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Markets are ranging with low volume and unclear trends, leading to frequent deferrals due to insufficient edge and unconfirmed trends. Trade memory shows limited activity with small gains.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 12,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.02
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'net_edge_too_low' and 'trend_unconfirmed' deferrals across multiple symbols",
+          "Ranging market conditions with low volume confirmation (e.g., 'range_signals_detected', 'volume_too_light')",
+          "High NEMOTRON_TOP_CANDIDATE_COUNT (24) may be diluting focus on quality opportunities",
+          "Portfolio shows limited turnover with minimal positions held"
+        ],
+        "confidence": 0.75
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407051043912612",
+      "created_at": "2026-04-07T05:10:43+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging mode with low volume confirmation; deferrals due to batch priority and regime mismatch.",
+      "updates": {
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "TRADER_RSI_OVERBOUGHT": 82.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'defer' decisions from batch priority limits and regime mismatches",
+          "Low volume confirmation across multiple candidates (e.g., volume_ratio <1.0)",
+          "Ranging market state without clear trend confirmation",
+          "High number of L3 lane candidates with mixed structure quality"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407054140784763",
+      "created_at": "2026-04-07T05:41:40+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Adjustments to improve candidate selection in ranging markets and meme coin opportunities",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "MEME_BASE_MOMO_THRESHOLD": -0.0025,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true,
+        "MEME_RSI_OVERBOUGHT": 92.0,
+        "MEME_EXEC_MIN_NOTIONAL_USD": 10.0,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.018,
+        "MEME_ATR_VOLATILITY_SCALE": 0.018
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Low entry scores leading to AVOID recommendations in ranging markets",
+          "Empty lane shortlists (L2-L4) indicating restrictive criteria",
+          "Potential missed meme coin opportunities due to conservative parameters",
+          "Nemotron JSON parsing errors affecting decision reliability"
+        ],
+        "confidence": 0.0
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407064238005680",
+      "created_at": "2026-04-07T06:42:38+00:00",
+      "source": "deterministic_aggression",
+      "summary": "deterministic aggression review recommends NORMAL (current=OFFENSIVE, score=-2.2, trend=unknown, btc_dom=56.6/alt_caution, alts=cautious_alts, fng=11, mcap24h=-0.83)",
+      "updates": {
+        "AGGRESSION_MODE": "NORMAL"
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "btc_dom_caution(56.6)",
+          "fear_greed_fear(11)",
+          "alt_market_cautious"
+        ],
+        "confidence": 0.68,
+        "current_mode": "OFFENSIVE",
+        "recommended_mode": "NORMAL",
+        "score": -2.25
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407105135720039",
+      "created_at": "2026-04-07T10:51:35+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in transition with weak volume confirmation and unclear trends. High candidate count diluting focus. Meme exposure requires caution.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 12,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.02
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Weak volume confirmation across multiple candidates (e.g., TIA/USD, FET/USD)",
+          "Market in transition/ranging state with mixed structure signals",
+          "NEMOTRON_TOP_CANDIDATE_COUNT=24 may be too high for current market conditions",
+          "Meme coins (KAS/USD, DOGE/USD) showing mixed signals with moderate risk"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407112232766890",
+      "created_at": "2026-04-07T11:22:32+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Ranging market conditions and low volume causing trend unconfirmation and insufficient edge. Adjustments to candidate selection and meme trade thresholds recommended.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 30,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_EXEC_MIN_NOTIONAL_USD": 20.0,
+        "TRADER_RSI_OVERBOUGHT": 75.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent trend unconfirmation in ranging market (BTC/USD, ETH/USD, etc.)",
+          "Low net edge and volume issues (SUI/USD, XRP/USD)",
+          "Meme universe candidates (DOGE/USD) showing sideways behavior with weak volume",
+          "High defer rates due to regime mismatches and weak confirmations"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407125532429443",
+      "created_at": "2026-04-07T12:55:32+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market ranging with weak trend confirmation; meme candidates underutilized; high candidate count diluting focus",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 12,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.02
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Market in ranging state with weak volume confirmation across multiple symbols",
+          "Meme candidates (e.g., DOGE/USD) with high scores not being acted upon due to trend confirmation requirements",
+          "Excessive candidate count (NEMOTRON_TOP_CANDIDATE_COUNT=24) leading to diluted focus",
+          "Strict momentum thresholds filtering potential opportunities",
+          "Portfolio holding weak positions (e.g., UNI/USD) with broken structures"
+        ],
+        "confidence": 0.5
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407142822507619",
+      "created_at": "2026-04-07T14:28:22+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in transition with fading momentum and mixed structure. ZEC/USD is the sole L1 candidate with BUY recommendation but showing weakness. Most candidates deferred due to low net edge, unconfirmed trends, or high reversal risk.",
+      "updates": {
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015,
+        "MEME_BASE_MOMO_THRESHOLD": -0.0025,
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 30,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Market transition state causing deferred decisions across multiple lanes",
+          "Low net edge percentages preventing entries despite strong profiles",
+          "High reversal risk in meme and volatile symbols",
+          "Weakening structure in held position (ZEC/USD) with no replacement candidates"
+        ],
+        "confidence": 0.65
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407170314303891",
+      "created_at": "2026-04-07T17:03:14+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market exhibits ranging behavior with unclear trends, leading to deferred trades despite strong entry scores. Lane assignments show mixed structure quality, and meme universe activity is present but constrained. Trade memory indicates mixed performance with small gains and losses.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 30,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.0015
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'trend_unconfirmed' and 'range_signals_detected' deferrals indicating market regime uncertainty",
+          "Multiple 'net_edge_too_low' rejections suggesting tight risk/reward parameters",
+          "Weak volume confirmation across multiple candidates despite bullish technical patterns",
+          "Lane drift detected in ATOM/USD indicating potential misassignment"
+        ],
+        "confidence": 0.72
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407173406505939",
+      "created_at": "2026-04-07T17:34:06+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging phase with low trend confirmation; adjusting candidate selection and entry criteria to adapt to sideways conditions.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 30,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true,
+        "TRADER_BASE_MOMO_THRESHOLD": 0.003
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Excessive deferrals due to 'net_edge_too_low' and 'trend_unconfirmed' in ranging markets",
+          "Low trade execution rate (mostly FLAT signals) despite valid candidates",
+          "Meme lane (L4) underutilized despite DOGE/USD showing BUY signal"
+        ],
+        "confidence": 0.52
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407193747751409",
+      "created_at": "2026-04-07T19:37:47+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Ranging market conditions and low net edge causing deferred decisions across multiple symbols. Meme sector shows volatility with mixed signals.",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 30,
+        "NEMOTRON_ALLOW_BUY_LOW_OUTSIDE_TOP": true,
+        "MEME_EXEC_MIN_NOTIONAL_USD": 10.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Frequent 'net_edge_too_low' rejections indicating insufficient edge for entries",
+          "Ranging market dynamics causing regime mismatches and deferred decisions",
+          "Meme symbols (e.g., DOGE/USD) showing volatility but limited execution",
+          "Open slots remaining at zero despite active candidates"
+        ],
+        "confidence": 0.72
+      },
+      "status": "pending"
+    },
+    {
+      "id": "rtovr-20260407211048573125",
+      "created_at": "2026-04-07T21:10:48+00:00",
+      "source": "nvidia_optimizer",
+      "summary": "Market in ranging mode with selective lane bias; volume confirmation weak across multiple candidates",
+      "updates": {
+        "NEMOTRON_TOP_CANDIDATE_COUNT": 30,
+        "NEMOTRON_ALLOW_BUY_MEDIUM_OUTSIDE_TOP": true,
+        "TRADER_ATR_VOLATILITY_SCALE": 0.02,
+        "TRADER_RSI_OVERBOUGHT": 82.0
+      },
+      "validation": {
+        "replay_passed": false,
+        "shadow_passed": false,
+        "human_approved": false
+      },
+      "context": {
+        "issues": [
+          "Batch priority lower causing deferred decisions despite strong entry scores",
+          "Weak volume confirmation across multiple symbols (repeated 'Candle confirmation lacks volume support' warnings)",
+          "Ranging market dynamics causing structure uncertainty",
+          "Potential over-restriction in nemotron candidate selection parameters"
+        ],
+        "confidence": 0.65
       },
       "status": "pending"
     }

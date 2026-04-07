@@ -74,7 +74,7 @@ ACCOUNT_SYNC_INTERVAL_SEC = float(os.getenv("ACCOUNT_SYNC_INTERVAL_SEC", "30"))
 SYMBOL_STATE_RETENTION_SEC = float(os.getenv("SYMBOL_STATE_RETENTION_SEC", "21600"))
 NEMOTRON_MAX_PER_CYCLE    = int(os.getenv("NEMOTRON_MAX_PER_CYCLE", "15"))
 NEMOTRON_BATCH_MODE       = os.getenv("NEMOTRON_BATCH_MODE", "true").lower() == "true"
-NEMOTRON_BATCH_TOP_N      = int(os.getenv("NEMOTRON_BATCH_TOP_N", "5"))
+NEMOTRON_BATCH_TOP_N      = int(os.getenv("NEMOTRON_BATCH_TOP_N", "10"))
 NEMOTRON_BATCH_SKIP_PHI3  = os.getenv("NEMOTRON_BATCH_SKIP_PHI3", "false").lower() == "true"
 
 

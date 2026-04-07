@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import csv
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from core.llm.client import phi3_advisory_chat, nemotron_chat, parse_json_response, sanitize_for_json
@@ -228,16 +231,52 @@ def _heuristic_lane_advice(candidate: dict[str, Any]) -> Phi3LaneAdvice:
     )
 
 
+def _load_candles_for_phi3(symbol: str, timeframe: str, n_bars: int) -> list[list[float]]:
+    """Load recent OHLCV bars as compact [o,h,l,c,v] arrays for Phi-3 chart reading."""
+    base = symbol.replace("/", "")
+    live_dir = Path(os.getenv("LIVE_SNAPSHOT_DIR", "logs/live"))
+    path = live_dir / f"candles_{base}_{timeframe}.csv"
+    if not path.exists():
+        return []
+    try:
+        rows = []
+        with open(path, newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                rows.append([
+                    round(float(row["open"]), 5),
+                    round(float(row["high"]), 5),
+                    round(float(row["low"]), 5),
+                    round(float(row["close"]), 5),
+                    round(float(row["volume"]), 1),
+                ])
+        return rows[-n_bars:]
+    except Exception:
+        return []
+
+
+# Only the fields Phi-3 needs for lane supervision — keeps payload within NPU context limit.
+_PHI3_LANE_CANDIDATE_FIELDS = (
+    "symbol", "lane", "entry_score", "rsi", "momentum_5",
+    "volume_ratio", "recommendation", "risk",
+)
+
+
 def phi3_supervise_lane(
     candidate: dict[str, Any],
     *,
     news_context: dict[str, Any] | None = None,
     dex_context: dict[str, Any] | None = None,
 ) -> Phi3LaneAdvice:
+    symbol = str(candidate.get("symbol", ""))
+    # Slim candidate to essential fields only.
+    # Phi-3 mini NPU has ~2560 char total context (system prompt + payload).
+    # Full candidate dict is ~550 chars; slimmed is ~180 chars.
+    slim_candidate = {k: candidate[k] for k in _PHI3_LANE_CANDIDATE_FIELDS if k in candidate}
+    # 15m is the primary trading timeframe; 8 bars = last 2h of price action.
     payload = {
-        "candidate": sanitize_for_json(candidate),
-        "news_context": sanitize_for_json(news_context or {}),
-        "dex_context": sanitize_for_json(dex_context or {}),
+        "candidate": sanitize_for_json(slim_candidate),
+        "chart_15m": _load_candles_for_phi3(symbol, "15m", 8),
     }
     try:
         parsed = parse_json_response(

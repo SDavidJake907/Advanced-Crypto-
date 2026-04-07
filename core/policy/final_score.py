@@ -231,16 +231,14 @@ def _btc_dominance_bonus(features: dict[str, Any]) -> tuple[float, str]:
         return 0.0, ""
 
     pressure = _clamp((btc_dominance - 55.0) / 10.0, 0.0, 1.0)
-    # Elevated BTC dominance is treated as a generic caution layer, not a symbol-specific preference.
-    penalty_mult = 1.0
-    if ranging_market:
-        penalty_mult += 0.25
-    if not trend_confirmed:
-        penalty_mult += 0.35
-    if lane == "L4":
-        penalty_mult += 0.25
-    penalty = round(_clamp(pressure * penalty_mult * 1.2, 0.0, 2.0), 2)
-    return -penalty, f"btc_dom_alt_caution({btc_dominance:.1f},-{penalty:.1f})" if penalty >= 0.5 else ""
+    # Elevated BTC dominance is treated as a generic market lead/strength layer.
+    bonus_mult = 1.0
+    if trend_confirmed:
+        bonus_mult += 0.35
+    if lane == "L1" or lane == "L2":
+        bonus_mult += 0.25
+    bonus = round(_clamp(pressure * bonus_mult * 1.5, 0.0, 3.0), 2)
+    return bonus, f"btc_dom_lead({btc_dominance:.1f},+{bonus:.1f})" if bonus >= 0.5 else ""
 
 
 def _basket_fit_bonus(features: dict[str, Any], held_correlation_map: dict[str, float]) -> tuple[float, str]:

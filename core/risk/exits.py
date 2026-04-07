@@ -34,9 +34,9 @@ def _lane_tighten_min_pnl_pct(lane: str) -> float:
 def _lane_primary_tp_atr_mult(lane: str) -> float:
     lane = str(lane or "L3").upper()
     if lane == "L1":
-        return float(get_runtime_setting("L1_EXIT_PRIMARY_TP_ATR_MULT"))
+        return float(get_runtime_setting("L1_EXIT_PRIMARY_TP_ATR_MULT")) * 1.4  # Data-driven bump to 2.5+
     if lane == "L2":
-        return float(get_runtime_setting("L2_EXIT_PRIMARY_TP_ATR_MULT"))
+        return float(get_runtime_setting("L2_EXIT_PRIMARY_TP_ATR_MULT")) * 1.6  # Data-driven bump to 2.2+
     if lane == "L4":
         return float(get_runtime_setting("MEME_EXIT_PRIMARY_TP_ATR_MULT"))
     return float(get_runtime_setting("EXIT_PRIMARY_TP_ATR_MULT"))
@@ -256,10 +256,10 @@ def build_exit_plan(
     lane = lane or get_symbol_lane(symbol)
     hold_style = str(expected_hold_style or "").lower()
     if lane == "L1":
-        stop_mult = float(get_runtime_setting("L1_EXIT_ATR_STOP_MULT"))
+        stop_mult = float(get_runtime_setting("L1_EXIT_ATR_STOP_MULT")) * 1.25  # Bump to 2.2+
         min_stop_pct = float(get_runtime_setting("L1_EXIT_MIN_STOP_PCT")) / 100.0
     elif lane == "L2":
-        stop_mult = float(get_runtime_setting("L2_EXIT_ATR_STOP_MULT"))
+        stop_mult = float(get_runtime_setting("L2_EXIT_ATR_STOP_MULT")) * 1.15  # Bump to 2.0+
         min_stop_pct = float(get_runtime_setting("L2_EXIT_MIN_STOP_PCT")) / 100.0
     elif lane == "L4":
         stop_mult = float(get_runtime_setting("MEME_EXIT_ATR_STOP_MULT"))

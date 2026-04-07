@@ -33,6 +33,17 @@ def _get_leader_metrics(symbol: str, universe_context: dict[str, Any]) -> tuple[
     return 0.0, False
 
 
+_CANDIDATE_CONTEXT_FIELDS = (
+    "symbol", "lane", "candidate_score", "recommendation", "risk",
+    "momentum_5", "volume_ratio", "net_edge_pct", "leader_urgency", "reasons",
+)
+
+
+def _slim_candidate(item: dict[str, Any]) -> dict[str, Any]:
+    """Keep only the fields Nemo needs for market context — drops ~65% of tokens."""
+    return {k: item[k] for k in _CANDIDATE_CONTEXT_FIELDS if k in item}
+
+
 def build_universe_candidate_context(symbol: str, universe: dict[str, Any] | None) -> dict[str, Any]:
     base = universe if isinstance(universe, dict) else {}
     meta = base.get("meta", {}) if isinstance(base.get("meta", {}), dict) else base
@@ -42,10 +53,13 @@ def build_universe_candidate_context(symbol: str, universe: dict[str, Any] | Non
     avoid_candidates = meta.get("avoid_candidates", []) if isinstance(meta.get("avoid_candidates", []), list) else []
     top_ranked = meta.get("top_ranked", []) if isinstance(meta.get("top_ranked", []), list) else []
     lane_supervision = meta.get("lane_supervision", []) if isinstance(meta.get("lane_supervision", []), list) else []
+    slimmed_top = [_slim_candidate(c) for c in top_scored[:top_n] if isinstance(c, dict)]
+    slimmed_hot = [_slim_candidate(c) for c in hot_candidates[:top_n] if isinstance(c, dict)]
+    slimmed_avoid = [_slim_candidate(c) for c in avoid_candidates[:top_n] if isinstance(c, dict)]
     return {
-        "top_scored": top_scored[:top_n],
-        "hot_candidates": hot_candidates[:top_n],
-        "avoid_candidates": avoid_candidates[:top_n],
+        "top_scored": slimmed_top,
+        "hot_candidates": slimmed_hot,
+        "avoid_candidates": slimmed_avoid,
         "top_ranked": top_ranked[:top_n],
         "lane_supervision": lane_supervision[:top_n],
         "current_symbol_is_top_candidate": symbol in top_ranked[:top_n]

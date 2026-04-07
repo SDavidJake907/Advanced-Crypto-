@@ -138,13 +138,13 @@ def recommend_aggression_mode(
             reasons.append("btc_market_bull_strong")
 
     if btc_dom_level == "alt_high_caution":
-        score -= 1.5
-        reasons.append(f"btc_dom_high({btc_dom:.1f})")
+        score += 1.5
+        reasons.append(f"btc_dom_high_lead({btc_dom:.1f})")
     elif btc_dom_level == "alt_caution":
-        score -= 0.75
-        reasons.append(f"btc_dom_caution({btc_dom:.1f})")
+        score += 0.75
+        reasons.append(f"btc_dom_lead({btc_dom:.1f})")
     elif btc_dom_level == "alt_tailwind":
-        score += 1.0
+        score += 0.5
         reasons.append(f"btc_dom_easing({btc_dom:.1f})")
 
     if fng <= 25:

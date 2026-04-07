@@ -9,7 +9,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from core.config.runtime import get_runtime_snapshot, load_runtime_override_proposals, stage_runtime_override_proposal
+from core.config.runtime import get_runtime_snapshot, load_runtime_override_proposals, stage_runtime_override_proposal, update_runtime_overrides
 from core.llm.client import nvidia_nemotron_chat, parse_json_response
 from core.llm.contracts import normalize_runtime_advice
 from core.llm.prompts import NVIDIA_OPTIMIZER_SYSTEM_PROMPT
@@ -83,6 +83,11 @@ def _maybe_stage_aggression_proposal(payload: dict[str, Any]) -> tuple[dict[str,
     current_mode = recommendation.current_mode
     if recommendation.mode == current_mode:
         return None, recommendation.to_dict()
+
+    if os.getenv("AUTO_APPLY_AGGRESSION", "").lower() in {"1", "true", "yes", "on"}:
+        update_runtime_overrides({"AGGRESSION_MODE": recommendation.mode})
+        print(f"[aggression] Auto-applied {recommendation.mode}: {recommendation.summary}")
+
     for proposal in reversed(load_runtime_override_proposals()):
         if not isinstance(proposal, dict):
             continue

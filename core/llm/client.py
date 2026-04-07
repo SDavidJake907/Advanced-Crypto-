@@ -1079,6 +1079,10 @@ def _expected_symbol_from_payload(payload: dict[str, Any]) -> str | None:
         feature_symbol = features.get("symbol")
         if isinstance(feature_symbol, str) and feature_symbol.strip():
             return feature_symbol.strip()
+    # Check for nested request in second-round payloads
+    request = payload.get("request")
+    if isinstance(request, dict):
+        return _expected_symbol_from_payload(request)
     return None
 
 
@@ -1087,7 +1091,7 @@ def _sanitize_final_decision_symbol(final_decision: dict[str, Any], *, expected_
         return final_decision
     cleaned = dict(final_decision)
     raw_symbol = str(cleaned.get("symbol", "") or "").strip()
-    if raw_symbol in {"", "SYMBOL", "<current_symbol>", "CURRENT_SYMBOL", "LINK/USD", "BTC/USD", "ETH/USD"}:
+    if raw_symbol.upper() in {"", "SYMBOL", "<current_symbol>", "CURRENT_SYMBOL", "LINK/USD", "BTC/USD", "ETH/USD", "TEST/USD"}:
         cleaned["symbol"] = expected_symbol
     return cleaned
 
@@ -1107,6 +1111,7 @@ def run_nemotron_tool_loop(
             {
                 "event": "nemotron_raw_response",
                 "round_trip": round_trip,
+                "expected_symbol": expected_symbol,
                 "payload": payload,
                 "raw_response": raw,
             }
@@ -1118,6 +1123,7 @@ def run_nemotron_tool_loop(
         final_decision = _coerce_object(response.get("final_decision"))
         if final_decision is not None:
             final_decision = _sanitize_final_decision_symbol(final_decision, expected_symbol=expected_symbol)
+        
         # Model always echoes tool call even after receiving a result.
         # Round 0: run the tool (ignore embedded final_decision).
         # Round 1+: model still includes tool but we already ran it — trust final_decision.
@@ -1144,5 +1150,10 @@ def run_nemotron_tool_loop(
                 "result": result,
             }
         )
-        payload = {"tool_result": {"tool": tool_name, "result": result}}
+        # Fix: Preserve context in second round by nesting or merging
+        payload = {
+            "symbol": expected_symbol,
+            "request": initial_payload,
+            "tool_result": {"tool": tool_name, "result": result}
+        }
     raise RuntimeError("Nemotron exceeded max tool-call round trips")

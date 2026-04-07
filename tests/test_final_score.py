@@ -110,24 +110,6 @@ class FinalScoreRefactorTests(unittest.TestCase):
         self.assertEqual(result.score_breakdown["fear_greed_bonus"], -1.2)
         self.assertEqual(result.btc_dominance_bonus, 0.0)
 
-    def test_btc_dominance_penalizes_unconfirmed_alt_setup(self) -> None:
-        result = compute_final_score(
-            {
-                "symbol": "ALGO/USD",
-                "entry_score": 60.0,
-                "reflex": {"reflex": "allow"},
-                "lane": "L2",
-                "trend_confirmed": False,
-                "ranging_market": True,
-                "sentiment_btc_dominance": 60.0,
-                "spread_pct": 0.2,
-                "point_breakdown": {"cost_penalty_pts": 2.0, "net_edge_pct": 0.5},
-            },
-        )
-
-        self.assertLess(result.btc_dominance_bonus, 0.0)
-        self.assertEqual(result.score_breakdown["btc_dominance_bonus"], round(result.btc_dominance_bonus, 1))
-
     def test_btc_dominance_gives_small_btc_tailwind(self) -> None:
         result = compute_final_score(
             {
@@ -143,8 +125,25 @@ class FinalScoreRefactorTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(result.btc_dominance_bonus, -0.6)
+        self.assertGreater(result.btc_dominance_bonus, 0.0)
         self.assertEqual(result.score_breakdown["btc_dominance_bonus"], round(result.btc_dominance_bonus, 1))
+
+    def test_btc_dominance_gives_bonus_for_confirmed_alt_setup(self) -> None:
+        result = compute_final_score(
+            {
+                "symbol": "ALGO/USD",
+                "entry_score": 60.0,
+                "reflex": {"reflex": "allow"},
+                "lane": "L2",
+                "trend_confirmed": True,
+                "ranging_market": False,
+                "sentiment_btc_dominance": 60.0,
+                "spread_pct": 0.2,
+                "point_breakdown": {"cost_penalty_pts": 2.0, "net_edge_pct": 0.5},
+            },
+        )
+
+        self.assertGreater(result.btc_dominance_bonus, 0.0)
 
 
 if __name__ == "__main__":

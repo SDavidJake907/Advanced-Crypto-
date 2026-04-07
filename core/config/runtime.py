@@ -178,17 +178,17 @@ _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 52.0},
     "NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.0},
     "L1_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 52.0},
-    "L2_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 48.0},
-    "L3_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 48.0},
-    "L4_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 45.0},
+    "L2_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 55.0},
+    "L3_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 55.0},
+    "L4_NEMOTRON_GATE_MIN_ENTRY_SCORE": {"type": float, "default": 50.0},
     "L1_NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.05},
     "L2_NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.1},
     "L3_NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.15},
     "L4_NEMOTRON_GATE_MIN_VOLUME_RATIO": {"type": float, "default": 1.5},
-    "L1_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 38.0},
-    "L2_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 35.0},
-    "L3_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 35.0},
-    "L4_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 35.0},
+    "L1_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 48.0},
+    "L2_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 48.0},
+    "L3_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 48.0},
+    "L4_NEMOTRON_WATCH_LOW_MIN_ENTRY_SCORE": {"type": float, "default": 45.0},
     "L1_NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO": {"type": float, "default": 1.05},
     "L2_NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO": {"type": float, "default": 1.10},
     "L3_NEMOTRON_WATCH_LOW_MIN_VOLUME_RATIO": {"type": float, "default": 1.15},
@@ -633,7 +633,8 @@ def get_proposed_weight(symbol: str | None = None, lane: str | None = None, atr_
         base_weight = float(get_runtime_setting("MEME_PROPOSED_WEIGHT" if is_meme else "TRADER_PROPOSED_WEIGHT"))
 
     # Dynamic ATR Volatility Scaling
-    if atr_pct and atr_pct > 0.0:
+    is_main_leader = symbol in {"BTC/USD", "XBTUSD", "XXBTZUSD", "XBT/USD"}
+    if atr_pct and atr_pct > 0.0 and not is_main_leader:
         # Target nominal move around 5%. If highly volatile (e.g., 10%), halve size. If low volatility (e.g., 2.5%), double it.
         vol_scalar = 5.0 / atr_pct
         base_weight *= max(0.5, min(vol_scalar, 2.0))

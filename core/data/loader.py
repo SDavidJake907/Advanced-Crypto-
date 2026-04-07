@@ -15,7 +15,7 @@ class CandleLoader:
     def load(self) -> pd.DataFrame:
         df = pd.read_csv(self.path)
         if "timestamp" in df.columns:
-            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+            df["timestamp"] = pd.to_datetime(df["timestamp"], format="ISO8601", utc=True)
 
         if self.symbol_col and self.symbol:
             df = df[df[self.symbol_col] == self.symbol]

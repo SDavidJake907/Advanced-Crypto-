@@ -325,6 +325,7 @@ def evaluate_trade(
     if lane == "L4" and trend_conflict:
         reasons.append("meme_trend_conflict_scale_down")
         size_factor = min(size_factor, float(get_runtime_setting("MEME_TREND_CONFLICT_SCALE")))
+    is_main_leader = symbol in {"BTC/USD", "XBTUSD", "XXBTZUSD", "XBT/USD"}
     high_corr_count = 0
     active_correlations: list[float] = []
     for idx, other_symbol in enumerate(symbols):
@@ -343,13 +344,15 @@ def evaluate_trade(
         if existing.side == side:
             reasons.append(f"high_corr_with_{other_symbol}_same_direction_corr={corr:.2f}")
             high_corr_count += 1
-            size_factor = min(size_factor, config.corr_scale_down)
+            if not is_main_leader:
+                size_factor = min(size_factor, config.corr_scale_down)
 
     if active_correlations:
         avg_corr = sum(active_correlations) / len(active_correlations)
         if avg_corr >= config.avg_corr_scale_threshold:
             reasons.append(f"avg_corr_scale_down={avg_corr:.2f}")
-            size_factor = min(size_factor, config.avg_corr_scale_down)
+            if not is_main_leader:
+                size_factor = min(size_factor, config.avg_corr_scale_down)
 
     if high_corr_count > config.max_high_corr_same_direction:
         return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}

@@ -110,17 +110,20 @@ You do not assign the official lane. Deterministic lane classification remains t
 
 Purpose: classify which lane best fits this candidate's current behavior.
 
-Lane definitions:
-- breakout (L1): clean continuation / breakout leader. Favor positive trend_1h, persistent momentum, improving structure, acceptable volume expansion, and leader quality over noise.
-- reversion (L2): structured rotation / release name. Favor improving rotation_score, short-timeframe readiness, compression-to-expansion behavior, and emerging strength. This is not pure mean reversion only.
-- main (L3): balanced quality setup. Favor moderate momentum, sane RSI, good tradability, and steadier all-around evidence. Use for solid non-chaotic names that are neither pure continuation leaders nor fast accelerators.
-- meme (L4): acceleration / high-beta asymmetric name. Favor fast momentum, volume surge, social heat, and explosive emergence. Accept wider thresholds, but only when true acceleration is present.
+You will receive chart_15m: last 8 x 15m OHLCV bars as [open,high,low,close,volume] arrays. Most recent bar is last.
+Read the candle structure first, then use candidate metrics as confirmation only.
 
-lane_conflict = true when the symbol's current behavior contradicts its assigned lane:
-- L4/high-beta name behaving like steady balanced quality for an extended period -> possible conflict
-- L3 balanced name showing clear L1 leader behavior or clear L4 acceleration behavior -> conflict
-- L2 rotation candidate losing structured early-move character and becoming generic balanced quality -> possible conflict
-- do not flag conflict on every soft adjacent shift; only flag when the behavioral mismatch is meaningful
+Lane definitions:
+- breakout (L1): clean continuation / breakout leader. Price making higher highs on 1h, volume expansion, persistent momentum.
+- reversion (L2): structured rotation / release. Price compressing then expanding, pullback holding support, improving short-term momentum.
+- main (L3): balanced quality setup. Moderate structure, sane RSI, no clear breakout or compression pattern.
+- meme (L4): acceleration / high-beta. Fast explosive candles, volume surge, wide-range bars.
+
+lane_conflict = true when price action contradicts the assigned lane:
+- L1 assigned but 15m chart shows distribution or breakdown -> conflict
+- L2 assigned but no compression or rotation visible on 15m -> conflict
+- L4 assigned but candles are tight and low-volume -> conflict
+- do not flag on every soft shift; only meaningful behavioral mismatch
 
 narrative_tag options: trend_continuation, breakout_acceleration, early_acceleration, balanced_setup, rotation_entry, structured_release, meme_breakout, range_fade
 
@@ -394,9 +397,9 @@ Allowed OPEN reasons:
 - continuation
 - rotation_entry
 
-Return one line only:
-{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"WATCH","side":null,"size":0,"reason":"trend_unconfirmed","debug":{}}}
-{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"OPEN","side":"LONG","size":12,"reason":"pullback_entry","debug":{}}}
+Return one line only. Use the exact symbol from the candidate field.
+{"final_decision":{"symbol":"SOL/USD","action":"WATCH","side":null,"size":0,"reason":"trend_unconfirmed","debug":{}}}
+{"final_decision":{"symbol":"ETH/USD","action":"OPEN","side":"LONG","size":12,"reason":"pullback_entry","debug":{}}}
 """.strip()
 
 
@@ -477,9 +480,9 @@ Prefer one specific reason from this list:
 - cash_too_low
 - data_integrity_issue
 
-Output contract:
-{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"WATCH","side":null,"size":0,"reason":"trend_unconfirmed","debug":{}}}
-{"final_decision":{"symbol":"CURRENT_SYMBOL","action":"OPEN","side":"LONG","size":12,"reason":"pullback_entry","debug":{}}}
+Output contract. Use the exact symbol from the candidate field.
+{"final_decision":{"symbol":"SOL/USD","action":"WATCH","side":null,"size":0,"reason":"trend_unconfirmed","debug":{}}}
+{"final_decision":{"symbol":"ETH/USD","action":"OPEN","side":"LONG","size":12,"reason":"pullback_entry","debug":{}}}
 """.strip()
 
 

@@ -40,45 +40,38 @@ def apply_lane_filters(features: dict[str, Any]) -> LaneFilterResult:
         return LaneFilterResult(lane=lane, passed=False, reason="spread_hard", severity="hard")
 
     if lane == "L1":
-        if volume_ratio < 0.30:
-            # vol_low: only hard-veto if structure is also weak; otherwise downgrade not kill
-            real_participation = rotation_score >= 0.08 or momentum_5 >= 0.004 or volume_surge >= 0.15
+        if volume_ratio < 0.20:
+            # vol_low: only hard-veto if structure is also weak
+            real_participation = rotation_score >= 0.05 or momentum_5 >= 0.002 or volume_surge >= 0.10
             if not real_participation:
                 return LaneFilterResult(lane=lane, passed=False, reason="lane1_vol_low", severity="soft")
             return LaneFilterResult(lane=lane, passed=True, reason="lane1_vol_low_overridden", severity="soft")
-        if rsi > 72.0:
-            return LaneFilterResult(lane=lane, passed=False, reason="lane1_rsi_hot", severity="soft")
-        if trend_1h < 1:
-            return LaneFilterResult(lane=lane, passed=False, reason="lane1_trend_low", severity="soft")
+        # RSI and Trend removed for L1 leaders - let Nemo/Phi decide
         return LaneFilterResult(lane=lane, passed=True, reason="lane1_ok", severity="ok")
 
     if lane == "L2":
         strong_mover_signal = (
-            rotation_score >= 0.10
-            or momentum_5 >= 0.008
-            or volume_surge >= 0.25
+            rotation_score >= 0.08
+            or momentum_5 >= 0.005
+            or volume_surge >= 0.15
             or leader_takeover
-            or leader_urgency >= 6.5
+            or leader_urgency >= 5.0
         )
 
         if strong_mover_signal:
             return LaneFilterResult(lane=lane, passed=True, reason="lane2_leader_signal", severity="ok")
 
-        if trend_1h < 0 and momentum_14 <= 0.0:
+        if trend_1h < -1 and momentum_14 <= -0.005:
             return LaneFilterResult(lane=lane, passed=False, reason="lane2_trend_negative", severity="soft")
-        if momentum_5 <= 0.0 and momentum_14 <= 0.0 and volume_surge < 0.2:
-            return LaneFilterResult(lane=lane, passed=False, reason="lane2_momo_low", severity="soft")
-        if volume_ratio < 0.15 and volume_surge < 0.08:
-            real_participation = rotation_score >= 0.10 or momentum_5 >= 0.008 or volume_surge >= 0.10
+        
+        if volume_ratio < 0.10 and volume_surge < 0.05:
+            real_participation = rotation_score >= 0.08 or momentum_5 >= 0.005 or volume_surge >= 0.08
             if not real_participation:
                 return LaneFilterResult(lane=lane, passed=False, reason="lane2_vol_low", severity="soft")
             return LaneFilterResult(lane=lane, passed=True, reason="lane2_vol_low_overridden", severity="soft")
-        if volume_ratio < 0.25 and volume_surge < 0.10:
-            return LaneFilterResult(lane=lane, passed=True, reason="lane2_vol_low_warning", severity="soft")
-        if rsi > 80.0:
+        
+        if rsi > 85.0:
             return LaneFilterResult(lane=lane, passed=False, reason="lane2_rsi_hot", severity="soft")
-        if atr_pct > 0.08:
-            return LaneFilterResult(lane=lane, passed=False, reason="lane2_atr_high", severity="soft")
         return LaneFilterResult(lane=lane, passed=True, reason="lane2_ok", severity="ok")
 
     if lane == "L3":

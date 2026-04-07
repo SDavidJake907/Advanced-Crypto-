@@ -3,9 +3,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from contextlib import closing
 import json
+import os
 from pathlib import Path
 import sqlite3
 from typing import Any
+
+# Retention policy — configurable via env vars
+_DEBUG_RETENTION_DAYS  = int(os.getenv("DECISION_DEBUG_RETENTION_DAYS", "3"))
+_TRACE_RETENTION_DAYS  = int(os.getenv("DECISION_TRACE_RETENTION_DAYS", "7"))
+_PRUNE_EVERY_N_INSERTS = int(os.getenv("DB_PRUNE_EVERY_N_INSERTS", "500"))
+_debug_insert_count    = 0
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -25,6 +32,20 @@ def _json(payload: Any) -> str:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def prune_old_records(*, vacuum: bool = False) -> None:
+    """Delete rows older than the configured retention windows and optionally VACUUM."""
+    debug_cutoff = datetime.now(timezone.utc).replace(microsecond=0)
+    from datetime import timedelta
+    debug_cutoff_str = (datetime.now(timezone.utc) - timedelta(days=_DEBUG_RETENTION_DAYS)).replace(microsecond=0).isoformat()
+    trace_cutoff_str = (datetime.now(timezone.utc) - timedelta(days=_TRACE_RETENTION_DAYS)).replace(microsecond=0).isoformat()
+    with closing(_connect()) as conn:
+        conn.execute("DELETE FROM decision_debug WHERE ts < ?", (debug_cutoff_str,))
+        conn.execute("DELETE FROM decision_traces WHERE ts < ?", (trace_cutoff_str,))
+        conn.commit()
+        if vacuum:
+            conn.execute("VACUUM")
 
 
 def ensure_system_record_schema() -> None:
@@ -155,6 +176,7 @@ def record_decision_trace(payload: dict[str, Any]) -> None:
 
 
 def record_decision_debug(payload: dict[str, Any]) -> None:
+    global _debug_insert_count
     ensure_system_record_schema()
     with closing(_connect()) as conn:
         conn.execute(
@@ -173,6 +195,9 @@ def record_decision_debug(payload: dict[str, Any]) -> None:
             ),
         )
         conn.commit()
+    _debug_insert_count += 1
+    if _debug_insert_count % _PRUNE_EVERY_N_INSERTS == 0:
+        prune_old_records(vacuum=(_debug_insert_count % (_PRUNE_EVERY_N_INSERTS * 10) == 0))
 
 
 def record_fill_event(payload: dict[str, Any], *, lane: str = "", ts: str | None = None) -> None:
