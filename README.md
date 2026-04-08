@@ -13,9 +13,32 @@ This project is an orchestration layer that integrates with third-party services
 ## The Architecture: Code + AI Synergy
 
 - **Deterministic Core:** Owns market normalization, feature extraction (GPU-accelerated), scoring, risk gating, and execution.
+- **GPU Feature Pipeline:** High-performance indicator computation via custom CUDA kernels (`double` precision).
+  - `cuda_rsi`: Wilder's RSI (RMA-smoothed).
+  - `cuda_atr`: Average True Range lookbacks.
+  - `cuda_bollinger`: Middle, Upper, Lower, and Bandwidth.
+  - `cuda_correlation`: Real-time full correlation matrix across the universe.
+  - `cuda_northstar`: Hurst exponent, Shannon entropy, and autocorrelation.
 - **Phi-3 NPU (Advisory):** Owns visual pattern verification, structural context, and candle-evidence translation.
 - **Nemotron 9B (Strategist):** Owns comparative ranking and final structured `OPEN/HOLD/FLAT` judgment on finalist candidates.
 - **Data-Driven Exits:** Zero time-based locks. Exits are triggered purely by price vs. ATR and structural integrity decay.
+
+## Advanced Structural Analysis
+
+The system employs **Lane-Aware Multi-Timeframe Feature Sets**, ensuring each symbol is judged by its specific hold-style:
+
+| Lane | Primary TF | Range TF | Use Case |
+|------|-----------|----------|----------|
+| **L4 (Meme)** | 5m | 15m | Fast momentum ignition and quick holds. |
+| **L2/L3 (Swing)** | 15m | 1h | Channel continuation and structured breakouts. |
+| **L1 (Blue Chip)** | 1h | 1h | Multi-day trends and persistent leadership. |
+
+## Dynamic Scoring & Cost Awareness
+
+KrakenSK uses a multi-phase **Point System** to ensure setup quality exceeds frictional costs:
+- **Phase 1 (Pre-Score):** Net-edge tiers adjust scores before AI evaluation (+5 to -15 pts).
+- **Phase 2 (Batch Context):** Net edge and cost-penalty metrics are injected into Nemotron rows for comparative reasoning.
+- **Phase 3 (Self-Calibration):** The **AI Behavior Score** tracks Nemo's precision and capture quality over the last 50 trades, auto-calibrating entry strictness live.
 
 ## System Flow
 
