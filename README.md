@@ -44,15 +44,16 @@ Current ownership note:
 
 ## Current Decision Rules
 
+- **BTC Lead Protocol:** BTC/USD is hard-coded as the L1 flagship. It bypasses correlation-based downsizing and volatility scaling, receiving priority sizing and the most aggressive entry filters.
+- **Pure Data-Driven Exits:** All time-based locks (`STOP_MIN_HOLD_MIN`) are disabled. Stop-losses are active from entry and governed purely by structural integrity and price vs. ATR.
+- **Dynamic Breakout Priority:** Range breakouts with volume surges are prioritized across all lanes, ensuring early entry into major moves.
 - Hard vetoes belong in deterministic risk, portfolio, and execution layers.
-- Ranging market state is caution, not an automatic entry kill, when the candidate already clears score and volume floors.
-- Nemotron may decline a setup, but the reason should be specific and loggable; soft labels are not substitutes for a real blocker.
-- Batch priority is ranking context, not a synthetic veto. A symbol losing rank should not look identical to a structurally bad setup.
+- Nemotron may decline a setup, but the reason should be specific and loggable.
 
 ```text
-Market Data -> Feature Engine -> Deterministic Scoring -> Phi-3 Verification
+Market Data -> Feature Engine -> Dynamic Lane Classification -> Phi-3 Verification
            -> Final Candidate Payload -> Nemotron Judgment
-           -> Risk / Portfolio Gates -> Execution -> Exit Logic
+           -> Portfolio Guard (BTC Priority) -> Execution -> Data-Driven Exits
            -> Trade Memory / Replay / Shadow Review
 ```
 
