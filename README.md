@@ -1,6 +1,12 @@
 # KrakenSK / Advanced-Crypto
 
+> [!WARNING]
+> **RISK DISCLAIMER:** Algorithmic trading involves significant financial risk. This repository is for educational and research purposes only. The author/operator is **not a financial advisor**. Use of this system, its code, and its strategies is at your own risk. The author is not responsible for any financial losses, technical failures, or exchange-related issues incurred through the use of this software.
+
 KrakenSK is a deterministic-first, AI-assisted crypto trading system. It merges hard mathematical risk controls with local LLM (Nemotron/Phi-3) strategic judgment. The architecture is Kraken-first, engineered for live, autonomous scalping and swing trading.
+
+## Third-Party Notice
+This project is an orchestration layer that integrates with third-party services and models, including the Kraken API, Ollama (Nemotron), and OpenVINO (Phi-3). Users are responsible for complying with the terms of service and licenses of all third-party providers used in their local runtime.
 
 **The Core Philosophy:** If it can be computed in code, it is computed in code. Features, scoring, portfolio limits, execution sizing, and live exits are purely deterministic. AI is reserved exclusively for chart context, structural verification, and comparative finalist ranking.
 
