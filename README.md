@@ -1,128 +1,98 @@
 # 🏛️ Advanced-Crypto: The KrakenSK Elite Framework
 
-**Production-Grade Deterministic Trading & AI Strategy Orchestration**
+**Institutional-Grade Deterministic Trading & AI Strategy Orchestration**
 
-> [!IMPORTANT]
-> **PRODUCTION STATUS:** This repository is currently in **LIVE TRADING** mode. All execution is deterministic and backed by institutional-grade risk parameters. Operating this system requires strict adherence to the **Master Operational CSV** and session-aware protocols.
+[![Production Ready](https://img.shields.io/badge/Status-Live_Trading-red.svg?style=for-the-badge)](https://github.com/SDavidJake907/Advanced-Crypto-)
+[![AI Architecture](https://img.shields.io/badge/AI-Nemo_/_Phi--3-blue.svg?style=for-the-badge)](https://github.com/SDavidJake907/Advanced-Crypto-)
+[![Performance](https://img.shields.io/badge/Core-GPU_Accelerated-green.svg?style=for-the-badge)](https://github.com/SDavidJake907/Advanced-Crypto-)
 
-#### **Executive Overview**
+## 📜 Executive Overview
 
-Advanced-Crypto is a high-performance trading architecture designed for the **Elite 7** cryptocurrency universe. It utilizes a **GPU-accelerated deterministic core** for execution, while offloading high-level strategic "Mindset" adjustments to a local **Nemotron (Nemo) / Phi-3 Cloud Advisory** model.
+**Advanced-Crypto** is a high-performance, professional-grade trading architecture engineered for the **Elite 7** cryptocurrency universe. It represents a paradigm shift from traditional algorithmic "collectors" to a **Concentrated Strike Force** model. 
 
-The system operates on a **24/7 Global Session Cycle**, utilizing lane-specific risk management to balance long-term capital appreciation (Anchors) with short-term liquidity capture (Scrapers).
-
----
-
-#### **Core Architecture: The "Whole 9 Yards"**
-
-*   **Deterministic Execution:** Zero-inference Python/CUDA core managing real-time volume gates and ATR-based armor.
-*   **NPU-Driven Charting (Phi-3):** Local on-device intelligence identifies structural signatures (e.g., "Lowest Low" floors and "Power Close" exits).
-*   **Cloud Advisory (Nemo):** Performs a **Tool Call** every morning at 04:30 AM AKDT to calculate session-specific overrides.
-*   **Fractal Logic:** The system treats 8-hour sessions as micro-representations of the 21-day macro cycle, ensuring "mini-paychecks" are harvested daily.
+The framework utilizes a unique **Hybrid Intelligence** approach: a zero-latency, deterministic GPU core handles the heavy lifting of market normalization and risk gating, while an advanced AI Intelligence Layer (local Nemotron-9B and NPU-accelerated Phi-3) provides high-level strategic orchestration.
 
 ---
 
-#### **Dynamic Operational Modes**
+## 🏛️ Core Philosophy: Precision over Participation
 
-1.  **🛡️ Defensive (Asian Session):** Focuses on capital preservation and floor accumulation.
-2.  **⚖️ Neutral (London Session):** Focuses on trend discovery and institutional confirmation.
-3.  **⚔️ Aggressive (NYC Flush):** Maximum liquidity strike using the **Confidence Multiplier** and **TP Bypass**.
+The system is built on the **"Anchor & Scrape"** mindset. Instead of diluting capital across hundreds of low-conviction setups, KrakenSK focuses on identifying and holding 1-2 "Alpha" anchors for parabolic moves while aggressively "scrapping" the daily noise for consistent cash flow.
 
----
+### **The 3-2-3 Execution Model**
+The system operates an **8-Slot Execution Engine**, strictly partitioned to balance long-term capital appreciation with short-term liquidity capture:
 
-### 🛠️ Production Configuration (CSV)
-
-The **Master Operational CSV** (`KrakenSK_Master_Operations_V1.csv`) integrates the exact time-aware triggers and lane overrides developed for this engine. This file acts as the "Source of Truth" for the engine's auto-adjustments.
-
-#### **Implementation Guide**
-
-*   **The Pause-and-Adjust:** The engine recognizes the **04:30 AM AKDT** window to pause the live trader, execute the Nemo tool call, and update `runtime_overrides.json` before the NYC open.
-*   **Lane Isolation:** Lane 1 (Anchors) and Lane 4 (Scrapers) utilize independent **Precision Volume Gates** as specified in the configuration.
-*   **The 08:30 AM Kill Switch:** Mandatory liquidation of all L4 positions to lock in session alpha.
+| Lane | Purpose | Quantity | Horizon | Armor (ATR) | Strategy |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **L1** | **Alpha Anchors** | 2 Slots | 21-28 Days | **1.65x (Heavy)** | Ignore daily noise; capture the parabolic "Week 3" moves. |
+| **L2/L3**| **Swing Runners** | 3 Slots | 3-7 Days | **1.50x (Mid)** | Mid-week trend rotation; capture institutional rebalancing events. |
+| **L4** | **NYC Scrapers** | 3 Slots | < 8 Hours | **1.42x (Light)** | Extreme momentum strikes (NYC Flush); mandatory 08:30 AM liquidations. |
 
 ---
 
-## 🏛️ Advanced Execution: The 3-2-3 Model
+## ⚙️ Architectural Stack: Code + AI Synergy
 
-The system utilizes an **8-Slot Execution Engine** divided into specialized lanes to balance stability with velocity:
+### **1. The Deterministic Core (GPU-Accelerated)**
+The "Engine Room" of the bot is written in optimized Python with custom **CUDA C++ kernels** for real-time feature extraction at `double` precision.
+*   **Indicator Engine:** High-performance computation of Wilder's RSI, ATR, and Bollinger Bandwidth.
+*   **Northstar Analysis:** Real-time calculation of **Hurst Exponents**, Shannon Entropy, and Autocorrelation to detect structural decay before price crashes.
+*   **Precision Gates:** Deterministic volume gates (e.g., 1.62x threshold) and spread-aware cost filters ensure only institutional-quality liquidity is entered.
 
-*   **L1 (Anchors):** 2 Slots. Focused on 21-day "Alpha" holds with Heavy Armor (1.65 ATR).
-*   **L2/L3 (Swing):** 3 Slots. Mid-week trend rotators.
-*   **L4 (Scrapers):** 3 Slots. NYC Flush strikes with Light Armor (1.42 ATR) and mandatory 08:30 AM Kill Switch.
+### **2. The Intelligence Layer (Nemo / Phi-3)**
+Strategic decisions are offloaded to local AI models to prevent "indicator blindness":
+*   **Phi-3 Vision (NPU):** Runs on dedicated device hardware (Intel NPU) to perform **Structural Verification**. It translates raw OHLC data into "Visual Patterns" (e.g., Identifying the "Lowest Low" floor or "Shooting Star" exhaustion).
+*   **Nemotron 9B (The Strategist):** Acts as the Portfolio Overwatch. Every morning at **04:30 AM AKDT**, it performs a **Global Tool Call** to audit all sessions and adjust `runtime_overrides` based on macro-economic shifts.
 
-## ₿ Institutional Mandate: 25% BTC Influence
+---
 
-Bitcoin is the **Lead Engine**. Altcoin scoring is dynamically weighted by BTC's structural health:
-*   **BTC Tailwind:** Alts receive a **+25% scoring tailwind** (approx +12 points) when BTC is bullish and correlation is high (> 0.40).
-*   **Automatic Protection:** The system monitors for **Blow-off Tops** (RSI > 85). If BTC goes parabolic, the engine automatically flips to **DEFENSIVE** and tightens all trailing stops to **0.5 ATR**.
+## ₿ Institutional Mandate: The 25% BTC Influence Rule
+
+KrakenSK recognizes Bitcoin as the market's **Lead Engine**. Altcoin scoring is never calculated in a vacuum; it is always weighted by BTC's structural health:
+*   **Bullish Tailwind:** When BTC is in a confirmed uptrend, correlated alts receive a **+25% scoring tailwind** (+12 points), reflecting institutional capital flow.
+*   **Automatic "Blow-off" Protection:** The system continuously monitors BTC for parabolic exhaustion (RSI > 85, EMA26 Distance > 15%). 
+*   **The Bunker Protocol:** If a blow-off is detected, the system automatically flips to **DEFENSIVE**, tightens the volume gate to **2.5x**, and slashes trailing stops to **0.5 ATR** to harvest gains before the crash.
 
 ---
 
-## The Architecture: Code + AI Synergy
+## 🔄 Seasonal & Fractal Market Dynamics
 
-- **Deterministic Core:** Owns market normalization, feature extraction (GPU-accelerated), scoring, risk gating, and execution.
-- **GPU Feature Pipeline:** High-performance indicator computation via custom CUDA kernels (`double` precision).
-  - `cuda_rsi`: Wilder's RSI (RMA-smoothed).
-  - `cuda_atr`: Average True Range lookbacks.
-  - `cuda_bollinger`: Middle, Upper, Lower, and Bandwidth.
-  - `cuda_correlation`: Real-time full correlation matrix across the universe.
-  - `cuda_northstar`: Hurst exponent, Shannon entropy, and autocorrelation.
-- **Phi-3 NPU (Advisory):** Owns visual pattern verification, structural context, and candle-evidence translation.
-- **Nemotron 9B (Strategist):** Owns comparative ranking and final structured `OPEN/HOLD/FLAT` judgment on finalist candidates.
-- **Data-Driven Exits:** Zero time-based locks. Exits are triggered purely by price vs. ATR and structural integrity decay.
+The bot is programmed with an inherent understanding of the **21-Day Fractal Cycle**:
+*   **Week 1 (Accumulation):** Focuses on floor identification and L1 anchor building.
+*   **Week 2 (Expansion):** Increases aggression to capture trend momentum.
+*   **Week 3 (Distribution):** Expects high volatility and "NYC Flushes"; tightens all exits.
+*   **Week 4 (Resolution):** Mandatory liquidation of stale rotations to clean the vault for the next month.
 
-## Advanced Structural Analysis
-
-The system employs **Lane-Aware Multi-Timeframe Feature Sets**, ensuring each symbol is judged by its specific hold-style:
-
-| Lane | Primary TF | Range TF | Use Case |
-|------|-----------|----------|----------|
-| **L4 (Meme)** | 5m | 1h | Fast momentum ignition and quick holds. |
-| **L2/L3 (Swing)** | 15m | 4h | Channel continuation and structured breakouts. |
-| **L1 (Blue Chip)** | 1h | 1D | Multi-day trends and persistent leadership. |
-
-## System Flow
-
-```text
-Market Data -> GPU Feature Engine -> Dynamic Lane Classification -> Phi-3 Verification
-           -> Final Candidate Payload -> Nemotron Judgment
-           -> Portfolio Guard (BTC Priority) -> Execution -> Pure Data-Driven Exits
-           -> Trade Memory / Replay / Shadow Review
-```
-
-## Quick Start
-
-### 1. Clone & Configure
-```powershell
-git clone https://github.com/SDavidJake907/Advanced-Crypto-.git
-cd Advanced-Crypto-
-copy .env.example .env
-# Add API credentials and adjust configs/runtime_overrides.json
-```
-
-### 2. Install Dependencies
-```powershell
-pip install -e .
-```
-
-### 3. Boot Local Models
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start_models.ps1
-```
-*(Wait for "Phi-3 ready" before proceeding)*
-
-### 4. Ignite the Stack
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1
-```
-
-## Hardware Requirements (Recommended)
-
-- Windows 11 + PowerShell
-- Modern 8+ Core CPU (Intel Core Ultra 7 / Ryzen 7)
-- 32 GB RAM
-- NVIDIA RTX GPU (16GB VRAM) for local Nemotron & CUDA features.
-- Intel NPU / OpenVINO setup for local Phi-3 advisory.
+### **Perfect Ratio Timing (HTF vs LTF)**
+The system adheres to the institutional **Perfect Ratio** for timeframe analysis:
+*   **L1 (Anchors):** 1-Day HTF / 1-Hour LTF.
+*   **L2/L3 (Swing):** 4-Hour HTF / 15-Minute LTF.
+*   **L4 (Scrapers):** 1-Hour HTF / 5-Minute LTF.
 
 ---
-*Disclaimer: Advanced-Crypto is a professional trading system. Systematic Wealth Generation requires discipline and technical rigor.*
+
+## 🛠️ Operational Workflow (Session Awareness)
+
+KrakenSK operates on a **24/7 Global Session Cycle**, adjusting its posture every few hours:
+
+1.  **🛡️ Asia Open (16:00 - 00:00 AKDT):** Defensive mode. Task: Floor accumulation.
+2.  **⚖️ London Open (00:00 - 04:00 AKDT):** Neutral mode. Task: Trend discovery.
+3.  **🧪 Pre-NYC Pause (04:00 - 05:30 AKDT):** **Calibration Phase.** Nemo performs the daily audit.
+4.  **⚔️ NYC Flush (05:30 - 08:30 AKDT):** Aggressive mode. Task: High-beta scraper strikes.
+5.  **🛑 Kill Switch (08:30 AKDT):** Mandatory L4 liquidation to lock in daily alpha.
+
+---
+
+## 🚀 Getting Started
+
+### **System Requirements**
+*   **OS:** Windows 11 + PowerShell.
+*   **RAM:** 32GB (Min) / 64GB (Recommended).
+*   **GPU:** NVIDIA RTX (16GB VRAM) for local Nemotron & CUDA indicators.
+*   **NPU:** Intel Core Ultra / OpenVINO for Phi-3 advisory.
+
+### **Quick Ignition**
+1.  **Configure:** Populate `.env` with Kraken API keys.
+2.  **Boot Models:** `.\scripts\start_models.ps1` (Initialize NPU and Ollama).
+3.  **Launch Stack:** `.\scripts\start_all.ps1` (Ignite the Watchdog and Core Apps).
+
+---
+*Disclaimer: Advanced-Crypto is a professional-grade systematic wealth generation framework. Algorithmic trading involves high risk. Adherence to the Master Blueprint and technical rigor is mandatory.*
