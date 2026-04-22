@@ -2,6 +2,9 @@
 
 **Institutional-Grade Deterministic Trading & AI Strategy Orchestration**
 
+> [!CAUTION]
+> **LEGAL DISCLAIMER:** This software is for **educational and research purposes only**. I am **not a financial advisor**, and this is **not financial advice**. Algorithmic trading involves extreme risk of capital loss. The author and contributors are **not responsible** for any financial losses, technical failures, or exchange-related issues. **Use at your own risk.**
+
 [![Production Ready](https://img.shields.io/badge/Status-Live_Trading-red.svg?style=for-the-badge)](https://github.com/SDavidJake907/Advanced-Crypto-)
 [![AI Architecture](https://img.shields.io/badge/AI-Nemo_/_Phi--3-blue.svg?style=for-the-badge)](https://github.com/SDavidJake907/Advanced-Crypto-)
 [![Performance](https://img.shields.io/badge/Core-GPU_Accelerated-green.svg?style=for-the-badge)](https://github.com/SDavidJake907/Advanced-Crypto-)
@@ -37,10 +40,17 @@ The "Engine Room" of the bot is written in optimized Python with custom **CUDA C
 *   **Northstar Analysis:** Real-time calculation of **Hurst Exponents**, Shannon Entropy, and Autocorrelation to detect structural decay before price crashes.
 *   **Precision Gates:** Deterministic volume gates (e.g., 1.62x threshold) and spread-aware cost filters ensure only institutional-quality liquidity is entered.
 
-### **2. The Intelligence Layer (Nemo / Phi-3)**
-Strategic decisions are offloaded to local AI models to prevent "indicator blindness":
-*   **Phi-3 Vision (NPU):** Runs on dedicated device hardware (Intel NPU) to perform **Structural Verification**. It translates raw OHLC data into "Visual Patterns" (e.g., Identifying the "Lowest Low" floor or "Shooting Star" exhaustion).
-*   **Nemotron 9B (The Strategist):** Acts as the Portfolio Overwatch. Every morning at **04:30 AM AKDT**, it performs a **Global Tool Call** to audit all sessions and adjust `runtime_overrides` based on macro-economic shifts.
+### **2. The Intelligence Layer: Multi-Tiered AI**
+Strategic decisions are offloaded to a multi-tiered AI stack to prevent "indicator blindness":
+
+#### **Local Vision (Phi-3 NPU)**
+Runs on dedicated device hardware (Intel NPU) via OpenVINO to perform **Structural Verification**. It translates raw OHLC data into "Visual Patterns"—identifying the "Lowest Low" floors or "Shooting Star" exhaustion points that deterministic math might miss.
+
+#### **Global Strategy (NVIDIA Cloud AI)**
+The system integrates with **NVIDIA's high-capacity Llama-3.3-Nemotron models** to act as the **Portfolio Overwatch**. 
+*   **Comparative Ranking:** Unlike the local core which sees one coin at a time, the NVIDIA layer reviews the entire "Finalist Payload" to rank assets against each other, ensuring capital is only deployed to the absolute "Alpha" of the hour.
+*   **Session Calibration:** Every morning at **04:30 AM AKDT**, the system triggers an **NVIDIA Tool Call**. The AI audits the previous 24 hours of global session data and automatically adjusts `runtime_overrides` (Aggression, Volume Gates, ATR Armor) to match the day's macro narrative (e.g., Geopolitical tension vs. Corporate expansion).
+*   **Narrative Processing:** It consumes macro sentiment data to determine if the market is in a "Structural Recovery" or a "Distribution Flush," adjusting the 8-slot engine's posture in real-time.
 
 ---
 
@@ -75,7 +85,7 @@ KrakenSK operates on a **24/7 Global Session Cycle**, adjusting its posture ever
 
 1.  **🛡️ Asia Open (16:00 - 00:00 AKDT):** Defensive mode. Task: Floor accumulation.
 2.  **⚖️ London Open (00:00 - 04:00 AKDT):** Neutral mode. Task: Trend discovery.
-3.  **🧪 Pre-NYC Pause (04:00 - 05:30 AKDT):** **Calibration Phase.** Nemo performs the daily audit.
+3.  **🧪 Pre-NYC Pause (04:00 - 05:30 AKDT):** **Calibration Phase.** NVIDIA AI performs the daily audit.
 4.  **⚔️ NYC Flush (05:30 - 08:30 AKDT):** Aggressive mode. Task: High-beta scraper strikes.
 5.  **🛑 Kill Switch (08:30 AKDT):** Mandatory L4 liquidation to lock in daily alpha.
 
@@ -95,4 +105,4 @@ KrakenSK operates on a **24/7 Global Session Cycle**, adjusting its posture ever
 3.  **Launch Stack:** `.\scripts\start_all.ps1` (Ignite the Watchdog and Core Apps).
 
 ---
-*Disclaimer: Advanced-Crypto is a professional-grade systematic wealth generation framework. Algorithmic trading involves high risk. Adherence to the Master Blueprint and technical rigor is mandatory.*
+*Disclaimer: Advanced-Crypto is a professional-grade systematic wealth generation framework. I am not a financial advisor. Algorithmic trading involves high risk. Adherence to the Master Blueprint and technical rigor is mandatory. USE AT YOUR OWN RISK.*
