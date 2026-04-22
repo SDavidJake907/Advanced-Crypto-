@@ -325,10 +325,17 @@ Decision priority:
 5. do not let secondary indicators outweigh a clearly strong chart unless they identify a specific blocker
 
 Read in this order:
-1. portfolio_summary
-2. candidate
-3. reflex
-4. market_state_review
+1. macro_context (Quarterly/Weekly fractal position)
+2. portfolio_summary
+3. candidate
+4. reflex
+5. market_state_review
+
+Macro-Seasonal Decision Lenses:
+- Q1/Q4 (Ignition/Resolution): Favor aggression. In Q4, use 'nyc_power_close_bypass' for L1 leaders.
+- Q2/Q3 (Expansion/Distribution): Tighten ATR armor. Mid-May and September are high-risk sell-off windows.
+- Week 3 (Distribution): Expect "NYC Flushes." Be extremely selective with L4 Scrapers.
+- Week 1 (Accumulation): Look for "Lowest Low" floor accumulation signatures in Asia sessions.
 
 Interpret market_state_review in this order:
 1. candle evidence and structure phase
@@ -505,7 +512,8 @@ Decision priority for every row:
 Do not let secondary indicators override a clearly strong chart unless they identify a specific blocker.
 
 Candidate columns:
-  symbol | lane | score | rec | risk | m5 | m14 | rsi | vol | vs | macd_h | adx | rot | sq | tq | rq | trend | chop | ema | brk | pb | hl | net_edge | cost_pen | phi3 | mkt | bias | mkt_cf | phase | scf | bq | rtq | locq | brk_state | trend_stage | pbq | vol_cf | late | candle | cbias | cstr | ccf | mem
+  symbol | lane | score | rec | risk | m5 | m14 | rsi | vol | vs | macd_h | adx | rot | sq | tq | rq | trend | chop | ema | brk | pb | hl | net_edge | cost_pen | phi3 | mkt | bias | mkt_cf | phase | scf | bq | rtq | locq | brk_state | trend_stage | pbq | vol_cf | late | candle | cbias | cstr | ccf | lane_sup | lane_conflict | univ_lane | ses_mkt | ses_str | ses_sym | ses_q | ses_watch | ses_avoid | mem
+  ses_mkt=London session market bias (bullish/bearish/neutral), ses_str=bias strength 0-1, ses_sym=per-symbol session bias, ses_q=NYC entry quality (high/medium/low/avoid), ses_watch=on watch list, ses_avoid=on avoid list
 
 Interpret the Phi chart-state fields strictly:
  - read Phi evidence in this order: candle structure -> EMA/support/retest structure -> breakout/pullback thesis validity -> warnings/context
@@ -551,6 +559,16 @@ Rules:
   range_not_clean, pattern_not_confirmed, momentum_not_confirmed
 - avoid generic weak_setup unless no specific label fits
 
+Pre-NYC session bias (London morning 08:00–13:00 UTC → NYC open outlook):
+- row columns: ses_mkt (market bias), ses_str (strength 0-1), ses_sym (per-symbol bias), ses_q (NYC entry quality), ses_watch (Y/N), ses_avoid (Y/N)
+- if ses_avoid=Y: require score >= 80 and exceptional structure to OPEN; otherwise HOLD with reason session_avoid
+- if ses_q=high and ses_sym=bullish: treat as additional confirmation alongside chart evidence
+- if ses_q=avoid: block OPEN; output HOLD or SKIP with reason session_avoid
+- if ses_mkt=bearish and ses_str >= 0.7: require score >= 75 for any OPEN
+- if ses_mkt=bullish and ses_watch=Y: a borderline score (68-72) with clean structure may qualify for reduced-size OPEN
+- session context is supporting evidence only — a poor chart cannot be rescued by a bullish session
+- if ses_mkt is empty or ses_str=0.00: no session data available, ignore session fields
+
 Return this exact shape only:
 {"reasoning":"1-2 sentences","decisions":[{"symbol":"X/USD","action":"OPEN","side":"LONG","size":15,"reason":"breakout"},{"symbol":"Y/USD","action":"WATCH","reason":"trend_unconfirmed"}]}
 """.strip()
@@ -593,6 +611,16 @@ Open rules:
   net_edge_too_low, trend_unconfirmed, reversal_risk_high, volume_too_light,
   range_not_clean, pattern_not_confirmed, momentum_not_confirmed
 - avoid generic weak_setup unless no specific label fits
+
+Pre-NYC session bias (London morning 08:00–13:00 UTC → NYC open outlook):
+- row columns: ses_mkt (market bias), ses_str (strength 0-1), ses_sym (per-symbol bias), ses_q (NYC entry quality), ses_watch (Y/N), ses_avoid (Y/N)
+- if ses_avoid=Y: require score >= 80 and exceptional structure to OPEN; otherwise HOLD with reason session_avoid
+- if ses_q=high and ses_sym=bullish: treat as additional confirmation alongside chart evidence
+- if ses_q=avoid: block OPEN; output HOLD or SKIP with reason session_avoid
+- if ses_mkt=bearish and ses_str >= 0.7: require score >= 75 for any OPEN
+- if ses_mkt=bullish and ses_watch=Y: a borderline score (68-72) with clean structure may qualify for reduced-size OPEN
+- session context is supporting evidence only — a poor chart cannot be rescued by a bullish session
+- if ses_mkt is empty or ses_str=0.00: no session data available, ignore session fields
 
 Return exactly:
 {"reasoning":"1-2 sentences","decisions":[{"symbol":"X/USD","action":"OPEN","side":"LONG","size":15,"reason":"breakout"},{"symbol":"Y/USD","action":"WATCH","reason":"trend_unconfirmed"}]}

@@ -36,6 +36,7 @@ class FinalTradeScore:
     divergence_bonus: float     # RSI divergence adjustment
     fear_greed_bonus: float     # macro sentiment context adjustment
     btc_dominance_bonus: float  # BTC dominance context adjustment
+    btc_correlation_bonus: float # 25% BTC influence tailwind
     reliability_bonus: float    # per-symbol win-rate adjustment
     basket_fit_bonus: float     # low correlation to held positions
     spread_penalty: float       # spread cost penalty
@@ -71,11 +72,12 @@ class _SetupContribution:
     divergence_bonus: float
     fear_greed_bonus: float
     btc_dominance_bonus: float
+    btc_correlation_bonus: float
     notes: tuple[str, ...]
 
     @property
     def total(self) -> float:
-        return self.entry_score + self.reflex_bonus + self.divergence_bonus + self.fear_greed_bonus + self.btc_dominance_bonus
+        return self.entry_score + self.reflex_bonus + self.divergence_bonus + self.fear_greed_bonus + self.btc_dominance_bonus + self.btc_correlation_bonus
 
 
 @dataclass(frozen=True)
@@ -241,6 +243,29 @@ def _btc_dominance_bonus(features: dict[str, Any]) -> tuple[float, str]:
     return bonus, f"btc_dom_lead({btc_dominance:.1f},+{bonus:.1f})" if bonus >= 0.5 else ""
 
 
+def _btc_correlation_bonus(features: dict[str, Any]) -> tuple[float, str]:
+    """
+    25% BTC Influence Rule: If BTC is in a strong trend, alts with high correlation
+    get a significant scoring tailwind.
+    """
+    symbol = str(features.get("symbol", ""))
+    if symbol in {"BTC/USD", "XBT/USD", "XXBTZUSD"}:
+        return 0.0, ""
+
+    btc_trend_bullish = bool(features.get("btc_trend_bullish", False))
+    if not btc_trend_bullish:
+        return 0.0, ""
+
+    # Correlation is a proxy for the '25% affect' weighting
+    correlation = float(features.get("btc_correlation", 0.0) or 0.0)
+    if correlation < 0.40:
+        return 0.0, ""
+
+    # Max bonus is 12 points (roughly 25% of a typical 50-score setup)
+    bonus = round(_clamp(correlation * 12.0, 0.0, 12.0), 2)
+    return bonus, f"btc_tailwind(corr={correlation:.2f},+{bonus:.1f})"
+
+
 def _basket_fit_bonus(features: dict[str, Any], held_correlation_map: dict[str, float]) -> tuple[float, str]:
     """
     Bonus for symbols that are uncorrelated with what's currently held.
@@ -357,6 +382,7 @@ def _build_score_breakdown(
         "divergence_bonus": round(setup.divergence_bonus, 1),
         "fear_greed_bonus": round(setup.fear_greed_bonus, 1),
         "btc_dominance_bonus": round(setup.btc_dominance_bonus, 1),
+        "btc_correlation_bonus": round(setup.btc_correlation_bonus, 1),
         "reliability_bonus": round(reliability.value, 1),
         "basket_fit": round(basket.basket_fit_bonus, 1),
         "spread_penalty": -round(cost.spread_penalty, 1),
@@ -422,6 +448,7 @@ def compute_final_score(
         divergence_bonus=setup.divergence_bonus,
         fear_greed_bonus=setup.fear_greed_bonus,
         btc_dominance_bonus=setup.btc_dominance_bonus,
+        btc_correlation_bonus=setup.btc_correlation_bonus,
         reliability_bonus=reliability.value,
         basket_fit_bonus=basket.basket_fit_bonus,
         spread_penalty=cost.spread_penalty,

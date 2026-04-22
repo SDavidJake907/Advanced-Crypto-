@@ -504,7 +504,7 @@ app = mcp.streamable_http_app()
 
 
 def main() -> None:
-    uvicorn.run(app, host=MCP_HOST, port=MCP_PORT)
+    uvicorn.run(app, host=MCP_HOST, port=MCP_PORT, proxy_headers=True, forwarded_allow_ips="*")
 
 
 if __name__ == "__main__":

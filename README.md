@@ -1,14 +1,62 @@
-# KrakenSK / Advanced-Crypto
+# 🏛️ Advanced-Crypto: The KrakenSK Elite Framework
 
-> [!WARNING]
-> **RISK DISCLAIMER:** Algorithmic trading involves significant financial risk. This repository is for educational and research purposes only. The author/operator is **not a financial advisor**. Use of this system, its code, and its strategies is at your own risk. The author is not responsible for any financial losses, technical failures, or exchange-related issues incurred through the use of this software.
+**Production-Grade Deterministic Trading & AI Strategy Orchestration**
 
-KrakenSK is a deterministic-first, AI-assisted crypto trading system. It merges hard mathematical risk controls with local LLM (Nemotron/Phi-3) strategic judgment. The architecture is Kraken-first, engineered for live, autonomous scalping and swing trading.
+> [!IMPORTANT]
+> **PRODUCTION STATUS:** This repository is currently in **LIVE TRADING** mode. All execution is deterministic and backed by institutional-grade risk parameters. Operating this system requires strict adherence to the **Master Operational CSV** and session-aware protocols.
 
-## Third-Party Notice
-This project is an orchestration layer that integrates with third-party services and models, including the Kraken API, Ollama (Nemotron), and OpenVINO (Phi-3). Users are responsible for complying with the terms of service and licenses of all third-party providers used in their local runtime.
+#### **Executive Overview**
 
-**The Core Philosophy:** If it can be computed in code, it is computed in code. Features, scoring, portfolio limits, execution sizing, and live exits are purely deterministic. AI is reserved exclusively for chart context, structural verification, and comparative finalist ranking.
+Advanced-Crypto is a high-performance trading architecture designed for the **Elite 7** cryptocurrency universe. It utilizes a **GPU-accelerated deterministic core** for execution, while offloading high-level strategic "Mindset" adjustments to a local **Nemotron (Nemo) / Phi-3 Cloud Advisory** model.
+
+The system operates on a **24/7 Global Session Cycle**, utilizing lane-specific risk management to balance long-term capital appreciation (Anchors) with short-term liquidity capture (Scrapers).
+
+---
+
+#### **Core Architecture: The "Whole 9 Yards"**
+
+*   **Deterministic Execution:** Zero-inference Python/CUDA core managing real-time volume gates and ATR-based armor.
+*   **NPU-Driven Charting (Phi-3):** Local on-device intelligence identifies structural signatures (e.g., "Lowest Low" floors and "Power Close" exits).
+*   **Cloud Advisory (Nemo):** Performs a **Tool Call** every morning at 04:30 AM AKDT to calculate session-specific overrides.
+*   **Fractal Logic:** The system treats 8-hour sessions as micro-representations of the 21-day macro cycle, ensuring "mini-paychecks" are harvested daily.
+
+---
+
+#### **Dynamic Operational Modes**
+
+1.  **🛡️ Defensive (Asian Session):** Focuses on capital preservation and floor accumulation.
+2.  **⚖️ Neutral (London Session):** Focuses on trend discovery and institutional confirmation.
+3.  **⚔️ Aggressive (NYC Flush):** Maximum liquidity strike using the **Confidence Multiplier** and **TP Bypass**.
+
+---
+
+### 🛠️ Production Configuration (CSV)
+
+The **Master Operational CSV** (`KrakenSK_Master_Operations_V1.csv`) integrates the exact time-aware triggers and lane overrides developed for this engine. This file acts as the "Source of Truth" for the engine's auto-adjustments.
+
+#### **Implementation Guide**
+
+*   **The Pause-and-Adjust:** The engine recognizes the **04:30 AM AKDT** window to pause the live trader, execute the Nemo tool call, and update `runtime_overrides.json` before the NYC open.
+*   **Lane Isolation:** Lane 1 (Anchors) and Lane 4 (Scrapers) utilize independent **Precision Volume Gates** as specified in the configuration.
+*   **The 08:30 AM Kill Switch:** Mandatory liquidation of all L4 positions to lock in session alpha.
+
+---
+
+## 🏛️ Advanced Execution: The 3-2-3 Model
+
+The system utilizes an **8-Slot Execution Engine** divided into specialized lanes to balance stability with velocity:
+
+*   **L1 (Anchors):** 2 Slots. Focused on 21-day "Alpha" holds with Heavy Armor (1.65 ATR).
+*   **L2/L3 (Swing):** 3 Slots. Mid-week trend rotators.
+*   **L4 (Scrapers):** 3 Slots. NYC Flush strikes with Light Armor (1.42 ATR) and mandatory 08:30 AM Kill Switch.
+
+## ₿ Institutional Mandate: 25% BTC Influence
+
+Bitcoin is the **Lead Engine**. Altcoin scoring is dynamically weighted by BTC's structural health:
+*   **BTC Tailwind:** Alts receive a **+25% scoring tailwind** (approx +12 points) when BTC is bullish and correlation is high (> 0.40).
+*   **Automatic Protection:** The system monitors for **Blow-off Tops** (RSI > 85). If BTC goes parabolic, the engine automatically flips to **DEFENSIVE** and tightens all trailing stops to **0.5 ATR**.
+
+---
 
 ## The Architecture: Code + AI Synergy
 
@@ -29,16 +77,9 @@ The system employs **Lane-Aware Multi-Timeframe Feature Sets**, ensuring each sy
 
 | Lane | Primary TF | Range TF | Use Case |
 |------|-----------|----------|----------|
-| **L4 (Meme)** | 5m | 15m | Fast momentum ignition and quick holds. |
-| **L2/L3 (Swing)** | 15m | 1h | Channel continuation and structured breakouts. |
-| **L1 (Blue Chip)** | 1h | 1h | Multi-day trends and persistent leadership. |
-
-## Dynamic Scoring & Cost Awareness
-
-KrakenSK uses a multi-phase **Point System** to ensure setup quality exceeds frictional costs:
-- **Phase 1 (Pre-Score):** Net-edge tiers adjust scores before AI evaluation (+5 to -15 pts).
-- **Phase 2 (Batch Context):** Net edge and cost-penalty metrics are injected into Nemotron rows for comparative reasoning.
-- **Phase 3 (Self-Calibration):** The **AI Behavior Score** tracks Nemo's precision and capture quality over the last 50 trades, auto-calibrating entry strictness live.
+| **L4 (Meme)** | 5m | 1h | Fast momentum ignition and quick holds. |
+| **L2/L3 (Swing)** | 15m | 4h | Channel continuation and structured breakouts. |
+| **L1 (Blue Chip)** | 1h | 1D | Multi-day trends and persistent leadership. |
 
 ## System Flow
 
@@ -48,25 +89,6 @@ Market Data -> GPU Feature Engine -> Dynamic Lane Classification -> Phi-3 Verifi
            -> Portfolio Guard (BTC Priority) -> Execution -> Pure Data-Driven Exits
            -> Trade Memory / Replay / Shadow Review
 ```
-
-## Current Decision Rules & Protocols
-
-- **The BTC Lead Protocol:** `BTC/USD` is the uncontested flagship (L1). It is mathematically immune to correlation-based downsizing and volatility-scaling penalties. When the market moves, the system follows BTC with full weight.
-- **Pure Data-Driven Exits:** The system does not hold trades based on a clock. Stop-losses are armed immediately upon entry and triggered by structural breaks or ATR-based invalidation.
-- **Dynamic Breakout Priority:** Range breakouts supported by volume surges bypass standard trend/RSI filters, immediately escalating candidates to L1/L2 leader status.
-- **Kelly Criterion Sizing:** Position weights are dynamically calculated using half-Kelly fractions derived from rolling historical trade performance.
-- **Asymmetric Risk Management:** Strict filters on low-cap "meme" coins (L4) combined with loosened, aggressive filters for market leaders (L1/L2) ensure capital is deployed where momentum is highest.
-
-## Repository Layout
-
-- `apps/` - Live trader loop, universe manager, review scheduler, and operator UI.
-- `configs/` - Hot-reloadable runtime configuration and exchange metadata.
-- `core/` - The brain: policy gates, risk engines, LLM adapters, feature extraction, and trade memory.
-- `cpp/` - Custom CUDA kernels for blazing-fast technical indicator computation.
-- `docs/` - Deep-dive architecture notes, operating models, and playbooks.
-- `scripts/` - PowerShell utilities for booting models and the trading stack.
-- `tests/` - Comprehensive regression suite and replay harness.
-- `logs/` - SQLite system record, decision traces, and synced state.
 
 ## Quick Start
 
@@ -94,13 +116,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start_models.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\start_all.ps1
 ```
 
-## Operational Safety & Shadow Mode
-
-KrakenSK is built for production, but never blindly trust live capital to new logic.
-- **Shadow Validation:** Run `SHADOW_VALIDATION_ENABLED=true` to compare baseline vs. LLM engine decisions live without placing real orders.
-- **Replay Mode:** Use `apps/replay/main.py` to backtest against historical ticks.
-- **Runtime Overrides:** The `review_scheduler` stages strategy proposals. They must pass shadow validation before being applied to the live trading engine.
-
 ## Hardware Requirements (Recommended)
 
 - Windows 11 + PowerShell
@@ -110,4 +125,4 @@ KrakenSK is built for production, but never blindly trust live capital to new lo
 - Intel NPU / OpenVINO setup for local Phi-3 advisory.
 
 ---
-*Disclaimer: KrakenSK is not financial advice. Use this system at your own risk. Live trading incurs financial risk, and algorithmic execution can result in capital loss.*
+*Disclaimer: Advanced-Crypto is a professional trading system. Systematic Wealth Generation requires discipline and technical rigor.*

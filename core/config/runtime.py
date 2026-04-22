@@ -148,7 +148,9 @@ _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "MEME_EXEC_MIN_NOTIONAL_USD": {"type": float, "default": 15.0},
     "MEME_EXEC_MIN_NOTIONAL_PCT_EQUITY": {"type": float, "default": 0.0},
     "EXEC_MIN_TRADE_RISK_BUDGET_MULT": {"type": float, "default": 1.5},
-    "EXEC_RISK_PER_TRADE_PCT": {"type": float, "default": 20.0},
+    "LEADER_MIN_STAKE_USD": {"type": float, "default": 100.0},
+    "EXEC_RISK_PER_TRADE_PCT": {"type": float, "default": 1.0},
+
     "L1_EXEC_RISK_PER_TRADE_PCT": {"type": float, "default": 30.0},
     "L2_EXEC_RISK_PER_TRADE_PCT": {"type": float, "default": 25.0},
     "MEME_EXEC_RISK_PER_TRADE_PCT": {"type": float, "default": 15.0},
@@ -167,6 +169,9 @@ _SETTING_SPECS: dict[str, dict[str, Any]] = {
     "PORTFOLIO_AVG_CORR_SCALE_THRESHOLD": {"type": float, "default": 0.7},
     "PORTFOLIO_AVG_CORR_SCALE_DOWN": {"type": float, "default": 0.6},
     "PORTFOLIO_MAX_POSITIONS_PER_SECTOR": {"type": int, "default": 2},
+    "L1_MAX_OPEN_POSITIONS": {"type": int, "default": 2},
+    "L2_MAX_OPEN_POSITIONS": {"type": int, "default": 3},
+    "L3_MAX_OPEN_POSITIONS": {"type": int, "default": 3},
     "MEME_MAX_OPEN_POSITIONS": {"type": int, "default": 1},
     "ACCOUNT_SYNC_USE_TRADES_HISTORY": {"type": bool, "default": True},
     "NEMOTRON_TOP_CANDIDATE_COUNT": {"type": int, "default": 15},
@@ -470,6 +475,40 @@ def apply_runtime_override_proposal(
     raise KeyError(f"Unknown runtime override proposal: {proposal_id}")
 
 
+def get_macro_context() -> dict[str, Any]:
+    """Calculate the current Quarterly and Weekly fractal context for the AI Intelligence Layer."""
+    now = datetime.now(timezone.utc)
+    month = now.month
+    day = now.day
+    
+    # Quarterly Cycle
+    if month in {1, 2, 3}:
+        quarter = "Q1 (Ignition)"
+    elif month in {4, 5, 6}:
+        quarter = "Q2 (Expansion)"
+    elif month in {7, 8, 9}:
+        quarter = "Q3 (Distribution)"
+    else:
+        quarter = "Q4 (Resolution)"
+        
+    # Weekly Fractal (1-4)
+    week = min(((day - 1) // 7) + 1, 4)
+    week_label = {
+        1: "Week 1 (Accumulation)",
+        2: "Week 2 (Expansion)",
+        3: "Week 3 (Distribution/Volatility)",
+        4: "Week 4 (Resolution/Close)"
+    }.get(week, f"Week {week}")
+
+    return {
+        "current_quarter": quarter,
+        "current_week": week_label,
+        "ts_utc": now.isoformat(),
+        "is_distribution_phase": month in {5, 9} or week == 3,
+        "is_ignition_phase": month in {1, 10} or week == 1
+    }
+
+
 def get_runtime_setting(name: str, default: Any | None = None) -> Any:
     if name not in _SETTING_SPECS:
         raise KeyError(f"Unknown runtime setting: {name}")
@@ -621,21 +660,32 @@ def get_effective_min_notional_usd(
     return max(base_floor, scaled_floor, explicit_floor)
 
 
-def get_proposed_weight(symbol: str | None = None, lane: str | None = None, atr_pct: float | None = None) -> float:
+def get_proposed_weight(
+    symbol: str | None = None,
+    lane: str | None = None,
+    atr_pct: float | None = None,
+    features: dict[str, Any] | None = None,
+) -> float:
     resolved_lane = lane or (get_symbol_lane(symbol) if symbol is not None else None)
-    is_meme = is_meme_lane(resolved_lane)
+    resolved_lane = str(resolved_lane or "L3").upper()
+    
+    # --- Elite Master Ops: Fixed Tiered Sizing ---
+    if resolved_lane == "L1":
+        base_weight = 0.125 # 12.5% L1
+    elif resolved_lane == "L4":
+        base_weight = 0.030 # 3.0% L4
+    else:
+        base_weight = 0.050 # 5.0% L2/L3 default
 
-    # Base weight uses lane-aware Kelly fractions when enabled.
-    base_weight = get_lane_risk_per_trade_pct(lane=resolved_lane, symbol=symbol) / 100.0
-
-    # Fallback to headline proposed weight if Kelly sizing is disabled or unreasonable.
-    if base_weight <= 0.0 or base_weight > 0.50:
-        base_weight = float(get_runtime_setting("MEME_PROPOSED_WEIGHT" if is_meme else "TRADER_PROPOSED_WEIGHT"))
+    # Confidence Multiplier during NYC Flush
+    if features and features.get("session_phase") == "NYC Flush":
+        entry_score = float(features.get("entry_score", 50.0) or 50.0)
+        # Apply Score/50 Multiplier to Sizing
+        base_weight *= (entry_score / 50.0)
 
     # Dynamic ATR Volatility Scaling
     is_main_leader = symbol in {"BTC/USD", "XBTUSD", "XXBTZUSD", "XBT/USD"}
     if atr_pct and atr_pct > 0.0 and not is_main_leader:
-        # Target nominal move around 5%. If highly volatile (e.g., 10%), halve size. If low volatility (e.g., 2.5%), double it.
         vol_scalar = 5.0 / atr_pct
         base_weight *= max(0.5, min(vol_scalar, 2.0))
 

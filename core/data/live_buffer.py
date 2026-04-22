@@ -151,16 +151,16 @@ class LiveMarketDataFeed:
 
     def get_ohlc(self, symbol: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
         if symbol not in self._buffers:
-            raise KeyError(f"unknown symbol: {symbol}")
+            return pd.DataFrame()
         if timeframe not in self._buffers[symbol]:
-            raise KeyError(f"unknown timeframe: {timeframe}")
+            return pd.DataFrame()
         return self._buffers[symbol][timeframe].to_frame(limit=limit)
 
     def get_bar_count(self, symbol: str, timeframe: str) -> int:
         if symbol not in self._buffers:
-            raise KeyError(f"unknown symbol: {symbol}")
+            return 0
         if timeframe not in self._buffers[symbol]:
-            raise KeyError(f"unknown timeframe: {timeframe}")
+            return 0
         return self._buffers[symbol][timeframe].count()
 
     def on_book(self, symbol: str, bids: list[tuple[float, float]], asks: list[tuple[float, float]]) -> None:

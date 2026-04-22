@@ -267,12 +267,18 @@ def evaluate_trade(
         if proposed_weight > 0.0:
             size_factor = min(size_factor, config.max_weight_per_symbol / proposed_weight)
 
+    # --- Lane Specific Quantity Limits (3-2-3 Model) ---
+    lane_key = f"{lane}_MAX_OPEN_POSITIONS"
+    # L4 uses legacy MEME key for backward compatibility
     if lane == "L4":
-        max_meme_positions = int(get_runtime_setting("MEME_MAX_OPEN_POSITIONS"))
-        meme_positions = sum(1 for position in positions.all() if position.lane == "L4")
-        if meme_positions >= max_meme_positions and symbol not in positions.positions:
-            reasons.append("max_meme_positions_reached")
-            return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
+        lane_key = "MEME_MAX_OPEN_POSITIONS"
+    
+    max_lane_positions = int(get_runtime_setting(lane_key))
+    lane_positions_count = sum(1 for p in positions.all() if p.lane == lane)
+    
+    if lane_positions_count >= max_lane_positions and symbol not in positions.positions:
+        reasons.append(f"max_{lane}_positions_reached")
+        return {"decision": "block", "size_factor": 0.0, "reasons": reasons, "replace_symbol": None, "replace_reason": None}
 
     if positions.count() >= config.max_open_positions and symbol not in positions.positions:
         replacement = _select_replacement_candidate(

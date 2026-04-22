@@ -24,11 +24,15 @@ function Wait-HttpReady {
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
     while ((Get-Date) -lt $deadline) {
         try {
-            $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5
-            if ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 500) {
+            $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5 -Headers @{ "Accept" = "text/event-stream" } -ErrorAction SilentlyContinue
+            if ($null -ne $resp) {
                 return $true
             }
         } catch {
+            if ($null -ne $_.Exception.Response) {
+                return $true
+            }
+            Write-Host "Wait-HttpReady attempt failed: $($_.Exception.Message)"
         }
         Start-Sleep -Seconds 1
     }
@@ -42,6 +46,8 @@ $cloudflaredExe = Get-EnvValue "CLOUDFLARED_EXE" "cloudflared"
 $mcpPublicHostname = Get-EnvValue "MCP_PUBLIC_HOSTNAME" ""
 $mcpTunnelName = Get-EnvValue "MCP_TUNNEL_NAME" ""
 $mcpLocalUrl = "http://${mcpHost}:${mcpPort}"
+
+Write-Host "Checking MCP server at $mcpLocalUrl ..."
 
 if (-not $mcpPublicEnabled) {
     Write-Host "MCP public tunnel disabled. Set MCP_PUBLIC_ENABLED=true to run cloudflared."

@@ -19,7 +19,7 @@ class RegimeState:
 _MACHINES: dict[str, RegimeState] = {}
 _MACHINES_LOCK = Lock()
 _CONFIRM_REQUIRED = 2
-_DWELL_MIN = {"unknown": 0, "bullish": 2, "sideways": 2, "bearish": 2, "volatile": 0}
+_DWELL_MIN = {"unknown": 0, "bullish": 2, "sideways": 2, "bearish": 2, "volatile": 0, "blowoff": 1}
 
 
 def _raw_regime(features: dict[str, Any]) -> str:
@@ -33,6 +33,15 @@ def _raw_regime(features: dict[str, Any]) -> str:
     price = float(features.get("price", 0.0) or 0.0)
     atr_pct = (atr / price) if price > 0.0 else 0.0
 
+    # Blow-off Detection (Macro Dynamic Mandate)
+    # 1h RSI > 85, Dist from EMA26 > 15%, Vertical structure
+    rsi_1h = float(features.get("rsi_1h", 0.0) or 0.0)
+    ema26_dist = float(features.get("dist_ema26_pct", 0.0) or 0.0)
+    blowoff_tag = bool(features.get("blowoff_structure", False))
+    
+    if rsi_1h >= 85.0 or ema26_dist >= 15.0 or blowoff_tag:
+        return "blowoff"
+
     if atr_pct >= 0.03 or rv_mkt >= 0.02:
         return "volatile"
     if regime_7d == "trending" and macro_30d == "bull" and trend_1h > 0 and breadth >= 0.45:
@@ -42,6 +51,18 @@ def _raw_regime(features: dict[str, Any]) -> str:
     if regime_7d == "choppy" or breadth <= 0.40:
         return "sideways"
     return "bullish" if trend_1h > 0 else "sideways"
+
+
+def get_blowoff_adjustments() -> dict[str, Any]:
+    """Return specific settings to apply automatically during/after a blow-off."""
+    return {
+        "AGGRESSION_MODE": "DEFENSIVE",
+        "NEMOTRON_GATE_MIN_VOLUME_RATIO": 2.5,
+        "NEMOTRON_GATE_MIN_NET_EDGE_PCT": 0.5,
+        "EXIT_ATR_STOP_MULT": 3.0, # Wider initial stop for volatility
+        "EXIT_TRAIL_ATR_MULT": 0.5, # Very tight trail to lock in the blow-off top
+        "L1_EXIT_TIGHTEN_MIN_PNL_PCT": 2.0,
+    }
 
 
 def update_regime_state(symbol: str, features: dict[str, Any]) -> dict[str, Any]:

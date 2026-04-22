@@ -15,6 +15,16 @@ def apply_policy_pipeline(symbol: str, features: dict[str, Any]) -> dict[str, An
     lane_filter = apply_lane_filters(enriched)
     regime_state = update_regime_state(symbol, enriched)
     enriched.update(regime_state)
+
+    # --- Automatic Blow-off Protection (Macro Dynamic Rule) ---
+    if symbol in {"BTC/USD", "XBT/USD"} and regime_state.get("regime_state") == "blowoff":
+        from core.policy.regime_state import get_blowoff_adjustments
+        from core.config.runtime import update_runtime_overrides
+        adjustments = get_blowoff_adjustments()
+        update_runtime_overrides(adjustments)
+        enriched["macro_auto_adjust"] = True
+        enriched["macro_auto_adjust_reason"] = "BTC_BLOWOFF_DETECTED"
+
     entry_verification = compute_entry_verification(
         {
             **enriched,

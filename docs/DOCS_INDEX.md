@@ -51,10 +51,10 @@ Suggested reading order for a new operator:
 3. [llm_operating_model.md](llm_operating_model.md)
 4. [trading_playbook.md](trading_playbook.md)
 5. [entry_exit_research.md](entry_exit_research.md)
-6. [funding_readiness_checklist.md](funding_readiness_checklist.md)
+6. [funding_readiness_checklist.md](funding_readiness_checklist.md)      
+7. [MACRO_MARKET_DYNAMICS.md](MACRO_MARKET_DYNAMICS.md)
 
-Suggested reading order for tuning live behavior:
-1. [tuning_audit.md](tuning_audit.md)
+Suggested reading order for tuning live behavior:1. [tuning_audit.md](tuning_audit.md)
 2. [tuning_review.md](tuning_review.md)
 3. [10_10_roadmap.md](10_10_roadmap.md)
 4. [research_action_plan.md](research_action_plan.md)

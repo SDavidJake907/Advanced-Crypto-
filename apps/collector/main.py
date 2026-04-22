@@ -400,10 +400,14 @@ async def _rest_refresh_loop(feed: LiveMarketDataFeed) -> None:
             continue
         stagger_delay = max(REST_REFRESH_INTERVAL_SEC / max(len(symbols), 1) / len(_REST_REFRESH_TIMEFRAMES), 0.1)
         for symbol in symbols:
+            if symbol not in feed.symbols:
+                continue
             # Always refresh fast frames (1m/5m/15m)
             timeframes_to_fetch = dict(_REST_REFRESH_TIMEFRAMES)
             # Also fetch slow frames (1h/7d/30d) if the symbol is missing them
             for tf, iv in _REST_SLOW_TIMEFRAMES.items():
+                if symbol not in feed.symbols:
+                    break
                 if feed.get_ohlc(symbol, tf, limit=1).empty:
                     timeframes_to_fetch[tf] = iv
             for timeframe, interval_min in timeframes_to_fetch.items():

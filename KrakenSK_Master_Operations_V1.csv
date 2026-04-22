@@ -1,0 +1,9 @@
+Phase,Time_AKDT,Mode,Vol_Gate,ATR_Armor,Task,Nemo_Audit
+Asia_Open,16:00 - 00:00,Defense,1.62,1.42,Floor Accumulation (Lowest Low),4h Structural Scan
+London_Open,00:00 - 04:00,Neutral,2.24,1.42,Ignition / Trend Discovery,1h Channel Verification
+Pre_NYC_Pause,04:00 - 05:30,Calibration,Dynamic,1.65,PAUSE TRADER / NEMO TOOL CALL,London End Signature Audit
+NYC_Flush,05:30 - 08:30,Aggressive,3.00,1.42,Momentum Strike (Scrapers),5m RVOL Ignition Scan
+London_Close,08:30,Kill_Switch,N/A,N/A,LIQUIDATE L4 (Mini-Paycheck),Profit Lock Verification
+NYC_Settlement,11:30 - 13:00,Defense,1.62,1.65,Fractal Week 3 Distribution Scan,Daily Close Structural Integrity
+Lane_L1,24/7,Anchor,1.62,1.65,21-Day Hold Strategy,TP Bypass Logic Active
+Lane_L4,NYC_Window,Scraper,3.00,1.42,Session Scalp Strategy,08:30 Kill Switch Logic Active

@@ -607,9 +607,11 @@ class NemotronStrategist:
         universe_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         from core.policy.candidate_packet import build_local_nemotron_candidate_packet
+        from core.config.runtime import get_macro_context
 
         return sanitize_for_json(
             {
+                "macro_context": get_macro_context(),
                 "candidate": build_local_nemotron_candidate_packet(candidate_packet),
                 "reflex": reflex,
                 "portfolio_summary": self._build_portfolio_summary(
@@ -1063,6 +1065,13 @@ class NemotronStrategist:
             lane_candidate = str(lane_supervision.get("lane_candidate", "") or "")
             lane_conflict = bool(lane_supervision.get("lane_conflict", False))
             universe_lane = str(lane_supervision.get("universe_lane", "") or "")
+            session_ctx = c.get("session_context", {}) if isinstance(c.get("session_context", {}), dict) else {}
+            ses_mkt_bias = str(session_ctx.get("session_market_bias", "") or "")
+            ses_strength = float(session_ctx.get("session_bias_strength", 0.0) or 0.0)
+            ses_sym_bias = str(session_ctx.get("symbol_session_bias", "") or "")
+            ses_quality = str(session_ctx.get("symbol_nyc_entry_quality", "") or "")
+            ses_watch = bool(session_ctx.get("symbol_in_watch_list", False))
+            ses_avoid = bool(session_ctx.get("symbol_in_avoid_list", False))
             symbol_lessons = self._memory_store.build_symbol_lesson_block(sym, n=3)
             symbol_lesson_tag = "-"
             if symbol_lessons:
@@ -1082,11 +1091,14 @@ class NemotronStrategist:
                 f"|brk_state:{breakout_state}|trend_stage:{trend_stage}|pbq:{pullback_quality}|vol_cf:{volume_confirmation}|late:{late_move_risk}"
                 f"|candle:{primary_candle}|cbias:{candle_bias}|cstr:{candle_strength:>3.2f}|ccf:{candle_confirmation_score:>3.2f}"
                 f"|lane_sup:{lane_candidate or '-'}|lane_conflict:{'Y' if lane_conflict else 'N'}|univ_lane:{universe_lane or '-'}"
+                f"|ses_mkt:{ses_mkt_bias or '-'}|ses_str:{ses_strength:.2f}|ses_sym:{ses_sym_bias or '-'}|ses_q:{ses_quality or '-'}|ses_watch:{'Y' if ses_watch else 'N'}|ses_avoid:{'Y' if ses_avoid else 'N'}"
                 f"|mem:{symbol_lesson_tag}"
             )
         table = "\n".join(rows)
 
+        from core.config.runtime import get_macro_context
         payload = {
+            "macro_context": get_macro_context(),
             "open_slots": open_slots,
             "max_positions": max_positions,
             "cash_usd": round(cash, 2),

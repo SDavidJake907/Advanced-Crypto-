@@ -1592,9 +1592,9 @@ def slice_features_for_asset(features_batch: dict[str, Any], asset_idx: int, *, 
         "overextended": overextended,
         "breakout_failure_risk": breakout_failure_risk,
         "structure_break_risk": structure_break_risk,
-        "governing_timeframe": "1h" if _lane in {"L1", "L2"} else "15m",
-        "macro_timeframe": "4h",
-        "trigger_timeframe": "5m" if _lane == "L4" else "15m",
+        "governing_timeframe": "1h" if _lane == "L1" else ("15m" if _lane in {"L2", "L3"} else "5m"),
+        "macro_timeframe": "1d" if _lane == "L1" else ("4h" if _lane in {"L2", "L3"} else "1h"),
+        "trigger_timeframe": "1h" if _lane == "L1" else ("15m" if _lane in {"L2", "L3"} else "5m"),
     })
     # Inject universe-assigned lane as universe_lane so it doesn't suppress runtime classification
     # pipeline.py: enriched["lane"] = enriched.get("lane") or classify_lane(...)

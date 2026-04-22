@@ -434,14 +434,34 @@ def review_live_exit_state(
     if position.entry_price is None or position.entry_price <= 0.0 or price <= 0.0:
         return ExitPostureDecision("RUN", "live_state_data_incomplete", 0.0)
 
-    lane = str(position.lane or "L3").upper()
-    pnl_pct = ((price / position.entry_price) - 1.0) * 100.0 if position.side == "LONG" else ((position.entry_price / price) - 1.0) * 100.0
+    lane = str(position.lane or get_symbol_lane(position.symbol)).upper()
+    pnl_pct = (price / position.entry_price - 1.0) * 100.0 if position.side == "LONG" else (1.0 - price / position.entry_price) * 100.0
     momentum_5 = float(features.get("momentum_5", 0.0) or 0.0)
     momentum_14 = float(features.get("momentum_14", 0.0) or 0.0)
-    momentum = float(features.get("momentum", momentum_5) or 0.0)
+    momentum = float(features.get("momentum", 0.0) or 0.0)
+    volume_ratio = float(features.get("volume_ratio", 0.0) or 0.0)
     spread_pct = float(features.get("spread_pct", 0.0) or 0.0)
-    volume_ratio = float(features.get("volume_ratio", 1.0) or 1.0)
     stall_min_hold = float(get_runtime_setting("EXIT_LIVE_STALL_MIN_HOLD_MIN"))
+
+    # --- Global Session Overrides ---
+    session_kill = bool(features.get("session_kill_switch", False))
+    session_tp_bypass = bool(features.get("session_tp_bypass", False))
+    session_phase = str(features.get("session_phase", ""))
+
+    # Hard Kill Switch: 08:30 AKDT Reset
+    if session_kill:
+        if lane == "L4": # Scrapers are liquidated
+            return ExitPostureDecision("EXIT", "session_kill_switch_l4", 1.0)
+        elif pnl_pct < 0.0: # Negative L1-L3 are liquidated to preserve paycheck
+            return ExitPostureDecision("EXIT", "session_kill_switch_neg_lock", 1.0)
+
+    # NYC Power Close: TP Bypass for winners
+    if session_tp_bypass and pnl_pct > 5.0 and momentum_5 > 0:
+        return ExitPostureDecision("RUN", "nyc_power_close_bypass", 0.9)
+
+    # Stale/Never Profited override: be faster in Week 3
+    if features.get("session_sprint_phase") == "Distribution":
+        stall_min_hold = min(stall_min_hold, 15.0)
     stall_max_pnl = float(get_runtime_setting("EXIT_LIVE_STALL_MAX_PNL_PCT"))
     spread_tighten_pct = float(get_runtime_setting("EXIT_LIVE_SPREAD_TIGHTEN_PCT"))
     spread_exit_pct = float(get_runtime_setting("EXIT_LIVE_SPREAD_EXIT_PCT"))
@@ -548,11 +568,14 @@ def evaluate_exit(
     if position.exit_posture == "STALE" and _is_hard_failure_reason(posture_reason):
         return f"exit_posture:{position.exit_posture_reason or 'time_stop'}"
     stop_level = position.trail_stop if position.trail_stop is not None else position.stop_loss
+    stop_min_hold = float(get_runtime_setting("STOP_MIN_HOLD_MIN"))
     min_hold = max(
-        float(get_runtime_setting("STOP_MIN_HOLD_MIN")),
+        stop_min_hold,
         _lane_min_hold_minutes(position),
         _structured_hold_min_minutes(position, {}),
     )
+    # stop_armed is true if the data-driven min_hold is met. 
+    # Since stop_min_hold is now 0.0, this is now governed by structural logic.
     stop_armed = hold_minutes >= min_hold
     if (
         stale_green_block
